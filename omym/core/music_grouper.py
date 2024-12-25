@@ -29,9 +29,7 @@ class MusicGrouper:
         components = [c.strip() for c in path_format.split("/") if c.strip()]
 
         # Validate components
-        invalid_components = [
-            c for c in components if c not in self.SUPPORTED_COMPONENTS
-        ]
+        invalid_components = [c for c in components if c not in self.SUPPORTED_COMPONENTS]
         if invalid_components:
             logger.error(
                 "Unsupported path components: %s. Supported components are: %s",
@@ -56,18 +54,10 @@ class MusicGrouper:
                     "album_artist": metadata.album_artist,
                     "genre": metadata.genre,
                     "year": str(metadata.year) if metadata.year else None,
-                    "track_number": str(metadata.track_number)
-                    if metadata.track_number
-                    else None,
-                    "track_total": str(metadata.track_total)
-                    if metadata.track_total
-                    else None,
-                    "disc_number": str(metadata.disc_number)
-                    if metadata.disc_number
-                    else None,
-                    "disc_total": str(metadata.disc_total)
-                    if metadata.disc_total
-                    else None,
+                    "track_number": str(metadata.track_number) if metadata.track_number else None,
+                    "track_total": str(metadata.track_total) if metadata.track_total else None,
+                    "disc_number": str(metadata.disc_number) if metadata.disc_number else None,
+                    "disc_total": str(metadata.disc_total) if metadata.disc_total else None,
                 }
 
                 # Check if all required components have values
@@ -93,9 +83,7 @@ class MusicGrouper:
 
         return result
 
-    def _get_component_value(
-        self, component: str, metadata: Dict[str, Optional[str]]
-    ) -> str:
+    def _get_component_value(self, component: str, metadata: Dict[str, Optional[str]]) -> str:
         """Get the value for a path component from metadata.
 
         Args:

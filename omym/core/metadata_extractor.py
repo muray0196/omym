@@ -100,9 +100,7 @@ class MetadataExtractor:
             return None
 
     @staticmethod
-    def _get_audio_tuple_value(
-        audio: MutagenTags, key: str
-    ) -> Optional[List[Tuple[int, int]]]:
+    def _get_audio_tuple_value(audio: MutagenTags, key: str) -> Optional[List[Tuple[int, int]]]:
         """Get audio tuple value with proper type casting.
 
         Args:
@@ -161,9 +159,7 @@ class MetadataExtractor:
             )
             track = track_str.split("/") if track_str else [""]
             track_number = int(track[0]) if track and track[0].isdigit() else None
-            track_total = (
-                int(track[1]) if len(track) > 1 and track[1].isdigit() else None
-            )
+            track_total = int(track[1]) if len(track) > 1 and track[1].isdigit() else None
 
             disc_str = MetadataExtractor._safe_get_first(
                 MetadataExtractor._get_audio_tag_value(audio, "discnumber")
@@ -233,9 +229,7 @@ class MetadataExtractor:
             )
             track = track_str.split("/") if track_str else [""]
             track_number = int(track[0]) if track and track[0].isdigit() else None
-            track_total = (
-                int(track[1]) if len(track) > 1 and track[1].isdigit() else None
-            )
+            track_total = int(track[1]) if len(track) > 1 and track[1].isdigit() else None
 
             disc_str = MetadataExtractor._safe_get_first(
                 MetadataExtractor._get_audio_tag_value(audio, "discnumber")
@@ -373,9 +367,7 @@ class MetadataExtractor:
             track_str = MetadataExtractor._get_dsf_tag_value(tag_dict, "TRCK", "")
             track = track_str.split("/") if track_str else [""]
             track_number = int(track[0]) if track and track[0].isdigit() else None
-            track_total = (
-                int(track[1]) if len(track) > 1 and track[1].isdigit() else None
-            )
+            track_total = int(track[1]) if len(track) > 1 and track[1].isdigit() else None
 
             disc_str = MetadataExtractor._get_dsf_tag_value(tag_dict, "TPOS", "")
             disc = disc_str.split("/") if disc_str else [""]
@@ -389,8 +381,7 @@ class MetadataExtractor:
             return TrackMetadata(
                 title=MetadataExtractor._get_dsf_tag_value(tag_dict, "TIT2") or None,
                 artist=MetadataExtractor._get_dsf_tag_value(tag_dict, "TPE1") or None,
-                album_artist=MetadataExtractor._get_dsf_tag_value(tag_dict, "TPE2")
-                or None,
+                album_artist=MetadataExtractor._get_dsf_tag_value(tag_dict, "TPE2") or None,
                 album=MetadataExtractor._get_dsf_tag_value(tag_dict, "TALB") or None,
                 track_number=track_number,
                 track_total=track_total,
