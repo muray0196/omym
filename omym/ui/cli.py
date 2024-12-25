@@ -5,13 +5,6 @@ import logging
 from pathlib import Path
 from typing import Optional, List, Set
 import sys
-from rich.progress import (
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    BarColumn,
-    TaskProgressColumn,
-)
 from rich.console import Console
 from rich.tree import Tree
 from rich.table import Table
@@ -248,55 +241,53 @@ def display_preview(results: List[ProcessResult], base_path: Path, show_db: bool
 def process_files_with_progress(
     processor: MusicProcessor,
     path: Path,
-    interactive: bool = False,
+    interactive: bool = True,
 ) -> List[ProcessResult]:
-    """Process files with a progress bar.
+    """Process files with progress bar.
 
     Args:
-        processor: The music processor instance.
+        processor: Music processor instance.
         path: Path to process.
-        interactive: Whether to ask for confirmation.
+        interactive: Whether to run in interactive mode.
 
     Returns:
-        List of processing results.
+        List of ProcessResult objects.
     """
-    console = Console()
+    # Create console with custom settings
+    console = Console(force_terminal=True)
 
-    # Count total files to process
+    # Count total files
     total_files = sum(
         1
         for f in path.rglob("*")
         if f.is_file() and f.suffix.lower() in processor.SUPPORTED_EXTENSIONS
     )
 
-    if total_files == 0:
-        logger.warning("No supported music files found in directory: %s", path)
-        return []
+    # Create a counter for processed files
+    processed_files = 0
 
-    results: List[ProcessResult] = []
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
-        transient=True,  # This ensures clean exit on interruption
-    ) as progress:
-        task = progress.add_task("[cyan]Processing files...", total=total_files)
+    def update_progress(current: int, total: int) -> None:
+        """Update progress counter.
 
-        def update_progress(current: int, total: int) -> None:
-            progress.update(task, completed=current)
+        Args:
+            current: Current number of files processed.
+            total: Total number of files to process.
+        """
+        nonlocal processed_files
+        if current > processed_files:
+            processed_files = current
+            if total_files > 0:
+                # Create progress message
+                progress = f"[{processed_files}/{total_files}]"
+                # Print progress at the end of the current line
+                console.print(progress, end="\r")
 
-        try:
-            results = processor.process_directory(path, progress_callback=update_progress)
-        except KeyboardInterrupt:
-            progress.stop()
-            logger.info("\nOperation cancelled by user")
-            sys.exit(130)  # Standard exit code for Ctrl+C
-        except Exception as e:
-            progress.stop()
-            logger.error("Error processing directory: %s", e)
-            sys.exit(1)
+    # Process files
+    results = processor.process_directory(path, update_progress)
+
+    # Clear the progress line
+    if total_files > 0:
+        console.print(" " * 20, end="\r")  # Clear any remaining progress display
 
     return results
 
