@@ -19,22 +19,44 @@ class ProcessingBeforeDAO:
         self.conn = conn
 
     def check_file_exists(self, file_hash: str) -> bool:
-        """Check if a file with the given hash exists.
+        """Check if a file with the given hash exists and is in the correct location.
 
         Args:
             file_hash: File hash to check.
 
         Returns:
-            True if file exists, False otherwise.
+            True if file exists and is in the correct location, False otherwise.
         """
         try:
             cursor = self.conn.cursor()
+            # Check if file exists in processing_before and has a matching entry in processing_after
             cursor.execute(
-                "SELECT COUNT(*) FROM processing_before WHERE file_hash = ?",
+                """
+                SELECT pa.target_path
+                FROM processing_before pb
+                LEFT JOIN processing_after pa ON pb.file_hash = pa.file_hash
+                WHERE pb.file_hash = ?
+                """,
                 (file_hash,),
             )
-            count = cursor.fetchone()[0]
-            return count > 0
+            result = cursor.fetchone()
+
+            if not result:
+                return False
+
+            target_path = result[0]
+
+            # If there's no target path in processing_after, file needs to be processed
+            if target_path is None:
+                return False
+
+            # Check if the file exists at the target path
+            target_path_obj = Path(target_path)
+            if not target_path_obj.exists():
+                return False
+
+            return True
+
         except sqlite3.Error as e:
             logger.error("Database error: %s", e)
             return False
