@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Pattern, Union, List
 
 from omym.utils.logger import logger
 
@@ -12,18 +12,18 @@ class Sanitizer:
     """Sanitize file and path names."""
 
     # Characters to be replaced with hyphens (all non-word characters except hyphens)
-    REPLACE_WITH_HYPHEN = re.compile(r"[^\w-]")
+    REPLACE_WITH_HYPHEN: Pattern[str] = re.compile(r"[^\w-]")
 
     # Apostrophes to remove
-    REMOVE_APOSTROPHE = re.compile(r"'")
+    REMOVE_APOSTROPHE: Pattern[str] = re.compile(r"'")
 
     # Multiple consecutive hyphens
-    MULTIPLE_HYPHENS = re.compile(r"-+")
+    MULTIPLE_HYPHENS: Pattern[str] = re.compile(r"-+")
 
     # Maximum lengths (in bytes)
-    MAX_ARTIST_LENGTH = 50
-    MAX_ALBUM_LENGTH = 90
-    MAX_TRACK_LENGTH = 90
+    MAX_ARTIST_LENGTH: int = 50
+    MAX_ALBUM_LENGTH: int = 90
+    MAX_TRACK_LENGTH: int = 90
 
     @classmethod
     def _clean_string(cls, text: str) -> str:
@@ -33,7 +33,12 @@ class Sanitizer:
             text: Text to clean.
 
         Returns:
-            str: Cleaned text.
+            str: Cleaned text with:
+                - Normalized Unicode characters (NFKC)
+                - Removed apostrophes
+                - Special characters replaced with hyphens
+                - Multiple hyphens compressed to single hyphens
+                - No leading or trailing hyphens
         """
         # Normalize using NFKC
         text = unicodedata.normalize("NFKC", text)
@@ -55,7 +60,7 @@ class Sanitizer:
     @classmethod
     def sanitize_string(
         cls,
-        text: Optional[str],
+        text: Optional[Union[str, int, float]],
         max_length: Optional[int] = None,
         preserve_extension: bool = False,
     ) -> str:
@@ -68,12 +73,19 @@ class Sanitizer:
         6. Truncate to max_length bytes if specified
 
         Args:
-            text: String to sanitize.
-            max_length: Maximum length in bytes.
+            text: String or number to sanitize.
+            max_length: Maximum length in bytes, if None no length limit is applied.
             preserve_extension: Whether to preserve the file extension if present.
 
         Returns:
-            str: Sanitized string.
+            str: Sanitized string that is:
+                - Safe for use in file and path names
+                - Within the specified byte length limit if provided
+                - Has preserved file extension if requested and present
+                - Empty string if input is None or contains only special characters
+
+        Raises:
+            Exception: If string sanitization fails for any reason.
         """
         if not text:
             return ""
@@ -120,7 +132,10 @@ class Sanitizer:
             artist_name: Artist name to sanitize.
 
         Returns:
-            str: Sanitized artist name.
+            str: Sanitized artist name that is:
+                - Safe for use in file and path names
+                - Within the MAX_ARTIST_LENGTH byte limit
+                - Empty string if input is None or contains only special characters
         """
         return cls.sanitize_string(artist_name, cls.MAX_ARTIST_LENGTH)
 
@@ -132,7 +147,10 @@ class Sanitizer:
             album_name: Album name to sanitize.
 
         Returns:
-            str: Sanitized album name.
+            str: Sanitized album name that is:
+                - Safe for use in file and path names
+                - Within the MAX_ALBUM_LENGTH byte limit
+                - Empty string if input is None or contains only special characters
         """
         return cls.sanitize_string(album_name, cls.MAX_ALBUM_LENGTH)
 
@@ -144,7 +162,10 @@ class Sanitizer:
             track_name: Track name to sanitize.
 
         Returns:
-            str: Sanitized track name, or 'Unknown-Title' if the track name is empty.
+            str: Sanitized track name that is:
+                - Safe for use in file and path names
+                - Within the MAX_TRACK_LENGTH byte limit
+                - 'Unknown-Title' if input is None or contains only special characters
         """
         sanitized = cls.sanitize_string(track_name, cls.MAX_TRACK_LENGTH)
         return sanitized if sanitized else "Unknown-Title"
@@ -157,11 +178,18 @@ class Sanitizer:
             path: Path to sanitize.
 
         Returns:
-            Path: Sanitized path.
+            Path: Sanitized path where:
+                - Each component is safe for use in file and path names
+                - Drive and root are preserved for absolute paths
+                - Empty components are removed
+                - File extension is preserved for the last component
+
+        Raises:
+            Exception: If path sanitization fails for any reason.
         """
         try:
             parts = list(path.parts)
-            sanitized_parts = []
+            sanitized_parts: List[str] = []
 
             # Handle absolute paths
             if path.is_absolute():
@@ -202,7 +230,9 @@ class Sanitizer:
             title: The track title to sanitize.
 
         Returns:
-            str: The sanitized track title.
+            str: Sanitized track title that is:
+                - Safe for use in file and path names
+                - 'Unknown-Title' if input is None or contains only special characters
         """
         if not title:
             return "Unknown-Title"

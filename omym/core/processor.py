@@ -5,7 +5,8 @@ import shutil
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Dict, Any
+from sqlite3 import Connection
 
 from omym.core.metadata import TrackMetadata
 from omym.core.metadata_extractor import MetadataExtractor
@@ -23,7 +24,18 @@ from omym.utils.logger import logger
 
 @dataclass
 class ProcessResult:
-    """Result of processing a music file."""
+    """Result of processing a music file.
+
+    Attributes:
+        source_path: Original path of the file.
+        target_path: New path after processing, if successful.
+        success: Whether the processing was successful.
+        error_message: Error message if processing failed.
+        dry_run: Whether this was a dry run (no actual file operations).
+        file_hash: SHA-256 hash of the file content.
+        metadata: Extracted metadata from the file.
+        artist_id: Generated artist ID if available.
+    """
 
     source_path: Path
     target_path: Optional[Path] = None
@@ -39,10 +51,10 @@ class MusicProcessor:
     """Process music files by extracting metadata and organizing them."""
 
     # Supported music file extensions
-    SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".m4a", ".dsf"}
+    SUPPORTED_EXTENSIONS: Set[str] = {".mp3", ".flac", ".m4a", ".dsf"}
 
     # Size of chunks to read when calculating file hash
-    HASH_CHUNK_SIZE = 8192  # 8KB chunks
+    HASH_CHUNK_SIZE: int = 8192  # 8KB chunks
 
     def __init__(self, base_path: Path, dry_run: bool = False):
         """Initialize the processor.
@@ -57,6 +69,10 @@ class MusicProcessor:
         # Initialize database manager and DAOs
         self.db_manager = DatabaseManager()
         self.db_manager.connect()
+
+        if not self.db_manager.conn:
+            raise RuntimeError("Failed to connect to database")
+
         self.artist_cache_dao = ArtistCacheDAO(self.db_manager.conn)
         self.processing_before_dao = ProcessingBeforeDAO(self.db_manager.conn)
         self.processing_after_dao = ProcessingAfterDAO(self.db_manager.conn)
@@ -65,29 +81,46 @@ class MusicProcessor:
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_cache_dao)
         self.file_name_generator = FileNameGenerator(self.artist_id_generator)
 
-    def __enter__(self):
-        """Context manager entry."""
+    def __enter__(self) -> "MusicProcessor":
+        """Context manager entry.
+
+        Returns:
+            MusicProcessor: The processor instance.
+        """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[Exception],
+        exc_tb: Optional[Any],
+    ) -> None:
+        """Context manager exit.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Exception traceback if an exception occurred.
+        """
         if exc_type:
-            self.db_manager.rollback()
+            if self.db_manager.conn:
+                self.db_manager.conn.rollback()
         else:
-            self.db_manager.commit()
-        self.db_manager.disconnect()
+            if self.db_manager.conn:
+                self.db_manager.conn.commit()
+        self.db_manager.close()
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of a file.
 
         Args:
-            file_path: Path to the file.
+            file_path: Path to the file to hash.
 
         Returns:
-            str: Hexadecimal hash string.
+            str: Hexadecimal hash string of the file content.
 
         Raises:
-            IOError: If file cannot be read.
+            IOError: If the file cannot be read.
         """
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
@@ -99,10 +132,11 @@ class MusicProcessor:
         """Check if a file with the same hash already exists.
 
         Args:
-            file_hash: Hash of the file to check.
+            file_hash: SHA-256 hash of the file to check.
 
         Returns:
-            Optional[Path]: Path to existing file if found, None otherwise.
+            Optional[Path]: Path to existing file if found with the same hash,
+                None if no duplicate exists.
         """
         # Check processing_before table for the hash
         files = self.processing_before_dao.get_all_files()
@@ -125,12 +159,13 @@ class MusicProcessor:
 
         Args:
             file_path: Original path to the file.
-            file_hash: Hash of the file content.
-            metadata: Extracted metadata.
-            target_path: Target path after processing.
+            file_hash: SHA-256 hash of the file content.
+            metadata: Extracted metadata from the file.
+            target_path: Target path where the file will be moved.
 
         Returns:
-            bool: True if successful, False otherwise.
+            bool: True if the file state was saved successfully,
+                False if either insert operation failed.
         """
         try:
             # Save pre-processing state
@@ -155,10 +190,11 @@ class MusicProcessor:
         """Find an available path by adding a sequence number if necessary.
 
         Args:
-            target_path: Initial target path.
+            target_path: Initial target path to check.
 
         Returns:
-            Path: Available path with sequence number if needed.
+            Path: Available path, either the original if it doesn't exist,
+                or a new path with a sequence number appended.
         """
         if not target_path.exists():
             return target_path
@@ -178,10 +214,14 @@ class MusicProcessor:
         """Process a single music file.
 
         Args:
-            file_path: Path to the music file.
+            file_path: Path to the music file to process.
 
         Returns:
-            ProcessResult: Result of the processing.
+            ProcessResult: Result of the processing operation, containing:
+                - Original and target paths
+                - Success status and any error message
+                - File hash and extracted metadata
+                - Generated artist ID if available
         """
         try:
             # Create result object

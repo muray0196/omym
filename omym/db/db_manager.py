@@ -3,7 +3,7 @@
 import sqlite3
 from pathlib import Path
 from importlib import resources
-from typing import Optional
+from typing import Optional, Any
 
 from omym.utils.logger import logger
 
@@ -88,13 +88,28 @@ class DatabaseManager:
             logger.error("Failed to close database connection: %s", e)
             raise
 
-    def __enter__(self):
-        """Enter context manager."""
+    def __enter__(self) -> "DatabaseManager":
+        """Enter context manager.
+
+        Returns:
+            DatabaseManager: The database manager instance.
+        """
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager."""
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[Exception],
+        exc_tb: Optional[Any],
+    ) -> None:
+        """Exit context manager.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Exception traceback if an exception occurred.
+        """
         try:
             if self.conn:
                 if exc_type is None:

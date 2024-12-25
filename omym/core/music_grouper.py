@@ -1,7 +1,7 @@
 """Music file grouping functionality."""
 
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional
 
 from omym.core.metadata import TrackMetadata
 from omym.core.metadata_extractor import MetadataExtractor
@@ -17,7 +17,7 @@ class MusicGrouper:
 
     def group_by_path_format(
         self, files: List[Path], path_format: str
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> Dict[str, Dict[str, Optional[str]]]:
         """Group files based on the specified path format.
 
         Args:
@@ -25,9 +25,10 @@ class MusicGrouper:
             path_format: Format string (e.g., "AlbumArtist/Album").
 
         Returns:
-            Dict[str, Dict[str, str]]: Dictionary mapping file hashes to metadata.
+            Dict[str, Dict[str, Optional[str]]]: Dictionary mapping file paths to metadata.
+                The metadata dictionary contains optional string values for each metadata field.
         """
-        result: Dict[str, Dict[str, str]] = {}
+        result: Dict[str, Dict[str, Optional[str]]] = {}
         components = [c.strip() for c in path_format.split("/") if c.strip()]
 
         for file_path in files:
@@ -39,7 +40,7 @@ class MusicGrouper:
                     continue
 
                 # Convert metadata to dictionary
-                metadata_dict = {
+                metadata_dict: Dict[str, Optional[str]] = {
                     "title": metadata.title,
                     "artist": metadata.artist,
                     "album": metadata.album,
@@ -81,22 +82,24 @@ class MusicGrouper:
 
         return result
 
-    def _get_component_value(self, component: str, metadata: Dict[str, str]) -> str:
+    def _get_component_value(
+        self, component: str, metadata: Dict[str, Optional[str]]
+    ) -> str:
         """Get the value for a path component from metadata.
 
         Args:
             component: Component name (e.g., "AlbumArtist").
-            metadata: File metadata.
+            metadata: File metadata dictionary with optional string values.
 
         Returns:
-            str: Component value.
+            str: Component value, empty string if not found.
         """
         if component == "AlbumArtist":
-            return metadata.get("album_artist") or metadata.get("artist", "")
+            return metadata.get("album_artist") or metadata.get("artist") or ""
         elif component == "Album":
-            return metadata.get("album", "")
+            return metadata.get("album") or ""
         elif component == "Genre":
-            return metadata.get("genre", "")
+            return metadata.get("genre") or ""
         else:
             logger.warning(f"Unknown path component: {component}")
             return ""

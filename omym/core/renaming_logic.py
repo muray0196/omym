@@ -1,7 +1,7 @@
 """Renaming logic functionality."""
 
 import re
-from typing import Optional
+from typing import Optional, Tuple, Pattern, List
 from pathlib import Path
 from unidecode import unidecode
 import langid
@@ -9,6 +9,7 @@ import pykakasi
 
 from omym.core.sanitizer import Sanitizer
 from omym.core.metadata import TrackMetadata
+from omym.db.dao_artist_cache import ArtistCacheDAO
 from omym.utils.logger import logger
 
 
@@ -16,32 +17,32 @@ class ArtistIdGenerator:
     """Generate artist IDs."""
 
     # Characters to keep in the ID (alphanumeric and hyphens)
-    KEEP_CHARS = re.compile(r"[^A-Z0-9-]")
+    KEEP_CHARS: Pattern[str] = re.compile(r"[^A-Z0-9-]")
 
     # Vowels to remove (except for the first character of each word)
-    VOWELS = re.compile(r"[AEIOU]")
+    VOWELS: Pattern[str] = re.compile(r"[AEIOU]")
 
     # Padding character for short IDs
-    PADDING_CHAR = "X"
+    PADDING_CHAR: str = "X"
 
     # ID length
-    ID_LENGTH = 5
+    ID_LENGTH: int = 5
 
     # Default ID for when generation fails
-    DEFAULT_ID = "NOART"
+    DEFAULT_ID: str = "NOART"
 
     # Initialize pykakasi converter
     _kakasi = pykakasi.Kakasi()
 
     @classmethod
-    def _process_word(cls, word: str) -> tuple[str, str]:
+    def _process_word(cls, word: str) -> Tuple[str, str]:
         """Process a single word by keeping its first character and removing vowels from the rest.
 
         Args:
             word: A word to process.
 
         Returns:
-            tuple[str, str]: A tuple containing:
+            Tuple[str, str]: A tuple containing:
                 - The processed word with vowels removed except for the first character
                 - The original word (for fallback if the processed word is too short)
         """
@@ -69,7 +70,7 @@ class ArtistIdGenerator:
             text: Japanese text to transliterate.
 
         Returns:
-            str: Transliterated text.
+            str: Transliterated text in uppercase Latin characters.
         """
         try:
             # Convert to romaji and uppercase
@@ -101,7 +102,10 @@ class ArtistIdGenerator:
             artist_name: The artist name to generate an ID for.
 
         Returns:
-            str: A 5-character artist ID.
+            str: A 5-character artist ID, either:
+                - A generated ID based on the artist name
+                - "NOART" if the input is empty/None
+                - "XXXXX" if no valid characters remain after processing
         """
         try:
             # Return DEFAULT_ID if artist_name is empty or None
@@ -135,7 +139,9 @@ class ArtistIdGenerator:
 
             # Split into words and process each word
             words = name.split("-")
-            processed_results = [cls._process_word(word) for word in words]
+            processed_results: List[Tuple[str, str]] = [
+                cls._process_word(word) for word in words
+            ]
 
             # Try with vowels removed
             processed_words = [result[0] for result in processed_results]
@@ -162,7 +168,7 @@ class ArtistIdGenerator:
 class CachedArtistIdGenerator:
     """Generate and cache artist IDs."""
 
-    def __init__(self, dao):
+    def __init__(self, dao: ArtistCacheDAO):
         """Initialize generator with a DAO.
 
         Args:
@@ -181,7 +187,10 @@ class CachedArtistIdGenerator:
             artist_name: The artist name to generate an ID for.
 
         Returns:
-            str: A 5-character artist ID.
+            str: A 5-character artist ID, either:
+                - A cached ID if found in the database
+                - A newly generated ID if not found in cache
+                - "NOART" if the input is empty/None or an error occurs
         """
         try:
             # Return DEFAULT_ID if artist_name is empty or None
@@ -236,7 +245,9 @@ class FileNameGenerator:
             metadata: Track metadata to generate file name from.
 
         Returns:
-            str: Generated file name.
+            str: Generated file name with the appropriate format and extension.
+                If any required fields are missing, they will be replaced with
+                placeholder values (e.g., "XX" for missing track numbers).
         """
         try:
             # Generate artist ID

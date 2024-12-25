@@ -3,7 +3,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Union
 
 from omym.core.music_grouper import MusicGrouper
 from omym.core.path_generator import PathGenerator, PathInfo
@@ -14,7 +14,16 @@ logger = logging.getLogger(__name__)
 
 
 def format_text_output(path_infos: List[PathInfo]) -> str:
-    """Format path information as text."""
+    """Format path information as text.
+
+    Args:
+        path_infos: List of path information objects to format.
+
+    Returns:
+        str: Formatted text output with one line per file, including:
+            - File hash and relative path
+            - Any warnings indented on the next line
+    """
     output = []
     for info in path_infos:
         line = f"{info.file_hash}: {info.relative_path}"
@@ -25,7 +34,17 @@ def format_text_output(path_infos: List[PathInfo]) -> str:
 
 
 def format_json_output(path_infos: List[PathInfo]) -> str:
-    """Format path information as JSON."""
+    """Format path information as JSON.
+
+    Args:
+        path_infos: List of path information objects to format.
+
+    Returns:
+        str: JSON-formatted string containing an array of objects with:
+            - file_hash: The file's content hash
+            - relative_path: The target path relative to base directory
+            - warnings: List of warning messages, if any
+    """
     data = [
         {
             "file_hash": info.file_hash,
@@ -40,18 +59,41 @@ def format_json_output(path_infos: List[PathInfo]) -> str:
 def preview_files(
     path: Path,
     format_str: str,
-    output_format: str = "text",
+    output_format: Literal["text", "json"] = "text",
 ) -> int:
-    """Preview how files would be organized."""
+    """Preview how files would be organized.
+
+    Args:
+        path: Path to file or directory to process.
+        format_str: Format string specifying the organization structure.
+        output_format: Output format, either "text" or "json".
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure).
+
+    Note:
+        Uses an in-memory database for preview operations to avoid
+        modifying the actual database.
+    """
     try:
-        with DatabaseManager(":memory:") as db_manager:
+        # Use None for db_path to create in-memory database
+        with DatabaseManager(db_path=None) as db_manager:
+            if not db_manager.conn:
+                logger.error("Failed to connect to in-memory database")
+                return 1
+
             # Initialize components
-            filter_dao = FilterDAO(db_manager)
+            filter_dao = FilterDAO(db_manager.conn)
             music_grouper = MusicGrouper()
-            path_generator = PathGenerator(filter_dao)
+            path_generator = PathGenerator(db_manager.conn, base_path=path)
 
             # Register hierarchies from format string
-            filter_dao.register_hierarchies(format_str)
+            hierarchies = format_str.split("/")
+            for hierarchy in hierarchies:
+                if hierarchy.strip():
+                    filter_dao.insert_hierarchy(
+                        hierarchy.strip(), priority=len(filter_dao.get_hierarchies())
+                    )
 
             # Process files and generate paths
             if path.is_file():
@@ -73,5 +115,5 @@ def preview_files(
             return 0
 
     except Exception as e:
-        logger.error(f"Failed to preview files: {e}")
+        logger.error("Failed to preview files: %s", e)
         return 1
