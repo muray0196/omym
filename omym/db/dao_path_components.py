@@ -1,7 +1,7 @@
 """Data access object for path components."""
 
-from typing import List, Optional, Dict
-from pathlib import Path
+from typing import List, Optional
+from sqlite3 import Connection
 
 from omym.core.path_components import ComponentValue
 from omym.utils.logger import logger
@@ -10,7 +10,7 @@ from omym.utils.logger import logger
 class PathComponentDAO:
     """Data access object for path components."""
 
-    def __init__(self, conn):
+    def __init__(self, conn: Connection):
         """Initialize DAO.
 
         Args:

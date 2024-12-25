@@ -156,7 +156,7 @@ class ProcessingBeforeDAO:
                 ORDER BY file_path
                 """
             )
-            results = []
+            results: List[Tuple[Path, str, TrackMetadata]] = []
             for row in cursor.fetchall():
                 file_path = Path(row[0])
                 file_hash = row[1]

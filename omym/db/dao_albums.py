@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass
+from sqlite3 import Connection
 
 from omym.utils.logger import logger
 
@@ -30,7 +31,7 @@ class TrackPosition:
 class AlbumDAO:
     """Data access object for album management."""
 
-    def __init__(self, conn):
+    def __init__(self, conn: Connection):
         """Initialize DAO.
 
         Args:
@@ -190,7 +191,7 @@ class AlbumDAO:
         if not tracks:
             return False, ["No tracks found in album"]
 
-        warnings = []
+        warnings: List[str] = []
         disc_tracks: Dict[int, List[int]] = {}
 
         # Group tracks by disc
