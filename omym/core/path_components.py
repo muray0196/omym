@@ -64,16 +64,12 @@ class AlbumArtistComponent(PathComponent):
         Returns:
             ComponentValue: Album artist value with metadata.
         """
-        album_artist = (
-            metadata.album_artist if metadata.album_artist else metadata.artist
-        )
+        album_artist = metadata.album_artist if metadata.album_artist else metadata.artist
         if not album_artist:
             album_artist = "Unknown-Artist"
 
         sanitized = Sanitizer.sanitize_artist_name(album_artist)
-        return ComponentValue(
-            value=sanitized, order=self.order, type=self.component_type
-        )
+        return ComponentValue(value=sanitized, order=self.order, type=self.component_type)
 
     @property
     def component_type(self) -> str:
@@ -99,9 +95,7 @@ class AlbumComponent(PathComponent):
         """
         album = metadata.album if metadata.album else "Unknown-Album"
         sanitized = Sanitizer.sanitize_album_name(album)
-        return ComponentValue(
-            value=sanitized, order=self.order, type=self.component_type
-        )
+        return ComponentValue(value=sanitized, order=self.order, type=self.component_type)
 
     @property
     def component_type(self) -> str:
@@ -139,9 +133,7 @@ class PathComponentFactory:
         return None
 
     @classmethod
-    def register_component(
-        cls, type_name: str, component_class: type[PathComponent]
-    ) -> None:
+    def register_component(cls, type_name: str, component_class: type[PathComponent]) -> None:
         """Register a new component type.
 
         Args:

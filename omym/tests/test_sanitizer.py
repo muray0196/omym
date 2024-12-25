@@ -1,7 +1,7 @@
 """Tests for file and path name sanitization functionality."""
 
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import Optional
 
 import pytest
 
@@ -103,10 +103,7 @@ class TestSanitizer:
     def test_length_truncation(self):
         """Test string truncation to maximum length."""
         long_string = "a" * 100
-        assert (
-            len(Sanitizer.sanitize_string(long_string, max_length=10).encode("utf-8"))
-            <= 10
-        )
+        assert len(Sanitizer.sanitize_string(long_string, max_length=10).encode("utf-8")) <= 10
 
     def test_artist_name_length(self):
         """Test artist name length limitation."""

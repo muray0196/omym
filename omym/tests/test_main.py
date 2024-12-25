@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Callable, Any
 
 import pytest
 from pytest_mock import MockerFixture
@@ -46,9 +46,7 @@ def mock_metadata(mocker: MockerFixture) -> TrackMetadata:
         disc_total=1,
         file_extension=".mp3",
     )
-    mocker.patch(
-        "omym.core.metadata_extractor.MetadataExtractor.extract", return_value=metadata
-    )
+    mocker.patch("omym.core.metadata_extractor.MetadataExtractor.extract", return_value=metadata)
     return metadata
 
 
@@ -65,14 +63,14 @@ def test_main_module_entry_point(
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
 
-    # Import the module
-    import omym.__main__
+    # Import and execute the module
+    import omym.__main__ as main_module
 
-    # Execute the code in __main__ block
-    if hasattr(omym.__main__, "__main_block__"):  # type: ignore[attr-defined]
-        omym.__main__.__main_block__()  # type: ignore[attr-defined]
+    if hasattr(main_module, "__main_block__"):
+        main_block: Callable[[], Any] = getattr(main_module, "__main_block__")
+        main_block()
     else:
-        omym.__main__.main()
+        main_module.main()
 
 
 def test_main_script_entry_point(
@@ -88,14 +86,14 @@ def test_main_script_entry_point(
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
 
-    # Import the module
-    import omym.main
+    # Import and execute the module
+    import omym.main as main_module
 
-    # Execute the code in __main__ block
-    if hasattr(omym.main, "__main_block__"):  # type: ignore[attr-defined]
-        omym.main.__main_block__()  # type: ignore[attr-defined]
+    if hasattr(main_module, "__main_block__"):
+        main_block: Callable[[], Any] = getattr(main_module, "__main_block__")
+        main_block()
     else:
-        omym.main.main()
+        main_module.main()
 
 
 def test_main_module_import(
@@ -111,8 +109,10 @@ def test_main_module_import(
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
 
-    # Import the module
-    import omym.__main__
+    # Import and use the module
+    import omym.__main__ as main_module
+
+    assert hasattr(main_module, "main")
 
 
 def test_main_script_import(
@@ -128,5 +128,7 @@ def test_main_script_import(
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
 
-    # Import the module
-    import omym.main
+    # Import and use the module
+    import omym.main as main_module
+
+    assert hasattr(main_module, "main")

@@ -1,22 +1,15 @@
 """Tests for the album management system."""
 
 import sqlite3
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import Dict, Optional
 
 import pytest
 
-from omym.core.album_manager import AlbumManager, AlbumGroup
-from omym.db.dao_albums import AlbumInfo
-
-if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
-    from sqlite3 import Connection
+from omym.core.album_manager import AlbumManager
 
 
 @pytest.fixture
-def conn() -> "sqlite3.Connection":
+def conn() -> sqlite3.Connection:
     """Create a test database connection.
 
     Returns:
@@ -52,7 +45,7 @@ def conn() -> "sqlite3.Connection":
 
 
 @pytest.fixture
-def album_manager(conn: "sqlite3.Connection") -> AlbumManager:
+def album_manager(conn: sqlite3.Connection) -> AlbumManager:
     """Create a test album manager.
 
     Args:
@@ -208,5 +201,6 @@ def test_get_latest_year(album_manager: AlbumManager) -> None:
     }
     file_hashes = {"hash1", "hash2", "hash3", "hash4"}
 
-    year = album_manager._get_latest_year(file_hashes, files)
+    # pylint: disable=protected-access
+    year = album_manager._get_latest_year(file_hashes, files)  # type: ignore
     assert year == 2021

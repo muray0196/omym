@@ -1,18 +1,12 @@
 """Tests for metadata extraction functionality."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import pytest
 from pytest_mock import MockerFixture
 
 from omym.core.metadata_extractor import MetadataExtractor, TrackMetadata
-
-if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.monkeypatch import MonkeyPatch
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.capture import CaptureFixture
 
 
 @pytest.fixture

@@ -126,9 +126,7 @@ class PathGenerator:
 
         # Generate paths for each group
         for group_values, file_hashes in file_groups.items():
-            group_paths = self._generate_group_paths(
-                hierarchies, group_values, file_hashes
-            )
+            group_paths = self._generate_group_paths(hierarchies, group_values, file_hashes)
             paths.extend(group_paths)
 
         return paths

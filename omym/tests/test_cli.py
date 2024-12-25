@@ -1,16 +1,13 @@
 """Tests for CLI functionality."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 from pytest_mock import MockerFixture
+from _pytest.capture import CaptureFixture
 
 from omym.core.processor import ProcessResult
 from omym.ui.cli import process_command
-
-if TYPE_CHECKING:
-    from _pytest.capture import CaptureFixture
 
 
 def test_process_single_file(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -233,7 +230,9 @@ def test_missing_command() -> None:
 
 
 def test_process_directory_interactive(
-    tmp_path: Path, mocker: MockerFixture, capsys: "CaptureFixture[str]"
+    tmp_path: Path,
+    mocker: MockerFixture,
+    capsys: CaptureFixture[str],
 ) -> None:
     """Test processing a directory in interactive mode.
 

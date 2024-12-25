@@ -2,6 +2,7 @@
 
 import sqlite3
 from pathlib import Path
+from typing import Generator
 
 import pytest
 
@@ -10,8 +11,12 @@ from omym.core.filtering import FilterDAO
 
 
 @pytest.fixture
-def conn():
-    """Create a test database connection."""
+def conn() -> Generator[sqlite3.Connection, None, None]:
+    """Create a test database connection.
+
+    Yields:
+        sqlite3.Connection: A test database connection.
+    """
     conn = sqlite3.connect(":memory:")
     with conn:
         conn.executescript(
@@ -102,23 +107,43 @@ def conn():
             CREATE INDEX IF NOT EXISTS idx_artist_cache_name ON artist_cache(artist_name);
             """
         )
-    return conn
+    yield conn
+    conn.close()
 
 
 @pytest.fixture
-def filter_dao(conn):
-    """Create a test filter DAO."""
+def filter_dao(conn: sqlite3.Connection) -> FilterDAO:
+    """Create a test filter DAO.
+
+    Args:
+        conn: A test database connection.
+
+    Returns:
+        FilterDAO: A test filter DAO.
+    """
     return FilterDAO(conn)
 
 
 @pytest.fixture
-def path_generator(conn):
-    """Create a test path generator."""
+def path_generator(conn: sqlite3.Connection) -> PathGenerator:
+    """Create a test path generator.
+
+    Args:
+        conn: A test database connection.
+
+    Returns:
+        PathGenerator: A test path generator.
+    """
     return PathGenerator(conn, Path("/test/music"))
 
 
-def test_generate_paths_single_file(path_generator, filter_dao):
-    """Test generating paths for a single file."""
+def test_generate_paths_single_file(path_generator: PathGenerator, filter_dao: FilterDAO) -> None:
+    """Test generating paths for a single file.
+
+    Args:
+        path_generator: A test path generator.
+        filter_dao: A test filter DAO.
+    """
     # Register hierarchies
     hierarchy_id = filter_dao.insert_hierarchy("AlbumArtist", 0)
     assert hierarchy_id is not None
@@ -137,8 +162,15 @@ def test_generate_paths_single_file(path_generator, filter_dao):
     assert len(path_info.warnings) == 0
 
 
-def test_generate_paths_multiple_hierarchies(path_generator, filter_dao):
-    """Test generating paths with multiple hierarchies."""
+def test_generate_paths_multiple_hierarchies(
+    path_generator: PathGenerator, filter_dao: FilterDAO
+) -> None:
+    """Test generating paths with multiple hierarchies.
+
+    Args:
+        path_generator: A test path generator.
+        filter_dao: A test filter DAO.
+    """
     # Register hierarchies
     artist_id = filter_dao.insert_hierarchy("AlbumArtist", 0)
     assert artist_id is not None
@@ -160,8 +192,15 @@ def test_generate_paths_multiple_hierarchies(path_generator, filter_dao):
     assert len(path_info.warnings) == 0
 
 
-def test_generate_paths_multiple_files(path_generator, filter_dao):
-    """Test generating paths for multiple files."""
+def test_generate_paths_multiple_files(
+    path_generator: PathGenerator, filter_dao: FilterDAO
+) -> None:
+    """Test generating paths for multiple files.
+
+    Args:
+        path_generator: A test path generator.
+        filter_dao: A test filter DAO.
+    """
     # Register hierarchies
     artist_id = filter_dao.insert_hierarchy("AlbumArtist", 0)
     assert artist_id is not None
@@ -193,8 +232,15 @@ def test_generate_paths_multiple_files(path_generator, filter_dao):
     assert len(path2.warnings) == 0
 
 
-def test_generate_paths_missing_values(path_generator, filter_dao):
-    """Test generating paths with missing values."""
+def test_generate_paths_missing_values(
+    path_generator: PathGenerator, filter_dao: FilterDAO
+) -> None:
+    """Test generating paths with missing values.
+
+    Args:
+        path_generator: A test path generator.
+        filter_dao: A test filter DAO.
+    """
     # Register hierarchies
     artist_id = filter_dao.insert_hierarchy("AlbumArtist", 0)
     assert artist_id is not None
@@ -210,7 +256,11 @@ def test_generate_paths_missing_values(path_generator, filter_dao):
     assert len(paths) == 0  # No paths generated due to missing album value
 
 
-def test_generate_paths_no_hierarchies(path_generator):
-    """Test generating paths with no hierarchies."""
+def test_generate_paths_no_hierarchies(path_generator: PathGenerator) -> None:
+    """Test generating paths with no hierarchies.
+
+    Args:
+        path_generator: A test path generator.
+    """
     paths = path_generator.generate_paths()
     assert len(paths) == 0

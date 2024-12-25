@@ -84,7 +84,28 @@ Project Structure
     ├── utils/               # Utilities
     │   └── logger.py           # Logging configuration
     │
-    └── tests/               # Test suite
+    ├── tests/               # Test suite
+    │   ├── test_renaming_logic.py
+    │   ├── test_processor.py
+    │   ├── test_cli.py
+    │   └── test_path_generator.py
+    │
+    └── docs/                # Documentation
+        ├── index.rst
+        ├── overview.rst
+        ├── architecture.rst
+        ├── user/
+        │   ├── index.rst
+        │   ├── quickstart.rst
+        │   ├── installation.rst
+        │   ├── usage.rst
+        │   ├── configuration.rst
+        │   └── troubleshooting.rst
+        └── developer/
+            ├── index.rst
+            ├── contributing.rst
+            ├── testing.rst
+            └── code_style.rst
 
 Dependencies
 -----------

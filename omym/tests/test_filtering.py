@@ -1,22 +1,15 @@
 """Tests for the filtering engine."""
 
 import sqlite3
-from typing import TYPE_CHECKING, Dict, Generator, Optional, cast
+from typing import Dict, Optional
 
 import pytest
 
 from omym.core.filtering import FilterDAO, HierarchicalFilter
 
-if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.monkeypatch import MonkeyPatch
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.capture import CaptureFixture
-    from sqlite3 import Connection
-
 
 @pytest.fixture
-def conn() -> "sqlite3.Connection":
+def conn() -> sqlite3.Connection:
     """Create a test database connection.
 
     Returns:
@@ -48,7 +41,7 @@ def conn() -> "sqlite3.Connection":
 
 
 @pytest.fixture
-def filter_dao(conn: "sqlite3.Connection") -> FilterDAO:
+def filter_dao(conn: sqlite3.Connection) -> FilterDAO:
     """Create a test filter DAO.
 
     Args:
@@ -61,7 +54,7 @@ def filter_dao(conn: "sqlite3.Connection") -> FilterDAO:
 
 
 @pytest.fixture
-def filter_engine(conn: "sqlite3.Connection") -> HierarchicalFilter:
+def filter_engine(conn: sqlite3.Connection) -> HierarchicalFilter:
     """Create a test filter engine.
 
     Args:
