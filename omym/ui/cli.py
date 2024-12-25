@@ -3,7 +3,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Set
 import sys
 from rich.progress import (
     Progress,
@@ -16,7 +16,6 @@ from rich.console import Console
 from rich.prompt import Confirm
 from rich.tree import Tree
 from rich.table import Table
-from rich import print as rich_print
 
 from omym.core.processor import MusicProcessor, ProcessResult
 from omym.utils.logger import logger, setup_logger
@@ -139,7 +138,7 @@ def display_db_preview(results: List[ProcessResult]) -> None:
     after_table.add_column("Status", style="yellow")
 
     # Collect unique artists and their IDs
-    artists_seen = set()
+    artists_seen: Set[str] = set()
     for result in results:
         if result.metadata and result.metadata.artist:
             artist = result.metadata.artist
@@ -273,7 +272,7 @@ def process_files_with_progress(
     # Count total files
     total_files = sum(1 for _ in path.rglob("*") if _.is_file())
 
-    results = []
+    results: List[ProcessResult] = []
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -330,9 +329,9 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
 
     # Load configuration
     if args.config:
-        config = Config.load(Path(args.config))
+        Config.load(Path(args.config))
     else:
-        config = Config.load()  # Load default config
+        Config.load()  # Load default config
 
     # Create processor with appropriate base path
     processor = MusicProcessor(
