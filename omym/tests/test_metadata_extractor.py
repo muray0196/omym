@@ -1,12 +1,18 @@
 """Tests for metadata extraction functionality."""
 
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import pytest
 from pytest_mock import MockerFixture
 
 from omym.core.metadata_extractor import MetadataExtractor, TrackMetadata
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.capture import CaptureFixture
 
 
 @pytest.fixture
@@ -66,12 +72,12 @@ def mock_m4a_metadata() -> Dict[str, Union[List[str], List[Tuple[int, int]]]]:
 class TestMetadataExtractor:
     """Test cases for MetadataExtractor."""
 
-    def test_unsupported_format(self):
+    def test_unsupported_format(self) -> None:
         """Test extraction with unsupported file format."""
         with pytest.raises(ValueError, match="Unsupported file format"):
             MetadataExtractor.extract(Path("test.wav"))
 
-    def test_nonexistent_file(self):
+    def test_nonexistent_file(self) -> None:
         """Test extraction with nonexistent file."""
         with pytest.raises(FileNotFoundError):
             MetadataExtractor.extract(Path("nonexistent.mp3"))
@@ -196,7 +202,7 @@ class TestMetadataExtractor:
                 track_total=12,
                 disc_number=1,
                 disc_total=2,
-                year="2023",
+                year=2023,
                 file_extension=".m4a",
             ),
         )
@@ -215,7 +221,7 @@ class TestMetadataExtractor:
             assert metadata.track_total == 12
             assert metadata.disc_number == 1
             assert metadata.disc_total == 2
-            assert metadata.year == "2023"
+            assert metadata.year == 2023
         finally:
             # Clean up
             test_file.unlink()

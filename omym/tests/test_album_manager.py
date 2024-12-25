@@ -1,17 +1,27 @@
 """Tests for the album management system."""
 
 import sqlite3
-from typing import Dict, Set
+from typing import TYPE_CHECKING, Dict, Optional
 
 import pytest
 
 from omym.core.album_manager import AlbumManager, AlbumGroup
 from omym.db.dao_albums import AlbumInfo
 
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from pytest_mock.plugin import MockerFixture
+    from sqlite3 import Connection
+
 
 @pytest.fixture
-def conn():
-    """Create a test database connection."""
+def conn() -> "sqlite3.Connection":
+    """Create a test database connection.
+
+    Returns:
+        Connection: SQLite database connection.
+    """
     conn = sqlite3.connect(":memory:")
     with conn:
         conn.executescript(
@@ -42,14 +52,21 @@ def conn():
 
 
 @pytest.fixture
-def album_manager(conn):
-    """Create a test album manager."""
+def album_manager(conn: "sqlite3.Connection") -> AlbumManager:
+    """Create a test album manager.
+
+    Args:
+        conn: SQLite database connection.
+
+    Returns:
+        AlbumManager: Album manager instance.
+    """
     return AlbumManager(conn)
 
 
-def test_process_files_single_album(album_manager):
+def test_process_files_single_album(album_manager: AlbumManager) -> None:
     """Test processing files for a single album."""
-    files = {
+    files: Dict[str, Dict[str, Optional[str]]] = {
         "hash1": {
             "album": "Test Album",
             "album_artist": "Test Artist",
@@ -85,9 +102,9 @@ def test_process_files_single_album(album_manager):
     assert len(group.warnings) == 0
 
 
-def test_process_files_multiple_albums(album_manager):
+def test_process_files_multiple_albums(album_manager: AlbumManager) -> None:
     """Test processing files for multiple albums."""
-    files = {
+    files: Dict[str, Dict[str, Optional[str]]] = {
         "hash1": {
             "album": "Album 1",
             "album_artist": "Artist 1",
@@ -124,9 +141,9 @@ def test_process_files_multiple_albums(album_manager):
     assert len(group2.warnings) == 0
 
 
-def test_process_files_missing_metadata(album_manager):
+def test_process_files_missing_metadata(album_manager: AlbumManager) -> None:
     """Test processing files with missing metadata."""
-    files = {
+    files: Dict[str, Dict[str, Optional[str]]] = {
         "hash1": {
             "album": "Test Album",
             "album_artist": "Test Artist",
@@ -155,9 +172,9 @@ def test_process_files_missing_metadata(album_manager):
     assert len(group.warnings) == 1  # Missing track position warning for hash1
 
 
-def test_process_files_track_continuity(album_manager):
+def test_process_files_track_continuity(album_manager: AlbumManager) -> None:
     """Test track continuity checking."""
-    files = {
+    files: Dict[str, Dict[str, Optional[str]]] = {
         "hash1": {
             "album": "Test Album",
             "album_artist": "Test Artist",
@@ -181,9 +198,9 @@ def test_process_files_track_continuity(album_manager):
     assert len(group.warnings) == 1  # Missing track 2 warning
 
 
-def test_get_latest_year(album_manager):
+def test_get_latest_year(album_manager: AlbumManager) -> None:
     """Test getting the latest year from files."""
-    files = {
+    files: Dict[str, Dict[str, Optional[str]]] = {
         "hash1": {"year": "2020"},
         "hash2": {"year": "2021"},
         "hash3": {"year": "invalid"},

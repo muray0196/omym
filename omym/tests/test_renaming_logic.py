@@ -1,10 +1,9 @@
 """Test renaming logic functionality."""
 
-import pytest
 from pathlib import Path
-from unidecode import unidecode
-import langid
-import pykakasi
+from typing import TYPE_CHECKING
+
+import pytest
 
 from omym.core.renaming_logic import (
     ArtistIdGenerator,
@@ -14,6 +13,11 @@ from omym.core.renaming_logic import (
 from omym.core.metadata import TrackMetadata
 from omym.db.dao_artist_cache import ArtistCacheDAO
 from omym.db.db_manager import DatabaseManager
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from pytest_mock.plugin import MockerFixture
 
 
 class TestArtistIdGenerator:
@@ -120,6 +124,10 @@ def test_cached_artist_id_generator(tmp_path: Path):
     db_path = tmp_path / "test.db"
     db_manager = DatabaseManager(db_path)
     db_manager.connect()
+
+    if not db_manager.conn:
+        raise RuntimeError("Failed to connect to database")
+
     dao = ArtistCacheDAO(db_manager.conn)
 
     # Create generator instance

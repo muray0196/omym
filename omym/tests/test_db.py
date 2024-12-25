@@ -2,26 +2,38 @@
 
 import sqlite3
 from pathlib import Path
+from typing import TYPE_CHECKING, Generator, cast
 
 import pytest
 
 from omym.db.db_manager import DatabaseManager
 
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.capture import CaptureFixture
+
 
 @pytest.fixture
-def db_manager():
-    """Create a database manager with in-memory database."""
+def db_manager() -> Generator[DatabaseManager, None, None]:
+    """Create a database manager with in-memory database.
+
+    Yields:
+        DatabaseManager: Database manager instance.
+    """
     with DatabaseManager() as manager:
         yield manager
 
 
-def test_database_transaction(db_manager):
+def test_database_transaction(db_manager: DatabaseManager) -> None:
     """Test database transaction management."""
     # Begin transaction
     db_manager.begin_transaction()
 
     # Execute some queries
-    cursor = db_manager.conn.cursor()
+    conn = cast(sqlite3.Connection, db_manager.conn)
+    cursor = cast(sqlite3.Cursor, conn.cursor())
     cursor.execute(
         """
         INSERT INTO processing_before (file_hash, file_path)
@@ -48,13 +60,14 @@ def test_database_transaction(db_manager):
     assert row[1] == "test_path"
 
 
-def test_database_rollback(db_manager):
+def test_database_rollback(db_manager: DatabaseManager) -> None:
     """Test database rollback."""
     # Begin transaction
     db_manager.begin_transaction()
 
     # Execute some queries
-    cursor = db_manager.conn.cursor()
+    conn = cast(sqlite3.Connection, db_manager.conn)
+    cursor = cast(sqlite3.Cursor, conn.cursor())
     cursor.execute(
         """
         INSERT INTO processing_before (file_hash, file_path)
@@ -79,13 +92,14 @@ def test_database_rollback(db_manager):
     assert row is None
 
 
-def test_database_connection(tmp_path):
+def test_database_connection(tmp_path: Path) -> None:
     """Test database connection with file path."""
     db_path = tmp_path / "test.db"
 
     # First connection: create table and insert data
     with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
+        conn = cast(sqlite3.Connection, conn)
+        cursor = cast(sqlite3.Cursor, conn.cursor())
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS processing_before (
@@ -120,7 +134,8 @@ def test_database_connection(tmp_path):
 
     # Second connection: verify data
     with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
+        conn = cast(sqlite3.Connection, conn)
+        cursor = cast(sqlite3.Cursor, conn.cursor())
         # Ensure the table exists
         cursor.execute(
             """
@@ -146,7 +161,8 @@ def test_database_connection(tmp_path):
 
     # Now test with DatabaseManager
     with DatabaseManager(db_path) as manager:
-        cursor = manager.conn.cursor()
+        conn = cast(sqlite3.Connection, manager.conn)
+        cursor = cast(sqlite3.Cursor, conn.cursor())
         cursor.execute(
             """
             SELECT file_hash, file_path
@@ -161,7 +177,7 @@ def test_database_connection(tmp_path):
         assert row[1] == "test_path"
 
 
-def test_database_error_handling():
+def test_database_error_handling() -> None:
     """Test database error handling."""
     # Try to connect with invalid path
     with pytest.raises(sqlite3.OperationalError):
@@ -171,16 +187,18 @@ def test_database_error_handling():
     # Try to execute invalid SQL
     with pytest.raises(sqlite3.OperationalError):
         with DatabaseManager() as manager:
-            cursor = manager.conn.cursor()
+            conn = cast(sqlite3.Connection, manager.conn)
+            cursor = cast(sqlite3.Cursor, conn.cursor())
             cursor.execute("INVALID SQL")
 
 
-def test_database_migration(tmp_path):
+def test_database_migration(tmp_path: Path) -> None:
     """Test database migration."""
     db_path = tmp_path / "test.db"
     with DatabaseManager(db_path) as manager:
         # Verify tables exist
-        cursor = manager.conn.cursor()
+        conn = cast(sqlite3.Connection, manager.conn)
+        cursor = cast(sqlite3.Cursor, conn.cursor())
         cursor.execute(
             """
             SELECT name

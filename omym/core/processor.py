@@ -1,12 +1,10 @@
 """Music file processing functionality."""
 
-import os
 import shutil
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Set, Dict, Any
-from sqlite3 import Connection
+from typing import List, Optional, Set, Any
 
 from omym.core.metadata import TrackMetadata
 from omym.core.metadata_extractor import MetadataExtractor

@@ -1,12 +1,19 @@
 """Tests for music file processing functionality."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING, List, cast
 
 import pytest
 from pytest_mock import MockerFixture
 
 from omym.core.metadata import TrackMetadata
 from omym.core.processor import MusicProcessor, ProcessResult
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.capture import CaptureFixture
 
 
 @pytest.fixture
@@ -63,7 +70,7 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test successful processing of a single music file."""
         # Arrange
         source_file = tmp_path / "test.mp3"
@@ -91,7 +98,7 @@ class TestMusicProcessor:
 
     def test_process_file_metadata_error(
         self, mocker: MockerFixture, processor: MusicProcessor, tmp_path: Path
-    ):
+    ) -> None:
         """Test handling of metadata extraction error."""
         # Arrange
         source_file = tmp_path / "test.mp3"
@@ -107,6 +114,7 @@ class TestMusicProcessor:
 
         # Assert
         assert result.success is False
+        assert result.error_message is not None
         assert "Metadata extraction failed" in result.error_message
         assert source_file.exists()
 
@@ -116,7 +124,7 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test dry run mode."""
         # Arrange
         source_file = tmp_path / "test.mp3"
@@ -134,6 +142,7 @@ class TestMusicProcessor:
         assert result.success is True
         assert result.dry_run is True
         assert source_file.exists()
+        assert result.target_path is not None
         assert not result.target_path.exists()
 
     def test_process_directory(
@@ -142,7 +151,7 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test processing of a directory."""
         # Arrange
         source_dir = tmp_path / "source"
@@ -190,7 +199,8 @@ class TestMusicProcessor:
         file_results = [
             r
             for r in results
-            if r.source_path.suffix.lower() in processor.SUPPORTED_EXTENSIONS
+            if r.source_path is not None
+            and r.source_path.suffix.lower() in processor.SUPPORTED_EXTENSIONS
         ]
         assert len(file_results) == len(music_files)
 
@@ -198,6 +208,7 @@ class TestMusicProcessor:
             assert result.success is True
             assert result.target_path is not None
             assert result.target_path.exists()
+            assert result.source_path is not None
             assert not result.source_path.exists()  # Original file should be moved
 
         # Non-music files should still exist
@@ -205,7 +216,7 @@ class TestMusicProcessor:
             assert (source_dir / name).exists()
 
         # Verify that only supported files were processed
-        processed_files = {r.source_path.name for r in file_results}
+        processed_files = {cast(Path, r.source_path).name for r in file_results}
         assert processed_files == set(music_files)
 
     def test_file_extension_safety(
@@ -214,12 +225,12 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test that file extensions are preserved and not modified during processing."""
         # Arrange
         extensions = [".mp3", ".flac", ".m4a"]
-        test_files = []
-        expected_files = []
+        test_files: List[Path] = []
+        expected_files: List[Path] = []
 
         for i, ext in enumerate(extensions, 1):
             # Create test file with specific extension
@@ -253,6 +264,7 @@ class TestMusicProcessor:
 
             # Verify extension preservation
             assert result.success is True
+            assert result.target_path is not None
             assert result.target_path == expected_file
             assert result.target_path.suffix == ext
             assert expected_file.exists()
@@ -264,7 +276,7 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test that duplicate file handling is safe and preserves all files."""
         # Arrange
         source_file = tmp_path / "test.mp3"
@@ -337,7 +349,7 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test that sequence numbers are correctly added to file names."""
         # Arrange
         source_files = [tmp_path / f"test{i}.mp3" for i in range(3)]
@@ -382,7 +394,7 @@ class TestMusicProcessor:
         processor: MusicProcessor,
         metadata: TrackMetadata,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test that file operations (move/delete) only affect intended files."""
         # Arrange
         # Create directory structure
@@ -415,6 +427,7 @@ class TestMusicProcessor:
 
         # Assert
         assert result.success is True
+        assert result.target_path is not None
         assert result.target_path.exists()
         assert not music_file.exists()  # Only the processed file should be moved
 

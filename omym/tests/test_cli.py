@@ -1,10 +1,18 @@
 """Tests for CLI functionality."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
 import pytest
 from pytest_mock import MockerFixture
 
 from omym.ui.cli import process_command
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.capture import CaptureFixture
 
 
 def test_process_single_file(tmp_path: Path, mocker: MockerFixture) -> None:

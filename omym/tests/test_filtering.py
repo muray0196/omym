@@ -1,16 +1,27 @@
 """Tests for the filtering engine."""
 
 import sqlite3
-from typing import Dict, Set
+from typing import TYPE_CHECKING, Dict, Generator, Optional, cast
 
 import pytest
 
 from omym.core.filtering import FilterDAO, HierarchicalFilter
 
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.capture import CaptureFixture
+    from sqlite3 import Connection
+
 
 @pytest.fixture
-def conn():
-    """Create a test database connection."""
+def conn() -> "sqlite3.Connection":
+    """Create a test database connection.
+
+    Returns:
+        Connection: SQLite database connection.
+    """
     conn = sqlite3.connect(":memory:")
     with conn:
         conn.executescript(
@@ -37,25 +48,39 @@ def conn():
 
 
 @pytest.fixture
-def filter_dao(conn):
-    """Create a test filter DAO."""
+def filter_dao(conn: "sqlite3.Connection") -> FilterDAO:
+    """Create a test filter DAO.
+
+    Args:
+        conn: SQLite database connection.
+
+    Returns:
+        FilterDAO: Filter DAO instance.
+    """
     return FilterDAO(conn)
 
 
 @pytest.fixture
-def filter_engine(conn):
-    """Create a test filter engine."""
+def filter_engine(conn: "sqlite3.Connection") -> HierarchicalFilter:
+    """Create a test filter engine.
+
+    Args:
+        conn: SQLite database connection.
+
+    Returns:
+        HierarchicalFilter: Filter engine instance.
+    """
     return HierarchicalFilter(conn)
 
 
-def test_register_hierarchies(filter_engine):
+def test_register_hierarchies(filter_engine: HierarchicalFilter) -> None:
     """Test registering filter hierarchies."""
     path_format = "AlbumArtist/Album"
     warnings = filter_engine.register_hierarchies(path_format)
     assert len(warnings) == 0
 
 
-def test_process_file(filter_engine):
+def test_process_file(filter_engine: HierarchicalFilter) -> None:
     """Test processing a file."""
     # Register hierarchies
     path_format = "AlbumArtist/Album"
@@ -64,7 +89,7 @@ def test_process_file(filter_engine):
 
     # Process file
     file_hash = "test_hash"
-    metadata = {
+    metadata: Dict[str, Optional[str]] = {
         "albumartist": "Test Artist",
         "album": "Test Album",
     }
@@ -72,7 +97,7 @@ def test_process_file(filter_engine):
     assert len(warnings) == 0
 
 
-def test_process_file_missing_values(filter_engine):
+def test_process_file_missing_values(filter_engine: HierarchicalFilter) -> None:
     """Test processing a file with missing values."""
     # Register hierarchies
     path_format = "AlbumArtist/Album"
@@ -81,7 +106,7 @@ def test_process_file_missing_values(filter_engine):
 
     # Process file with missing values
     file_hash = "test_hash"
-    metadata = {
+    metadata: Dict[str, Optional[str]] = {
         "albumartist": "Test Artist",
         # Missing album
     }
@@ -90,7 +115,7 @@ def test_process_file_missing_values(filter_engine):
     assert "Missing value for hierarchy 'Album'" in warnings[0]
 
 
-def test_process_file_unknown_hierarchy(filter_engine):
+def test_process_file_unknown_hierarchy(filter_engine: HierarchicalFilter) -> None:
     """Test processing a file with unknown hierarchy."""
     # Register hierarchies
     path_format = "Unknown"
@@ -99,7 +124,7 @@ def test_process_file_unknown_hierarchy(filter_engine):
 
     # Process file with unknown hierarchy
     file_hash = "test_hash"
-    metadata = {
+    metadata: Dict[str, Optional[str]] = {
         "unknown": "Test Value",
     }
     warnings = filter_engine.process_file(file_hash, metadata)
