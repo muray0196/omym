@@ -77,4 +77,3 @@ tests/*.py[cod]
 uv.lock
 .cursorrules
 .cursorignore
-pyproject.toml
