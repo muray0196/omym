@@ -223,10 +223,10 @@ class MusicProcessor:
                 - File hash and extracted metadata
                 - Generated artist ID if available
         """
-        try:
-            # Create result object
-            result = ProcessResult(source_path=file_path, dry_run=self.dry_run)
+        # Initialize result at the start
+        result = ProcessResult(source_path=file_path, dry_run=self.dry_run)
 
+        try:
             # Calculate file hash
             file_hash = self._calculate_file_hash(file_path)
             result.file_hash = file_hash
