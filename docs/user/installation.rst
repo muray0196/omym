@@ -1,17 +1,17 @@
 Installation Guide
 =================
 
-This guide covers the installation of OMYM and its dependencies.
+This guide covers the installation process for OMYM.
 
-System Requirements
-----------------
+Requirements
+----------
 
-- Python 3.13 or higher
-- SQLite 3.x
-- Sufficient disk space for your music library
+- Python 3.8 or later
+- pip (Python package installer)
+- 50MB free disk space
 
-Installation Methods
------------------
+Installation Steps
+---------------
 
 Using pip
 ~~~~~~~~
@@ -22,81 +22,59 @@ The recommended way to install OMYM is using pip:
 
     pip install omym
 
-Using uv (Recommended)
-~~~~~~~~~~~~~~~~~~~
-
-For better dependency management, you can use uv:
-
-.. code-block:: bash
-
-    uv pip install omym
-
-From Source
-~~~~~~~~~
-
-To install from source:
-
-1. Clone the repository:
-
-   .. code-block:: bash
-
-       git clone https://github.com/yourusername/omym.git
-       cd omym
-
-2. Install using uv:
-
-   .. code-block:: bash
-
-       uv pip install -e .
-
-Development Installation
----------------------
-
-For development purposes, install with additional dependencies:
-
-.. code-block:: bash
-
-    uv pip install -e ".[dev]"
-
-This includes:
-- Testing tools (pytest)
-- Linting tools (ruff)
-- Documentation tools (sphinx)
+This will install OMYM and all its dependencies.
 
 Verifying Installation
 -------------------
 
-1. Check version:
+After installation, verify that OMYM is working:
 
+.. code-block:: bash
+
+    omym --version
+
+You should see the version number of OMYM displayed.
+
+Test the installation with:
+
+.. code-block:: bash
+
+    omym --help
+
+This should display the help message with available commands.
+
+Environment Setup
+--------------
+
+While not required, you can set up environment variables for convenience:
+
+1. Output Directory
+   
    .. code-block:: bash
 
-       omym --version
+       export OMYM_OUTPUT_DIR=~/OrganizedMusic
 
-2. Run self-test:
-
+2. Default Format
+   
    .. code-block:: bash
 
-       omym test
+       export OMYM_FILE_FORMAT="{artist}/{album}/{track:02d} {title}"
 
-Dependencies
-----------
+3. Log Level
+   
+   .. code-block:: bash
 
-Core Dependencies
-~~~~~~~~~~~~~~
+       export OMYM_LOG_LEVEL=INFO
 
-- mutagen: Audio metadata handling
-- rich: Terminal UI
-- pykakasi: Japanese text processing
-- langid: Language detection
-- unidecode: Unicode character handling
+Add these to your shell's startup file (e.g., .bashrc, .zshrc) to make them permanent.
 
-Optional Dependencies
-~~~~~~~~~~~~~~~~~
+Supported Platforms
+----------------
 
-Development tools:
-- pytest: Testing framework
-- ruff: Code linting and formatting
-- sphinx: Documentation generation
+OMYM is tested on:
+- Linux (Ubuntu, Fedora, Debian)
+- macOS (10.15+)
+- Windows 10/11
 
 Troubleshooting
 -------------
@@ -104,33 +82,39 @@ Troubleshooting
 Common Issues
 ~~~~~~~~~~~
 
-1. Python Version
+1. Python Version Error
    
-   If you see a Python version error:
-   - Check your Python version: ``python --version``
-   - Ensure you have Python 3.13+
+   If you see an error about Python version:
+   - Check your Python version: `python --version`
+   - Install Python 3.8 or later if needed
 
-2. SQLite Issues
+2. Permission Error
    
-   If you encounter SQLite errors:
-   - Check SQLite installation: ``sqlite3 --version``
-   - Ensure write permissions in the database directory
+   If you get permission errors:
+   - Use `pip install --user omym`
+   - Or use a virtual environment
 
-3. Dependency Conflicts
+3. Missing Dependencies
    
-   If you see dependency conflicts:
-   - Try using a virtual environment
-   - Use uv for better dependency resolution
+   If dependencies fail to install:
+   - Update pip: `pip install --upgrade pip`
+   - Try installing dependencies manually
 
 Getting Help
-----------
+~~~~~~~~~~
 
 If you encounter issues:
+1. Check the error message carefully
+2. Look for similar issues on GitHub
+3. File a new issue if needed
 
-1. Check the :doc:`troubleshooting` guide
-2. Search existing GitHub issues
-3. Create a new issue with:
-   - Your system information
-   - Installation method used
-   - Complete error message
-   - Steps to reproduce 
+Uninstallation
+------------
+
+To remove OMYM:
+
+.. code-block:: bash
+
+    pip uninstall omym
+
+This will remove OMYM while keeping your music files and configurations intact. 

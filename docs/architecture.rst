@@ -6,10 +6,6 @@ This document describes the high-level architecture of OMYM.
 System Components
 ---------------
 
-.. image:: _static/architecture.png
-   :alt: OMYM Architecture Diagram
-   :align: center
-
 The system is composed of several key components that work together:
 
 Command Line Interface (CLI)
@@ -18,9 +14,10 @@ Command Line Interface (CLI)
 The CLI layer handles user interaction and command processing:
 
 - Command parsing and validation
-- Progress reporting
-- Interactive confirmations
-- Error reporting
+- Progress reporting with rich library
+- Interactive confirmations for file operations
+- Detailed error reporting with context
+- Dry-run mode for safe preview
 
 Core Processing
 ~~~~~~~~~~~~~
@@ -29,23 +26,26 @@ The core processing components handle the main business logic:
 
 1. Metadata Extraction
    - File format detection (MP3, FLAC, M4A, DSF)
-   - Metadata parsing with mutagen
-   - Data normalization and validation
-   - Missing metadata handling
+   - Type-safe metadata parsing with mutagen
+   - Comprehensive data validation
+   - Robust error handling for missing metadata
+   - Custom type definitions for external libraries
+   - Modular metadata handling with dedicated package structure
 
 2. Path Generation
-   - Pattern parsing and validation
-   - Artist ID generation and caching
+   - Type-safe pattern parsing and validation
    - Directory structure generation
-   - File name generation
+   - File name generation with sanitization
    - Collision detection and resolution
+   - Path component validation
+   - Robust path and filename sanitization
 
 3. Album Management
-   - Track grouping by album
+   - Type-safe track grouping by album
    - Track position validation
    - Track continuity checking
    - Multi-disc album handling
-   - Year determination from metadata
+   - Intelligent year determination
 
 Database Layer
 ~~~~~~~~~~~~
@@ -58,45 +58,53 @@ The database layer manages persistent state:
    - albums: Album information
    - track_positions: Track numbering
    - artist_cache: Cached artist IDs
+   - filter_hierarchies: Organization rules
+   - filter_values: Applied filters
 
 2. Management
-   - SQLite connection handling
-   - Transaction management
-   - Migration system
-   - Data access objects (DAOs)
+   - Type-safe SQLite connection handling
+   - Transaction management for data integrity
+   - Data access objects (DAOs) with type checking
+   - Error handling with rollback support
+   - Database schema migrations for versioning
 
 3. Caching
-   - Artist ID caching
-   - Processing state caching
+   - Artist ID caching for consistency
+   - Processing state tracking
    - Album information caching
+   - Filter hierarchy caching
 
 Processing Flow
 -------------
 
 1. Input Processing
    - File/directory path validation
-   - Command option parsing
-   - Configuration loading
-   - Database initialization
+   - Command option parsing with type checking
+   - Configuration loading and validation
+   - Database initialization and migration
+   - Path and filename sanitization
 
 2. Metadata Analysis
-   - File format detection
-   - Metadata extraction
-   - Data validation
-   - Artist ID generation
+   - Type-safe file format detection
+   - Metadata extraction with error handling
+   - Data validation and normalization
+   - Artist ID generation and caching
+   - Modular metadata processing
 
 3. Organization
-   - Album grouping
+   - Type-safe album grouping
    - Track position validation
    - Directory path generation
-   - File name generation
-   - Collision detection
+   - File name generation with collision handling
+   - Filter application
+   - Path sanitization
 
 4. Execution
-   - Preview generation
+   - Preview generation in dry-run mode
    - Database state tracking
-   - File operations
-   - Error handling
+   - Atomic file operations
+   - Comprehensive error handling
+   - Progress reporting
 
 Error Handling
 ------------
@@ -104,22 +112,28 @@ Error Handling
 The system implements a robust error handling strategy:
 
 1. Validation Errors
-   - Path validation
-   - Metadata requirements
-   - Format compatibility
+   - Path validation with type checking
+   - Metadata requirements validation
+   - Format compatibility checking
    - Track position validation
+   - Filter hierarchy validation
+   - Path sanitization validation
 
 2. Processing Errors
-   - Metadata extraction failures
-   - Path generation issues
-   - Database errors
-   - File operation errors
+   - Type-safe metadata extraction
+   - Path generation error handling
+   - Database operation errors
+   - File operation failures
+   - Cache management errors
+   - Sanitization errors
 
 3. System Errors
-   - File system errors
-   - Permission issues
-   - Resource constraints
-   - Database connection issues
+   - File system error handling
+   - Permission issue detection
+   - Resource constraint handling
+   - Database connection error recovery
+   - Type checking errors
+   - Migration errors
 
 Data Flow
 --------
@@ -129,25 +143,34 @@ Data Flow
     Input Files
         │
         ▼
+    Type Validation & Format Detection
+        │
+        ▼
     Metadata Extraction
         │
         ▼
-    Artist ID Generation
+    Data Validation & Normalization
         │
         ▼
-    Album Grouping
+    Artist ID Generation & Caching
+        │
+        ▼
+    Album Grouping & Validation
         │
         ▼
     Track Position Validation
         │
         ▼
-    Path Generation
+    Filter Application
+        │
+        ▼
+    Path Generation & Sanitization
         │
         ▼
     Database State Tracking
         │
         ▼
-    File Operations
+    File Operations (or Preview)
 
 Configuration
 -----------
@@ -156,20 +179,24 @@ The system is configurable through:
 
 1. Command Line Options
    - Path format patterns
-   - Processing modes
-   - Output control
+   - Processing modes (organize, preview)
+   - Output control (quiet, verbose)
    - Dry run mode
+   - Format selection
 
 2. Environment Variables
-   - Database settings
-   - Logging configuration
-   - Default formats
+   - OMYM_OUTPUT_DIR: Output directory
+   - OMYM_FILE_FORMAT: File naming format
+   - OMYM_LOG_LEVEL: Logging configuration
+   - OMYM_DB_PATH: Database location
+   - OMYM_CACHE_DIR: Cache directory
 
-3. Configuration File
-   - Path settings
-   - Japanese text handling
-   - Error handling
-   - Cache settings
+3. Type Safety
+   - Runtime type checking
+   - Configuration validation
+   - Format string validation
+   - Path pattern validation
+   - Sanitization rules validation
 
 Extension Points
 -------------
@@ -177,16 +204,21 @@ Extension Points
 The system can be extended through:
 
 1. Metadata Extractors
-   - Support for additional formats
-   - Custom metadata fields
+   - Support for additional audio formats
+   - Custom metadata field extraction
    - New metadata sources
+   - Type-safe extraction interfaces
+   - Metadata package extensions
 
 2. Path Generators
    - Custom naming patterns
    - Special handling rules
    - New format fields
+   - Type-safe path generation
+   - Custom sanitization rules
 
 3. Filters
    - New hierarchy types
    - Custom filter conditions
+   - Type-safe filter implementations
    - Metadata processors 

@@ -1,302 +1,268 @@
 Troubleshooting Guide
 ==================
 
-This guide helps you diagnose and fix common issues with OMYM.
+This guide helps you resolve common issues when using OMYM.
 
-Installation Issues
-----------------
-
-Python Version Error
-~~~~~~~~~~~~~~~~~
-
-**Problem**: Error about Python version requirement
-
-**Solution**:
-1. Check your Python version:
-   
-   .. code-block:: bash
-
-       python --version
-
-2. Install Python 3.13 or higher
-3. Ensure you're using the correct Python environment
-
-Dependency Errors
-~~~~~~~~~~~~~~
-
-**Problem**: Missing or conflicting dependencies
-
-**Solution**:
-1. Use uv for installation:
-   
-   .. code-block:: bash
-
-       uv pip install omym
-
-2. Install in a fresh virtual environment:
-   
-   .. code-block:: bash
-
-       uv venv
-       source .venv/bin/activate
-       uv pip install omym
-
-Database Issues
--------------
-
-Connection Errors
-~~~~~~~~~~~~~~
-
-**Problem**: Cannot connect to database
-
-**Solution**:
-1. Check database path:
-   
-   .. code-block:: bash
-
-       echo $OMYM_DB_PATH
-
-2. Ensure directory permissions:
-   
-   .. code-block:: bash
-
-       chmod 755 /path/to/database/directory
-
-3. Verify SQLite installation:
-   
-   .. code-block:: bash
-
-       sqlite3 --version
-
-Corruption Issues
-~~~~~~~~~~~~~~
-
-**Problem**: Database corruption messages
-
-**Solution**:
-1. Backup current database
-2. Reset the database:
-   
-   .. code-block:: bash
-
-       omym reset
-
-3. Reprocess your files
-
-Metadata Issues
--------------
+Common Issues
+-----------
 
 Missing Metadata
 ~~~~~~~~~~~~~
 
-**Problem**: Files not processed due to missing metadata
+Problem:
+    Files are skipped or incorrectly organized due to missing metadata.
 
-**Solution**:
-1. Check file metadata:
-   
-   .. code-block:: bash
+Solutions:
+1. Check the original files have proper metadata
+2. Use a metadata editor to add missing information
+3. Use a more lenient format pattern
+4. Check the log file for specific issues
 
-       omym inspect /path/to/file.mp3
+Example:
+    .. code-block:: bash
 
-2. Add missing metadata using a tag editor
-3. Use ``--force`` to process anyway:
-   
-   .. code-block:: bash
+        export OMYM_LOG_LEVEL=DEBUG
+        omym preview ~/Music
 
-       omym organize --force /path/to/music
-
-Invalid Characters
+File Access Issues
 ~~~~~~~~~~~~~~~
 
-**Problem**: Error processing file names with special characters
+Problem:
+    Permission denied or cannot access files.
 
-**Solution**:
-1. Enable character mapping:
-   
-   .. code-block:: toml
+Solutions:
+1. Check file permissions
+2. Verify directory permissions
+3. Run with appropriate user rights
+4. Check file ownership
 
-       [paths]
-       sanitize_names = true
+Example:
+    .. code-block:: bash
 
-2. Add custom character mappings:
-   
-   .. code-block:: toml
-
-       [paths.mapping]
-       "?" = ""
-       "/" = "-"
-
-File System Issues
----------------
-
-Permission Errors
-~~~~~~~~~~~~~~
-
-**Problem**: Cannot read/write files
-
-**Solution**:
-1. Check file permissions:
-   
-   .. code-block:: bash
-
-       ls -l /path/to/music
-
-2. Fix permissions:
-   
-   .. code-block:: bash
-
-       chmod -R u+rw /path/to/music
-
-3. Run as appropriate user
+        ls -l ~/Music
+        chmod -R u+r ~/Music
 
 Path Length Issues
+~~~~~~~~~~~~~~
+
+Problem:
+    File paths are too long for the filesystem.
+
+Solutions:
+1. Use shorter format patterns
+2. Reduce nested directory levels
+3. Use abbreviated metadata
+4. Consider filesystem limitations
+
+Example:
+    .. code-block:: bash
+
+        # Instead of
+        export OMYM_FILE_FORMAT="{artist}/{album} ({year})/{disc:02d}-{track:02d} {title}"
+        # Use
+        export OMYM_FILE_FORMAT="{artist}/{album}/{track:02d} {title}"
+
+Special Characters
 ~~~~~~~~~~~~~~~
 
-**Problem**: Path too long errors
+Problem:
+    Invalid characters in filenames or paths.
 
-**Solution**:
-1. Use shorter format strings:
-   
-   .. code-block:: bash
+Solutions:
+1. Use the :s modifier for safe filenames
+2. Check for unsupported characters
+3. Use simpler format patterns
+4. Enable automatic character replacement
 
-       omym organize --format "{artist:.30}/{album:.30}" /path/to/music
+Example:
+    .. code-block:: bash
 
-2. Enable long path support (Windows):
-   
-   .. code-block:: toml
+        export OMYM_FILE_FORMAT="{artist:s}/{album:s}/{track:02d} {title:s}"
 
-       [paths]
-       enable_long_paths = true
+Multi-disc Albums
+~~~~~~~~~~~~~~
 
-Performance Issues
----------------
+Problem:
+    Incorrect handling of multi-disc albums.
 
-Slow Processing
+Solutions:
+1. Use disc number in format
+2. Check disc metadata
+3. Verify album grouping
+4. Use appropriate separators
+
+Example:
+    .. code-block:: bash
+
+        export OMYM_FILE_FORMAT="{artist}/{album}/Disc {disc:02d}/{track:02d} {title}"
+
+Compilation Albums
+~~~~~~~~~~~~~~
+
+Problem:
+    Various artists albums not organized correctly.
+
+Solutions:
+1. Use album_artist instead of artist
+2. Check compilation flags
+3. Verify artist metadata
+4. Use appropriate format pattern
+
+Example:
+    .. code-block:: bash
+
+        export OMYM_FILE_FORMAT="{album_artist}/{album}/{track:02d} {artist} - {title}"
+
+Database Issues
 ~~~~~~~~~~~~
 
-**Problem**: Processing is unusually slow
+Problem:
+    Database errors or corruption.
 
-**Solution**:
-1. Enable caching:
-   
-   .. code-block:: toml
+Solutions:
+1. Check database permissions
+2. Verify database path
+3. Ensure sufficient disk space
+4. Reset database if necessary
 
-       [cache]
-       enabled = true
-       max_size = 1000
+Example:
+    .. code-block:: bash
 
-2. Optimize database:
-   
-   .. code-block:: bash
+        rm ~/.local/share/omym/omym.db
+        omym organize ~/Music
 
-       omym optimize-db
+Performance Issues
+~~~~~~~~~~~~~~
 
-3. Process in smaller batches
+Problem:
+    Slow processing or high resource usage.
 
-Memory Usage
-~~~~~~~~~~
+Solutions:
+1. Process smaller batches
+2. Use simpler format patterns
+3. Check disk space
+4. Monitor system resources
 
-**Problem**: High memory usage
+Example:
+    .. code-block:: bash
 
-**Solution**:
-1. Reduce cache size:
-   
-   .. code-block:: toml
+        omym organize ~/Music/Album1
+        omym organize ~/Music/Album2
 
-       [cache]
-       max_size = 500
-
-2. Process directories sequentially:
-   
-   .. code-block:: bash
-
-       for dir in */; do
-           omym organize "$dir"
-       done
-
-Japanese Text Issues
------------------
-
-Romanization Problems
-~~~~~~~~~~~~~~~~~
-
-**Problem**: Incorrect romanization of Japanese text
-
-**Solution**:
-1. Configure Japanese settings:
-   
-   .. code-block:: toml
-
-       [japanese]
-       use_romaji = true
-       preserve_spaces = true
-
-2. Add custom mappings:
-   
-   .. code-block:: toml
-
-       [japanese.mapping]
-       "々" = "々"
-       "ヶ" = "ケ"
-
-Logging and Debugging
-------------------
+Debugging
+--------
 
 Enable Debug Logging
 ~~~~~~~~~~~~~~~~
 
-To get more detailed logs:
+Get detailed information about issues:
 
-1. Set log level:
-   
-   .. code-block:: bash
+.. code-block:: bash
 
-       export OMYM_LOG_LEVEL=DEBUG
+    export OMYM_LOG_LEVEL=DEBUG
+    omym organize ~/Music
 
-2. Specify log file:
-   
-   .. code-block:: bash
+Check Log File
+~~~~~~~~~~~
 
-       export OMYM_LOG_FILE=/path/to/omym.log
+View the log file for details:
 
-3. Run with verbose output:
-   
-   .. code-block:: bash
+.. code-block:: bash
 
-       omym organize -v /path/to/music
+    cat ~/.local/share/omym/omym.log
+
+Use Preview Mode
+~~~~~~~~~~~~
+
+Test changes before applying:
+
+.. code-block:: bash
+
+    omym preview ~/Music
+
+Use Verbose Output
+~~~~~~~~~~~~~~
+
+Get more detailed output:
+
+.. code-block:: bash
+
+    omym organize --verbose ~/Music
 
 Common Error Messages
 -----------------
 
-"No such table"
+"Missing Required Metadata"
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Cause:
+    Required metadata fields are missing.
+
+Solution:
+1. Check file metadata
+2. Use metadata editor
+3. Modify format pattern
+4. Check log for details
+
+"Permission Denied"
+~~~~~~~~~~~~~~~
+
+Cause:
+    Insufficient file permissions.
+
+Solution:
+1. Check file ownership
+2. Verify directory permissions
+3. Run with appropriate rights
+4. Use sudo if necessary
+
+"Invalid Format Pattern"
+~~~~~~~~~~~~~~~~~~
+
+Cause:
+    Format string syntax error.
+
+Solution:
+1. Check format syntax
+2. Verify variable names
+3. Check modifier usage
+4. Test with preview mode
+
+"Database Error"
 ~~~~~~~~~~~~
 
-**Problem**: Database table missing
+Cause:
+    Database access or corruption issues.
 
-**Solution**:
-1. Reset database:
-   
-   .. code-block:: bash
+Solution:
+1. Check permissions
+2. Verify disk space
+3. Reset database
+4. Check log file
 
-       omym reset
+Getting Help
+----------
 
-2. Rerun migrations:
-   
-   .. code-block:: bash
+If you still have issues:
 
-       omym migrate
+1. Check Documentation
+   - Read relevant guides
+   - Review format patterns
+   - Check configuration options
 
-"Invalid track position"
-~~~~~~~~~~~~~~~~~~~
+2. Search Issues
+   - Look for similar problems
+   - Check resolved issues
+   - Review workarounds
 
-**Problem**: Track number metadata issues
+3. Report Problems
+   - Provide error messages
+   - Include log output
+   - Describe steps to reproduce
+   - Share configuration
 
-**Solution**:
-1. Check track metadata:
-   
-   .. code-block:: bash
-
-       omym inspect /path/to/file.mp3
-
-2. Fix track numbers in metadata
-3. Use ``--ignore-track-position`` flag 
+4. Contact Support
+   - Open GitHub issue
+   - Provide system details
+   - Share log files
+   - Describe use case 
