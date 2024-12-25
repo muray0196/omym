@@ -13,7 +13,6 @@ from rich.progress import (
     TaskProgressColumn,
 )
 from rich.console import Console
-from rich.prompt import Confirm
 from rich.tree import Tree
 from rich.table import Table
 
@@ -173,9 +172,7 @@ def display_db_preview(results: List[ProcessResult]) -> None:
     console.print(after_table)
 
 
-def display_preview(
-    results: List[ProcessResult], base_path: Path, show_db: bool = False
-) -> None:
+def display_preview(results: List[ProcessResult], base_path: Path, show_db: bool = False) -> None:
     """Display a preview of the planned file organization.
 
     Args:
@@ -194,9 +191,7 @@ def display_preview(
     album_node = None
 
     # Sort results by target path to group by artist/album
-    sorted_results = sorted(
-        [r for r in results if r.target_path], key=lambda r: str(r.target_path)
-    )
+    sorted_results = sorted([r for r in results if r.target_path], key=lambda r: str(r.target_path))
 
     for result in sorted_results:
         if not result.target_path:
@@ -247,9 +242,7 @@ def display_preview(
             console.print(f"[red]Will fail: {failed_count}[/red]")
             for result in results:
                 if not result.success:
-                    console.print(
-                        f"[red]  • {result.source_path}: {result.error_message}[/red]"
-                    )
+                    console.print(f"[red]  • {result.source_path}: {result.error_message}[/red]")
 
 
 def process_files_with_progress(
@@ -269,8 +262,16 @@ def process_files_with_progress(
     """
     console = Console()
 
-    # Count total files
-    total_files = sum(1 for _ in path.rglob("*") if _.is_file())
+    # Count total files to process
+    total_files = sum(
+        1
+        for f in path.rglob("*")
+        if f.is_file() and f.suffix.lower() in processor.SUPPORTED_EXTENSIONS
+    )
+
+    if total_files == 0:
+        logger.warning("No supported music files found in directory: %s", path)
+        return []
 
     results: List[ProcessResult] = []
     with Progress(
@@ -279,26 +280,23 @@ def process_files_with_progress(
         BarColumn(),
         TaskProgressColumn(),
         console=console,
+        transient=True,  # This ensures clean exit on interruption
     ) as progress:
         task = progress.add_task("[cyan]Processing files...", total=total_files)
 
-        for file_path in path.rglob("*"):
-            if not file_path.is_file():
-                continue
+        def update_progress(current: int, total: int) -> None:
+            progress.update(task, completed=current)
 
-            if interactive:
-                if not Confirm.ask(f"Process {file_path}?"):
-                    progress.advance(task)
-                    continue
-
-            result = processor.process_file(file_path)
-            results.append(result)
-            progress.advance(task)
-
-            if not result.success:
-                console.print(
-                    f"[red]Failed to process '{file_path}': {result.error_message}[/red]"
-                )
+        try:
+            results = processor.process_directory(path, progress_callback=update_progress)
+        except KeyboardInterrupt:
+            progress.stop()
+            logger.info("\nOperation cancelled by user")
+            sys.exit(130)  # Standard exit code for Ctrl+C
+        except Exception as e:
+            progress.stop()
+            logger.error("Error processing directory: %s", e)
+            sys.exit(1)
 
     return results
 
@@ -347,20 +345,15 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
             results = [processor.process_file(path)]
         else:  # organize or verify
             if not path.is_dir():
-                logger.error(
-                    "Path must be a directory for '%s' command: %s", args.command, path
-                )
+                logger.error("Path must be a directory for '%s' command: %s", args.command, path)
                 sys.exit(1)
 
-            # Use process_directory directly if quiet mode, dry run, or force is enabled
-            if args.quiet or args.dry_run or args.force:
-                results = processor.process_directory(path)
-            else:
-                results = process_files_with_progress(
-                    processor,
-                    path,
-                    interactive=True,
-                )
+            # Process files with progress bar
+            results = process_files_with_progress(
+                processor,
+                path,
+                interactive=not (args.quiet or args.dry_run or args.force),
+            )
 
         # Display preview in dry-run mode
         if args.dry_run or args.command == "verify":
@@ -370,12 +363,8 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
             console = Console()
             console.print("\n[bold]Processing Summary:[/bold]")
             console.print(f"Total files processed: {len(results)}")
-            console.print(
-                f"[green]Successful: {sum(1 for r in results if r.success)}[/green]"
-            )
-            console.print(
-                f"[red]Failed: {sum(1 for r in results if not r.success)}[/red]"
-            )
+            console.print(f"[green]Successful: {sum(1 for r in results if r.success)}[/green]")
+            console.print(f"[red]Failed: {sum(1 for r in results if not r.success)}[/red]")
 
         # Exit with error code if any failures
         if any(not r.success for r in results):

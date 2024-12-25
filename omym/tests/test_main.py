@@ -50,8 +50,34 @@ def mock_metadata(mocker: MockerFixture) -> TrackMetadata:
     return metadata
 
 
+@pytest.fixture
+def mock_database(mocker: MockerFixture) -> None:
+    """Mock database operations.
+
+    Args:
+        mocker: Pytest mocker fixture.
+    """
+    # Mock database manager
+    mock_db = mocker.patch("omym.core.processor.DatabaseManager")
+    mock_instance = mock_db.return_value
+    mock_instance.connect.return_value = None
+
+    # Mock DAOs
+    mock_before_dao = mocker.patch("omym.core.processor.ProcessingBeforeDAO")
+    mock_before_instance = mock_before_dao.return_value
+    mock_before_instance.insert_file.return_value = True
+    mock_before_instance.check_file_exists.return_value = False
+
+    mock_after_dao = mocker.patch("omym.core.processor.ProcessingAfterDAO")
+    mock_after_instance = mock_after_dao.return_value
+    mock_after_instance.insert_file.return_value = True
+
+
 def test_main_module_entry_point(
-    mocker: MockerFixture, test_file: str, mock_metadata: TrackMetadata
+    mocker: MockerFixture,
+    test_file: str,
+    mock_metadata: TrackMetadata,
+    mock_database: None,
 ) -> None:
     """Test the main entry point when running as a module.
 
@@ -59,6 +85,7 @@ def test_main_module_entry_point(
         mocker: Pytest mocker fixture.
         test_file: Path to test file.
         mock_metadata: Mock metadata fixture.
+        mock_database: Mock database fixture.
     """
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
@@ -74,7 +101,10 @@ def test_main_module_entry_point(
 
 
 def test_main_script_entry_point(
-    mocker: MockerFixture, test_file: str, mock_metadata: TrackMetadata
+    mocker: MockerFixture,
+    test_file: str,
+    mock_metadata: TrackMetadata,
+    mock_database: None,
 ) -> None:
     """Test the main entry point when running as a script.
 
@@ -82,6 +112,7 @@ def test_main_script_entry_point(
         mocker: Pytest mocker fixture.
         test_file: Path to test file.
         mock_metadata: Mock metadata fixture.
+        mock_database: Mock database fixture.
     """
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
@@ -97,7 +128,10 @@ def test_main_script_entry_point(
 
 
 def test_main_module_import(
-    mocker: MockerFixture, test_file: str, mock_metadata: TrackMetadata
+    mocker: MockerFixture,
+    test_file: str,
+    mock_metadata: TrackMetadata,
+    mock_database: None,
 ) -> None:
     """Test importing the main module without running it.
 
@@ -105,6 +139,7 @@ def test_main_module_import(
         mocker: Pytest mocker fixture.
         test_file: Path to test file.
         mock_metadata: Mock metadata fixture.
+        mock_database: Mock database fixture.
     """
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])
@@ -116,7 +151,10 @@ def test_main_module_import(
 
 
 def test_main_script_import(
-    mocker: MockerFixture, test_file: str, mock_metadata: TrackMetadata
+    mocker: MockerFixture,
+    test_file: str,
+    mock_metadata: TrackMetadata,
+    mock_database: None,
 ) -> None:
     """Test importing the main script without running it.
 
@@ -124,6 +162,7 @@ def test_main_script_import(
         mocker: Pytest mocker fixture.
         test_file: Path to test file.
         mock_metadata: Mock metadata fixture.
+        mock_database: Mock database fixture.
     """
     # Mock sys.argv to provide required arguments
     mocker.patch("sys.argv", ["omym", "process", test_file])

@@ -49,8 +49,8 @@ def test_organize_directory(tmp_path: Path, mocker: MockerFixture) -> None:
 
     # Setup mock
     mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
-    mock_instance = mock_processor.return_value
-    mock_instance.process_directory.return_value = []
+    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
+    mock_progress.return_value = []
 
     # Run CLI with quiet mode to avoid stdin interaction
     args = ["organize", str(source_dir), "--quiet"]
@@ -58,7 +58,11 @@ def test_organize_directory(tmp_path: Path, mocker: MockerFixture) -> None:
 
     # Verify
     mock_processor.assert_called_once()
-    mock_instance.process_directory.assert_called_once_with(source_dir)
+    mock_progress.assert_called_once_with(
+        mock_processor.return_value,
+        source_dir,
+        interactive=False,
+    )
 
 
 def test_verify_directory(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -98,17 +102,23 @@ def test_dry_run(tmp_path: Path, mocker: MockerFixture) -> None:
 
     # Setup mock
     mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
+    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
+    mock_progress.return_value = []
 
     # Run CLI with dry-run
     args = ["organize", str(source_dir), "--dry-run"]
     process_command(args)
 
-    # Verify dry-run was passed to processor and process_directory was used
+    # Verify dry-run was passed to processor and process_files_with_progress was used
     mock_processor.assert_called_once_with(
         base_path=source_dir,
         dry_run=True,
     )
-    mock_processor.return_value.process_directory.assert_called_once_with(source_dir)
+    mock_progress.assert_called_once_with(
+        mock_processor.return_value,
+        source_dir,
+        interactive=False,
+    )
 
 
 def test_verbose_logging(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -167,15 +177,19 @@ def test_force_option(tmp_path: Path, mocker: MockerFixture) -> None:
 
     # Setup mock
     mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
-    mock_instance = mock_processor.return_value
-    mock_instance.process_directory.return_value = []
+    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
+    mock_progress.return_value = []
 
     # Run CLI with force flag
     args = ["organize", str(source_dir), "--force"]
     process_command(args)
 
-    # Verify process_directory was used directly
-    mock_instance.process_directory.assert_called_once_with(source_dir)
+    # Verify process_files_with_progress was used with interactive=False
+    mock_progress.assert_called_once_with(
+        mock_processor.return_value,
+        source_dir,
+        interactive=False,
+    )
 
 
 def test_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:

@@ -1,203 +1,135 @@
-"""Data access object for pre-processing state."""
+"""Data access object for processing_before table."""
 
+import sqlite3
 from pathlib import Path
-from sqlite3 import Connection
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from omym.core.metadata import TrackMetadata
 from omym.utils.logger import logger
 
 
 class ProcessingBeforeDAO:
-    """Data access object for pre-processing state.
+    """Data access object for processing_before table."""
 
-    This class manages the storage and retrieval of music file metadata
-    before processing. It ensures that file information is properly tracked
-    and can be accessed throughout the processing pipeline.
-    """
-
-    def __init__(self, conn: Connection):
+    def __init__(self, conn: sqlite3.Connection) -> None:
         """Initialize DAO.
 
         Args:
-            conn: SQLite database connection.
+            conn: Database connection.
         """
         self.conn = conn
 
-    def insert_file(
-        self, file_path: Path, file_hash: str, metadata: TrackMetadata
-    ) -> bool:
-        """Insert file metadata into pre-processing state.
-
-        If a file with the same path already exists, updates its metadata
-        and sets the updated_at timestamp.
+    def check_file_exists(self, file_hash: str) -> bool:
+        """Check if a file with the given hash exists.
 
         Args:
-            file_path: Path to the music file.
-            file_hash: Hash of the file content.
-            metadata: Extracted metadata from the file.
+            file_hash: File hash to check.
 
         Returns:
-            bool: True if successful, False if the operation failed.
+            True if file exists, False otherwise.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM processing_before WHERE file_hash = ?",
+                (file_hash,),
+            )
+            count = cursor.fetchone()[0]
+            return count > 0
+        except sqlite3.Error as e:
+            logger.error("Database error: %s", e)
+            return False
+
+    def insert_file(self, file_hash: str, source_path: Path, target_path: Path) -> bool:
+        """Insert a file record.
+
+        Args:
+            file_hash: File hash.
+            source_path: Source file path.
+            target_path: Target file path.
+
+        Returns:
+            True if successful, False otherwise.
         """
         try:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO processing_before (
-                    file_path, file_hash, title, artist, album,
-                    album_artist, genre, year, track_number, track_total,
-                    disc_number, disc_total
-                ) VALUES (
-                    :path, :hash,
-                    :title, :artist, :album, :album_artist, :genre,
-                    CAST(:year AS INTEGER),
-                    CAST(:track_number AS INTEGER),
-                    CAST(:track_total AS INTEGER),
-                    CAST(:disc_number AS INTEGER),
-                    CAST(:disc_total AS INTEGER)
-                )
-                ON CONFLICT(file_path) DO UPDATE SET
-                    file_hash = excluded.file_hash,
-                    title = excluded.title,
-                    artist = excluded.artist,
-                    album = excluded.album,
-                    album_artist = excluded.album_artist,
-                    genre = excluded.genre,
-                    year = excluded.year,
-                    track_number = excluded.track_number,
-                    track_total = excluded.track_total,
-                    disc_number = excluded.disc_number,
-                    disc_total = excluded.disc_total,
-                    updated_at = CURRENT_TIMESTAMP
+                    file_hash,
+                    file_path
+                ) VALUES (?, ?)
                 """,
-                {
-                    "path": str(file_path),
-                    "hash": file_hash,
-                    "title": metadata.title,
-                    "artist": metadata.artist,
-                    "album": metadata.album,
-                    "album_artist": metadata.album_artist,
-                    "genre": metadata.genre,
-                    "year": metadata.year,
-                    "track_number": metadata.track_number,
-                    "track_total": metadata.track_total,
-                    "disc_number": metadata.disc_number,
-                    "disc_total": metadata.disc_total,
-                },
+                (file_hash, str(source_path)),
             )
-            self.conn.commit()
             return True
-
-        except Exception as e:
-            logger.error("Failed to insert file metadata: %s", e)
-            self.conn.rollback()
+        except sqlite3.Error as e:
+            logger.error("Database error: %s", e)
             return False
 
-    def get_file_metadata(self, file_path: Path) -> Optional[Tuple[str, TrackMetadata]]:
-        """Get file metadata from pre-processing state.
+    def get_source_path(self, file_hash: str) -> Optional[Path]:
+        """Get source path for a file.
 
         Args:
-            file_path: Path to the music file.
+            file_hash: File hash.
 
         Returns:
-            Optional[Tuple[str, TrackMetadata]]: Tuple of (file_hash, metadata) if found,
-                None if the file doesn't exist or on error.
+            Source path if found, None otherwise.
         """
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                """
-                SELECT file_hash, title, artist, album, album_artist,
-                       genre, year, track_number, track_total,
-                       disc_number, disc_total
-                FROM processing_before
-                WHERE file_path = :path
-                """,
-                {"path": str(file_path)},
+                "SELECT file_path FROM processing_before WHERE file_hash = ?",
+                (file_hash,),
             )
             result = cursor.fetchone()
-            if result:
-                file_hash = result[0]
-                metadata = TrackMetadata(
-                    title=result[1],
-                    artist=result[2],
-                    album=result[3],
-                    album_artist=result[4],
-                    genre=result[5],
-                    year=result[6],
-                    track_number=result[7],
-                    track_total=result[8],
-                    disc_number=result[9],
-                    disc_total=result[10],
-                )
-                return file_hash, metadata
+            return Path(result[0]) if result else None
+        except sqlite3.Error as e:
+            logger.error("Database error: %s", e)
             return None
 
-        except Exception as e:
-            logger.error("Failed to get file metadata: %s", e)
-            return None
-
-    def get_all_files(self) -> List[Tuple[Path, str, TrackMetadata]]:
-        """Get all files from pre-processing state.
-
-        Returns:
-            List[Tuple[Path, str, TrackMetadata]]: List of (file_path, file_hash, metadata).
-            Returns an empty list if no files exist or on error.
-        """
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                """
-                SELECT file_path, file_hash, title, artist, album,
-                       album_artist, genre, year, track_number, track_total,
-                       disc_number, disc_total
-                FROM processing_before
-                ORDER BY file_path
-                """
-            )
-            results: List[Tuple[Path, str, TrackMetadata]] = []
-            for row in cursor.fetchall():
-                file_path = Path(row[0])
-                file_hash = row[1]
-                metadata = TrackMetadata(
-                    title=row[2],
-                    artist=row[3],
-                    album=row[4],
-                    album_artist=row[5],
-                    genre=row[6],
-                    year=row[7],
-                    track_number=row[8],
-                    track_total=row[9],
-                    disc_number=row[10],
-                    disc_total=row[11],
-                )
-                results.append((file_path, file_hash, metadata))
-            return results
-
-        except Exception as e:
-            logger.error("Failed to get all files: %s", e)
-            return []
-
-    def delete_file(self, file_path: Path) -> bool:
-        """Delete file from pre-processing state.
+    def get_target_path(self, file_hash: str) -> Optional[Path]:
+        """Get target path for a file.
 
         Args:
-            file_path: Path to the music file.
+            file_hash: File hash.
 
         Returns:
-            bool: True if successful, False if the file doesn't exist or on error.
+            Target path if found, None otherwise.
         """
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "DELETE FROM processing_before WHERE file_path = :path",
-                {"path": str(file_path)},
+                """
+                SELECT pa.target_path
+                FROM processing_before pb
+                JOIN processing_after pa ON pb.file_hash = pa.file_hash
+                WHERE pb.file_hash = ?
+                """,
+                (file_hash,),
             )
-            self.conn.commit()
-            return True
+            result = cursor.fetchone()
+            return Path(result[0]) if result else None
+        except sqlite3.Error as e:
+            logger.error("Database error: %s", e)
+            return None
 
-        except Exception as e:
-            logger.error("Failed to delete file: %s", e)
-            self.conn.rollback()
-            return False
+    def get_file_path(self, file_hash: str) -> Optional[Path]:
+        """Get file path for a file.
+
+        Args:
+            file_hash: File hash.
+
+        Returns:
+            File path if found, None otherwise.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT file_path FROM processing_before WHERE file_hash = ?",
+                (file_hash,),
+            )
+            result = cursor.fetchone()
+            return Path(result[0]) if result else None
+        except sqlite3.Error as e:
+            logger.error("Database error: %s", e)
+            return None

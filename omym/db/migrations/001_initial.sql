@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS path_components;
 -- Update processing_before table
 DROP TABLE IF EXISTS processing_before;
 CREATE TABLE processing_before (
-    file_hash TEXT PRIMARY KEY,
+    file_hash TEXT NOT NULL,
     file_path TEXT NOT NULL UNIQUE,
     title TEXT,
     artist TEXT,
@@ -17,17 +17,21 @@ CREATE TABLE processing_before (
     disc_number INTEGER,
     disc_total INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (file_path),
+    UNIQUE (file_hash)
 );
 
 -- Update processing_after table
 DROP TABLE IF EXISTS processing_after;
 CREATE TABLE processing_after (
-    file_hash TEXT PRIMARY KEY,
+    file_hash TEXT NOT NULL,
     file_path TEXT NOT NULL UNIQUE,
     target_path TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (file_path),
+    FOREIGN KEY (file_path) REFERENCES processing_before (file_path),
     FOREIGN KEY (file_hash) REFERENCES processing_before (file_hash)
 );
 
