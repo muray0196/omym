@@ -1,9 +1,8 @@
 """Music file grouping functionality."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, ClassVar, Set
 
-from omym.core.metadata import TrackMetadata
 from omym.core.metadata_extractor import MetadataExtractor
 from omym.utils.logger import logger
 
@@ -11,9 +10,7 @@ from omym.utils.logger import logger
 class MusicGrouper:
     """Group music files based on path format."""
 
-    def __init__(self):
-        """Initialize the grouper."""
-        pass
+    SUPPORTED_COMPONENTS: ClassVar[Set[str]] = {"AlbumArtist", "Album", "Genre", "Year"}
 
     def group_by_path_format(
         self, files: List[Path], path_format: str
@@ -31,12 +28,24 @@ class MusicGrouper:
         result: Dict[str, Dict[str, Optional[str]]] = {}
         components = [c.strip() for c in path_format.split("/") if c.strip()]
 
+        # Validate components
+        invalid_components = [
+            c for c in components if c not in self.SUPPORTED_COMPONENTS
+        ]
+        if invalid_components:
+            logger.error(
+                "Unsupported path components: %s. Supported components are: %s",
+                ", ".join(invalid_components),
+                ", ".join(sorted(self.SUPPORTED_COMPONENTS)),
+            )
+            return result
+
         for file_path in files:
             try:
                 # Extract metadata
                 metadata = MetadataExtractor.extract(file_path)
                 if not metadata:
-                    logger.warning(f"Failed to extract metadata from {file_path}")
+                    logger.warning("Failed to extract metadata from %s", file_path)
                     continue
 
                 # Convert metadata to dictionary
@@ -62,7 +71,7 @@ class MusicGrouper:
                 }
 
                 # Check if all required components have values
-                missing_components = []
+                missing_components: List[str] = []
                 for component in components:
                     value = self._get_component_value(component, metadata_dict)
                     if not value:
@@ -70,7 +79,9 @@ class MusicGrouper:
 
                 if missing_components:
                     logger.warning(
-                        f"Missing required components for {file_path}: {', '.join(missing_components)}"
+                        "Missing required components for %s: %s",
+                        file_path,
+                        ", ".join(missing_components),
                     )
                     continue
 
@@ -78,7 +89,7 @@ class MusicGrouper:
                 result[str(file_path)] = metadata_dict
 
             except Exception as e:
-                logger.error(f"Failed to process file {file_path}: {e}")
+                logger.error("Failed to process file %s: %s", file_path, e)
 
         return result
 
@@ -100,6 +111,8 @@ class MusicGrouper:
             return metadata.get("album") or ""
         elif component == "Genre":
             return metadata.get("genre") or ""
+        elif component == "Year":
+            return metadata.get("year") or ""
         else:
-            logger.warning(f"Unknown path component: {component}")
+            logger.warning("Unknown path component: %s", component)
             return ""

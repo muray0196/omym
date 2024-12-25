@@ -1,11 +1,11 @@
 """Filtering engine for organizing music files."""
 
 from sqlite3 import Connection
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 
 from omym.utils.logger import logger
-from omym.db.dao_albums import AlbumDAO, AlbumInfo, TrackPosition
-from omym.db.dao_filter import FilterDAO, FilterHierarchy, FilterValue
+from omym.db.dao_albums import AlbumDAO
+from omym.db.dao_filter import FilterDAO
 
 
 class HierarchicalFilter:

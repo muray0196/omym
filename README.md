@@ -1,70 +1,90 @@
-# OMYM (Organize My Music)
+# OMYM (Organize Music Your Music)
 
-A Python tool to organize your music library by automatically renaming files and creating a consistent directory structure based on audio file metadata.
+A Python tool that helps you organize your music library by automatically processing metadata and organizing files into a clean, consistent structure.
 
 ## Features
 
-- Automatic metadata extraction from audio files (FLAC/MP3/M4A/DSF)
-- Intelligent file and directory naming based on track, album, and artist information
-- Consistent directory structure organization
-- Smart artist ID generation with transliteration support
-- Configuration management and logging
-- Both CLI and GUI interfaces (GUI coming soon)
+- **Smart Metadata Extraction**: Automatically reads metadata from your music files
+  - Supported formats: MP3, FLAC, M4A/AAC, DSF
+  - Extracts artist, album, track numbers, and more
+  - Handles multi-disc albums correctly
+
+- **Intelligent Organization**: Creates a clean folder structure based on metadata
+  - Artist/Album/Track organization
+  - Proper handling of album artists vs track artists
+  - Special handling for compilations and various artists albums
+
+- **File Management**:
+  - Sanitizes filenames for cross-platform compatibility
+  - Preserves your music files' metadata
+  - Handles duplicate files intelligently
+  - Groups tracks into albums based on metadata
 
 ## Installation
 
-1. Ensure you have Python 3.13 or later installed
-2. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/omym.git
-   cd omym
-   ```
-3. Install using pip:
-   ```bash
-   pip install .
-   ```
-
-## Usage
-
-### Command Line Interface
-
-Basic usage:
 ```bash
-omym --base-path /path/to/music/library
+pip install omym
 ```
 
-Additional options:
+## Quick Start
+
+1. Basic usage to organize a music folder:
 ```bash
-omym --help  # Show all available options
-omym --base-path /path/to/music --log-file /path/to/log.txt  # Specify log file
-omym --config-file /path/to/config.json  # Use custom config file
+omym organize /path/to/music/folder
 ```
 
-### Configuration
+2. Preview changes without moving files:
+```bash
+omym organize --dry-run /path/to/music/folder
+```
 
-The default configuration file is stored at `~/.config/omym/config.json`. You can specify:
-- Base path for your music library
-- Log file location
-- Other settings (more coming soon)
+3. Organize with custom settings:
+```bash
+omym organize --format "{artist}/{album} ({year})/{track} - {title}" /path/to/music/folder
+```
 
-## Development
+## Configuration
 
-1. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+OMYM can be configured using environment variables or a configuration file. Create a `.env` file in your working directory:
 
-2. Install development dependencies:
-   ```bash
-   pip install -e ".[dev]"
-   ```
+```env
+OMYM_OUTPUT_DIR=/path/to/organized/music
+OMYM_FILE_FORMAT="{artist}/{album}/{track} - {title}"
+OMYM_LOG_LEVEL=INFO
+```
 
-3. Run tests:
-   ```bash
-   pytest
-   ```
+## Available Format Variables
+
+- `{artist}` - Track artist
+- `{album_artist}` - Album artist (if different from track artist)
+- `{album}` - Album name
+- `{track}` - Track number (padded with zeros)
+- `{title}` - Track title
+- `{year}` - Release year
+- `{disc}` - Disc number (for multi-disc albums)
+
+## Examples
+
+1. Basic organization:
+```bash
+omym organize ~/Music
+```
+
+2. Custom format with year in album folder:
+```bash
+omym organize --format "{artist}/{album} ({year})/{track} - {title}" ~/Music
+```
+
+3. Process specific file types:
+```bash
+omym organize --formats mp3,flac ~/Music
+```
+
+## Support
+
+For bug reports and feature requests, please visit:
+https://github.com/yourusername/omym/issues
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+[Your License Here] 

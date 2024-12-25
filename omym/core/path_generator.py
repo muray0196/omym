@@ -2,12 +2,12 @@
 
 from pathlib import Path
 from sqlite3 import Connection
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 
 from omym.utils.logger import logger
-from omym.core.filtering import FilterDAO, FilterHierarchy, FilterValue
-from omym.db.dao_albums import AlbumDAO, AlbumInfo, TrackPosition
+from omym.db.dao_filter import FilterDAO, FilterHierarchy, FilterValue
+from omym.db.dao_albums import AlbumDAO
 
 
 @dataclass
@@ -72,9 +72,10 @@ class PathGenerator:
 
         for file_path, metadata in grouped_files.items():
             warnings: List[str] = []
+            relative_path = Path()
 
             # Build relative path components
-            components = []
+            components: List[str] = []
 
             # Add album artist
             album_artist = metadata.get("album_artist") or metadata.get("artist")
@@ -89,7 +90,6 @@ class PathGenerator:
             components.append(f"{year}_{album}")
 
             # Build relative path
-            relative_path = Path()
             for component in components:
                 relative_path = relative_path / component
 
@@ -217,9 +217,9 @@ class PathGenerator:
                 Each PathInfo contains the file hash, relative path, and any warnings.
         """
         paths: List[PathInfo] = []
+        relative_path = Path()
 
         # Build relative path
-        relative_path = Path()
         for value in group_values:
             relative_path = relative_path / value
 

@@ -3,7 +3,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Union
+from typing import List, Literal
 
 from omym.core.music_grouper import MusicGrouper
 from omym.core.path_generator import PathGenerator, PathInfo
@@ -24,7 +24,7 @@ def format_text_output(path_infos: List[PathInfo]) -> str:
             - File hash and relative path
             - Any warnings indented on the next line
     """
-    output = []
+    output: List[str] = []
     for info in path_infos:
         line = f"{info.file_hash}: {info.relative_path}"
         if info.warnings:

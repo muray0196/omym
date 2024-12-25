@@ -4,8 +4,7 @@ from sqlite3 import Connection
 from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 
-from omym.utils.logger import logger
-from omym.db.dao_albums import AlbumDAO, AlbumInfo, TrackPosition
+from omym.db.dao_albums import AlbumDAO, AlbumInfo
 
 
 @dataclass

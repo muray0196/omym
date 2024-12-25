@@ -6,12 +6,10 @@ from typing import TYPE_CHECKING
 import pytest
 from pytest_mock import MockerFixture
 
+from omym.core.processor import ProcessResult
 from omym.ui.cli import process_command
 
 if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.monkeypatch import MonkeyPatch
-    from _pytest.logging import LogCaptureFixture
     from _pytest.capture import CaptureFixture
 
 
@@ -232,3 +230,49 @@ def test_missing_command() -> None:
     """Test error when no command is provided."""
     with pytest.raises(SystemExit):
         process_command([])
+
+
+def test_process_directory_interactive(
+    tmp_path: Path, mocker: MockerFixture, capsys: "CaptureFixture[str]"
+) -> None:
+    """Test processing a directory in interactive mode.
+
+    Args:
+        tmp_path: Temporary directory path fixture.
+        mocker: Pytest mocker fixture.
+        capsys: Pytest capture fixture.
+    """
+    # Create test directory with files
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    test_file = source_dir / "test.mp3"
+    test_file.touch()
+
+    # Setup mocks
+    mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
+    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
+    mock_progress.return_value = [
+        ProcessResult(
+            source_path=test_file,
+            target_path=tmp_path / "organized/test.mp3",
+            success=True,
+        )
+    ]
+
+    # Run CLI in interactive mode
+    args = ["organize", str(source_dir)]
+    process_command(args)
+
+    # Verify interactive mode was used
+    mock_progress.assert_called_once_with(
+        mock_processor.return_value,
+        source_dir,
+        interactive=True,
+    )
+
+    # Verify output
+    captured = capsys.readouterr()
+    assert "Processing Summary" in captured.out
+    assert "Total files processed: 1" in captured.out
+    assert "Successful: 1" in captured.out
+    assert "Failed: 0" in captured.out

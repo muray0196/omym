@@ -1,7 +1,7 @@
 """Path component handling functionality."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from dataclasses import dataclass
 
 from omym.core.metadata import TrackMetadata

@@ -1,16 +1,20 @@
 """Renaming logic functionality."""
 
 import re
-from typing import Optional, Tuple, Pattern, List
+from typing import Optional, Tuple, Pattern, List, Dict, Set
 from pathlib import Path
 from unidecode import unidecode
-import langid
+import langid  # type: ignore
 import pykakasi
 
 from omym.core.sanitizer import Sanitizer
 from omym.core.metadata import TrackMetadata
 from omym.db.dao_artist_cache import ArtistCacheDAO
 from omym.utils.logger import logger
+
+
+# Type alias for langid.classify return type
+LangIdResult = Tuple[str, float]
 
 
 class ArtistIdGenerator:
@@ -115,7 +119,8 @@ class ArtistIdGenerator:
             # First, try to detect language and transliterate if needed
             name = artist_name
             try:
-                lang, _ = langid.classify(name)
+                # Ignore type checking for langid.classify as it's a third-party library
+                lang, _ = langid.classify(name)  # type: ignore
                 # Treat Chinese as Japanese since langid often detects Japanese kanji as Chinese
                 if lang in ["ja", "zh"]:
                     # Use pykakasi for Japanese text
@@ -281,7 +286,8 @@ class FileNameGenerator:
 class DirectoryGenerator:
     """Generate directory structure from track metadata."""
 
-    _album_years = {}  # Cache for album years
+    # Cache for album years: Dict[album_key, Set[year]]
+    _album_years: Dict[str, Set[int]] = {}
 
     @classmethod
     def _get_album_key(cls, album_artist: str, album: str) -> str:
@@ -347,7 +353,7 @@ class DirectoryGenerator:
         years = cls._album_years.get(key, {0})
 
         # Get the latest year (excluding 0)
-        non_zero_years = {y for y in years if y != 0}
+        non_zero_years: Set[int] = {y for y in years if y != 0}
         if non_zero_years:
             return max(non_zero_years)
         return 0
