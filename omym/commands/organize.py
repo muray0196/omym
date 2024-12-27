@@ -114,6 +114,7 @@ def organize_files(
 
             except Exception as e:
                 db_manager.rollback_transaction()
+                logging.error("Transaction failed: %s", e)
                 raise
 
     except Exception as e:

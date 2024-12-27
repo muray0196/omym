@@ -331,7 +331,21 @@ class TestMusicProcessor:
         mock_before_dao = mocker.MagicMock()
         mock_before_dao.check_file_exists.side_effect = [False, True, True]
         mock_before_dao.insert_file.return_value = True
+        mock_before_dao.get_target_path.return_value = None
         processor.before_dao = mock_before_dao
+
+        # Mock after DAO
+        mock_after_dao = mocker.MagicMock()
+        mock_after_dao.insert_file.return_value = True
+        processor.after_dao = mock_after_dao
+
+        # Mock shutil.move to simulate file movement
+        def mock_move(src: str | Path, dst: str | Path) -> None:
+            Path(src).unlink()
+            Path(dst).parent.mkdir(parents=True, exist_ok=True)
+            Path(dst).touch()
+
+        mocker.patch("shutil.move", side_effect=mock_move)
 
         # Act
         results = processor.process_directory(source_dir)
