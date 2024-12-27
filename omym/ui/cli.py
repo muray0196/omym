@@ -3,7 +3,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Optional, List, Set
+from typing import Optional, List, Dict
 import sys
 from rich.console import Console
 from rich.tree import Tree
@@ -130,19 +130,28 @@ def display_db_preview(results: List[ProcessResult]) -> None:
     after_table.add_column("Status", style="yellow")
 
     # Collect unique artists and their IDs
-    artists_seen: Set[str] = set()
+    artists_seen: Dict[str, str] = {}  # artist_name -> artist_id
     for result in results:
         if result.metadata and result.metadata.artist:
             artist = result.metadata.artist
-            if artist not in artists_seen:
-                artists_seen.add(artist)
-                artist_table.add_row(
-                    artist,
-                    result.artist_id or "N/A",
-                    "Cache Update" if result.success else "Skip",
-                )
+            # Extract artist ID from the target file name
+            if result.target_path:
+                file_name = result.target_path.name
+                # Artist ID is the last part before the extension
+                artist_id = file_name.rsplit("_", 1)[-1].split(".")[0]
+                if len(artist_id) == 5:  # Valid artist ID length
+                    artists_seen[artist] = artist_id
 
-        # Add processing records
+    # Add rows to artist table
+    for artist, artist_id in sorted(artists_seen.items()):
+        artist_table.add_row(
+            artist,
+            artist_id,
+            "Cache Update",
+        )
+
+    # Add processing records
+    for result in results:
         if result.file_hash:
             # Before record
             before_table.add_row(
@@ -159,7 +168,7 @@ def display_db_preview(results: List[ProcessResult]) -> None:
             )
 
     # Print tables if they have data
-    if len(artists_seen) > 0:
+    if artists_seen:
         console.print(artist_table)
     console.print(before_table)
     console.print(after_table)

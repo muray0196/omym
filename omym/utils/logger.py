@@ -65,6 +65,11 @@ class WhitePathRichHandler(RichHandler):
             message = message.replace("Configuration loaded from", "")
             text.append("Configuration loaded from", style=Style(color="cyan"))
             text.append(" ")  # Add space after message
+        elif "Moving file" in message:
+            text.append("📦 ", style=Style(color="magenta", bold=True))
+            message = message.replace("Moving file from", "")
+            text.append("Moving file from", style=Style(color="magenta"))
+            text.append(" ")  # Add space after message
         elif record.levelno >= logging.ERROR:
             text.append("❌ ", style=Style(color="red", bold=True))
             text.append(message, style=Style(color="red"))

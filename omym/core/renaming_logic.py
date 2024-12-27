@@ -144,9 +144,7 @@ class ArtistIdGenerator:
 
             # Split into words and process each word
             words = name.split("-")
-            processed_results: List[Tuple[str, str]] = [
-                cls._process_word(word) for word in words
-            ]
+            processed_results: List[Tuple[str, str]] = [cls._process_word(word) for word in words]
 
             # Try with vowels removed
             processed_words = [result[0] for result in processed_results]
@@ -199,33 +197,104 @@ class CachedArtistIdGenerator:
         """
         try:
             # Return DEFAULT_ID if artist_name is empty or None
-            if not artist_name:
+            if not artist_name or not artist_name.strip():
                 return ArtistIdGenerator.DEFAULT_ID
 
+            # Normalize artist name
+            normalized_name = artist_name.strip()
+
             # Check cache first
-            cached_id = self.dao.get_artist_id(artist_name)
+            cached_id = self.dao.get_artist_id(normalized_name)
             if cached_id:
-                return cached_id
+                if self._is_valid_id(cached_id):
+                    return cached_id
+                else:
+                    # If cached ID is invalid, remove it and generate new one
+                    logger.warning(
+                        "Found invalid cached ID '%s' for artist '%s', regenerating",
+                        cached_id,
+                        normalized_name,
+                    )
 
             # Generate new ID
-            new_id = ArtistIdGenerator.generate(artist_name)
+            new_id = ArtistIdGenerator.generate(normalized_name)
 
-            # Only cache if the generation was successful (not DEFAULT_ID or error case)
-            if new_id not in [ArtistIdGenerator.DEFAULT_ID, "XXXXX"]:
-                try:
-                    self.dao.insert_artist_id(artist_name, new_id)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to cache artist ID for '%s': %s", artist_name, e
-                    )
+            # Validate generated ID
+            if not self._is_valid_id(new_id):
+                logger.error(
+                    "Generated invalid ID '%s' for artist '%s'",
+                    new_id,
+                    normalized_name,
+                )
+                return ArtistIdGenerator.DEFAULT_ID
+
+            # Cache the new ID only if it's a valid, successfully generated ID
+            # (not DEFAULT_ID, XXXXX, or any other special case)
+            if (
+                new_id not in [ArtistIdGenerator.DEFAULT_ID, "XXXXX"]
+                and self._is_valid_id(new_id)
+                and all(c.isalnum() or c == "-" for c in new_id)
+            ):
+                retry_count = 3
+                while retry_count > 0:
+                    try:
+                        if self.dao.insert_artist_id(normalized_name, new_id):
+                            logger.debug(
+                                "Successfully cached artist ID '%s' for '%s'",
+                                new_id,
+                                normalized_name,
+                            )
+                            break
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to cache artist ID for '%s' (attempt %d): %s",
+                            normalized_name,
+                            4 - retry_count,
+                            e,
+                        )
+                    retry_count -= 1
+                    if retry_count > 0:
+                        import time
+
+                        time.sleep(0.1)  # Short delay before retry
+            else:
+                logger.debug(
+                    "Skipping cache for invalid/special artist ID '%s' for '%s'",
+                    new_id,
+                    normalized_name,
+                )
 
             return new_id
 
         except Exception as e:
             logger.error(
-                "Failed to generate/cache artist ID for '%s': %s", artist_name, e
+                "Failed to generate/cache artist ID for '%s': %s",
+                artist_name,
+                e,
             )
             return ArtistIdGenerator.DEFAULT_ID
+
+    @staticmethod
+    def _is_valid_id(artist_id: str) -> bool:
+        """Check if an artist ID is valid.
+
+        Args:
+            artist_id: The artist ID to validate.
+
+        Returns:
+            bool: True if the ID is valid, False otherwise.
+        """
+        if not artist_id:
+            return False
+
+        if len(artist_id) != ArtistIdGenerator.ID_LENGTH:
+            return False
+
+        if artist_id in [ArtistIdGenerator.DEFAULT_ID, "XXXXX"]:
+            return True
+
+        # Check if ID contains only allowed characters
+        return bool(ArtistIdGenerator.KEEP_CHARS.sub("", artist_id) == artist_id)
 
 
 class FileNameGenerator:
@@ -262,18 +331,14 @@ class FileNameGenerator:
             title = Sanitizer.sanitize_title(metadata.title)
 
             # Format track number (XX if missing)
-            track_num = (
-                str(metadata.track_number).zfill(2) if metadata.track_number else "XX"
-            )
+            track_num = str(metadata.track_number).zfill(2) if metadata.track_number else "XX"
 
             # Format disc number if present
             prefix = f"D{metadata.disc_number}" if metadata.disc_number else ""
 
             # Combine all parts with underscores
             if prefix:
-                return (
-                    f"{prefix}_{track_num}_{title}_{artist_id}{metadata.file_extension}"
-                )
+                return f"{prefix}_{track_num}_{title}_{artist_id}{metadata.file_extension}"
             else:
                 return f"{track_num}_{title}_{artist_id}{metadata.file_extension}"
 
@@ -310,9 +375,7 @@ class DirectoryGenerator:
             metadata: Track metadata containing album information.
         """
         # Get album artist (fallback to artist if missing)
-        album_artist = (
-            metadata.album_artist if metadata.album_artist else metadata.artist
-        )
+        album_artist = metadata.album_artist if metadata.album_artist else metadata.artist
         if not album_artist:
             album_artist = "Unknown-Artist"
 
@@ -373,9 +436,7 @@ class DirectoryGenerator:
         """
         try:
             # Get album artist (fallback to artist if missing)
-            album_artist = (
-                metadata.album_artist if metadata.album_artist else metadata.artist
-            )
+            album_artist = metadata.album_artist if metadata.album_artist else metadata.artist
             if not album_artist:
                 album_artist = "Unknown-Artist"
 

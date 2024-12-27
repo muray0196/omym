@@ -18,9 +18,12 @@ class Config:
     # Log file path
     log_file: Optional[Path] = None
 
-    # Default configuration file path
+    # Project output directory (relative to project root)
+    output_dir: Path = field(default_factory=lambda: Path("output"))
+
+    # Default configuration file path (relative to project root)
     config_file: Path = field(
-        default_factory=lambda: Path.home() / ".config" / "omym" / "config.json"
+        default_factory=lambda: Path(__file__).parent.parent / "config" / "config.json"
     )
 
     # Singleton instance

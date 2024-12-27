@@ -34,13 +34,16 @@ class ArtistCacheDAO:
                 INSERT INTO artist_cache (artist_name, artist_id)
                 VALUES (?, ?)
                 ON CONFLICT(artist_name) DO UPDATE SET
-                    artist_id = excluded.artist_id
+                    artist_id = excluded.artist_id,
+                    updated_at = CURRENT_TIMESTAMP
                 """,
                 (artist_name, artist_id),
             )
+            self.conn.commit()
             return True
         except sqlite3.Error as e:
             logger.error("Database error: %s", e)
+            self.conn.rollback()
             return False
 
     def get_artist_id(self, artist_name: str) -> Optional[str]:
@@ -55,7 +58,11 @@ class ArtistCacheDAO:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT artist_id FROM artist_cache WHERE artist_name = ?",
+                """
+                SELECT artist_id 
+                FROM artist_cache 
+                WHERE LOWER(artist_name) = LOWER(?)
+                """,
                 (artist_name,),
             )
             result = cursor.fetchone()
@@ -63,3 +70,19 @@ class ArtistCacheDAO:
         except sqlite3.Error as e:
             logger.error("Database error: %s", e)
             return None
+
+    def clear_cache(self) -> bool:
+        """Clear the artist cache.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM artist_cache")
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            logger.error("Failed to clear artist cache: %s", e)
+            self.conn.rollback()
+            return False

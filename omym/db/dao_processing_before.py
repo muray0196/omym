@@ -61,13 +61,12 @@ class ProcessingBeforeDAO:
             logger.error("Database error: %s", e)
             return False
 
-    def insert_file(self, file_hash: str, source_path: Path, target_path: Path) -> bool:
+    def insert_file(self, file_hash: str, file_path: Path) -> bool:
         """Insert a file record.
 
         Args:
             file_hash: File hash.
-            source_path: Source file path.
-            target_path: Target file path.
+            file_path: Source file path.
 
         Returns:
             True if successful, False otherwise.
@@ -80,8 +79,11 @@ class ProcessingBeforeDAO:
                     file_hash,
                     file_path
                 ) VALUES (?, ?)
+                ON CONFLICT(file_hash) DO UPDATE SET
+                    file_path = excluded.file_path,
+                    updated_at = CURRENT_TIMESTAMP
                 """,
-                (file_hash, str(source_path)),
+                (file_hash, str(file_path)),
             )
             return True
         except sqlite3.Error as e:

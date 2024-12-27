@@ -18,11 +18,12 @@ class ProcessingAfterDAO:
         """
         self.conn = conn
 
-    def insert_file(self, file_hash: str, target_path: Path) -> bool:
+    def insert_file(self, file_hash: str, file_path: Path, target_path: Path) -> bool:
         """Insert a file record.
 
         Args:
             file_hash: File hash.
+            file_path: Original file path.
             target_path: Target file path.
 
         Returns:
@@ -32,10 +33,17 @@ class ProcessingAfterDAO:
             cursor = self.conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO processing_after (file_hash, target_path)
-                VALUES (?, ?)
+                INSERT INTO processing_after (
+                    file_hash,
+                    file_path,
+                    target_path
+                ) VALUES (?, ?, ?)
+                ON CONFLICT(file_hash) DO UPDATE SET
+                    file_path = excluded.file_path,
+                    target_path = excluded.target_path,
+                    updated_at = CURRENT_TIMESTAMP
                 """,
-                (file_hash, str(target_path)),
+                (file_hash, str(file_path), str(target_path)),
             )
             return True
         except sqlite3.Error as e:

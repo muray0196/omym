@@ -169,69 +169,105 @@ class MusicProcessor:
             except OSError:
                 continue
 
+    def _generate_target_path(self, file_path: Path, metadata: TrackMetadata) -> Optional[Path]:
+        """Generate target path for a file.
+
+        Args:
+            file_path: Source file path.
+            metadata: Track metadata.
+
+        Returns:
+            Target path if successful, None otherwise.
+        """
+        try:
+            # Generate target path components
+            dir_path = self.directory_generator.generate(metadata)
+            file_name = self.file_name_generator.generate(metadata)
+            if not dir_path or not file_name:
+                return None
+
+            # Find available path
+            target_path = self._find_available_path(self.base_path / dir_path / file_name)
+            return target_path
+
+        except Exception as e:
+            logger.error("Error generating target path: %s", e)
+            return None
+
     def process_file(self, file_path: Path) -> ProcessResult:
         """Process a single music file.
 
         Args:
-            file_path: Path to music file.
+            file_path: Path to the music file.
 
         Returns:
-            ProcessResult: Result of processing the file.
+            ProcessResult object containing the result of processing.
         """
-        result = ProcessResult(source_path=file_path)
-
+        file_hash: Optional[str] = None
         try:
             # Calculate file hash
             file_hash = self._calculate_file_hash(file_path)
-            result.file_hash = file_hash
+
+            # Check if file has already been processed
+            if self.before_dao.check_file_exists(file_hash):
+                # Get existing target path
+                target_path = self.before_dao.get_target_path(file_hash)
+                if target_path and target_path.exists():
+                    logger.info("File already processed: %s -> %s", file_path, target_path)
+                    return ProcessResult(
+                        source_path=file_path,
+                        target_path=target_path,
+                        success=True,
+                        dry_run=self.dry_run,
+                        file_hash=file_hash,
+                    )
 
             # Extract metadata
             metadata = MetadataExtractor.extract(file_path)
-            if metadata is None:  # type: ignore
+            if not metadata:
                 raise ValueError("Failed to extract metadata")
-            result.metadata = metadata
 
-            # Generate target path components
-            dir_path = self.directory_generator.generate(metadata)
-            file_name = self.file_name_generator.generate(metadata)
-            target_path = self._find_available_path(self.base_path / dir_path / file_name)
-            result.target_path = target_path
+            # Generate target path
+            target_path = self._generate_target_path(file_path, metadata)
+            if not target_path:
+                raise ValueError("Failed to generate target path")
 
+            # Save file state to database
+            if not self.before_dao.insert_file(file_hash, file_path):
+                raise ValueError("Failed to save file state to database")
+
+            # Move file if not in dry run mode
             if not self.dry_run:
                 # Create target directory
                 target_path.parent.mkdir(parents=True, exist_ok=True)
 
-                try:
-                    # Move file
-                    logger.info("Moving file from %s to %s", file_path, target_path)
-                    shutil.move(str(file_path), str(target_path))
+                # Move file
+                logger.info("Moving file from %s to %s", file_path, target_path)
+                shutil.move(str(file_path), str(target_path))
 
-                    # Generate and save artist ID
-                    artist_id = self.artist_id_generator.generate(metadata.artist)
-                    result.artist_id = artist_id
+                # Save after state to database
+                if not self.after_dao.insert_file(file_hash, file_path, target_path):
+                    raise ValueError("Failed to save file state to database")
 
-                    # Save file state to database
-                    if not self._save_file_state(file_path, file_hash, metadata, target_path):
-                        raise RuntimeError("Failed to save file state to database")
-
-                    result.success = True
-                except OSError as e:
-                    error_message = str(e)
-                    logger.error("Error moving file: %s", error_message)
-                    result.error_message = error_message
-                    return result
-
-            else:
-                # In dry run mode, just mark as success
-                result.success = True
-                result.dry_run = True
+            return ProcessResult(
+                source_path=file_path,
+                target_path=target_path,
+                success=True,
+                dry_run=self.dry_run,
+                file_hash=file_hash,
+                metadata=metadata,
+            )
 
         except Exception as e:
             error_message = str(e) if str(e) else type(e).__name__
             logger.error("Error processing file '%s': %s", file_path, error_message)
-            result.error_message = error_message
-
-        return result
+            return ProcessResult(
+                source_path=file_path,
+                success=False,
+                error_message=error_message,
+                dry_run=self.dry_run,
+                file_hash=file_hash,
+            )
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of a file.
@@ -294,18 +330,18 @@ class MusicProcessor:
                 return False
 
             # Save to processing_before table
-            if not self.before_dao.insert_file(file_hash, file_path, target_path):
+            if not self.before_dao.insert_file(file_hash, file_path):
                 return False
 
             # Save to processing_after table
-            if not self.after_dao.insert_file(file_hash, target_path):
+            if not self.after_dao.insert_file(file_hash, file_path, target_path):
                 return False
 
             # Save artist ID to cache
-            if metadata.artist and not self.artist_dao.insert_artist_id(
-                metadata.artist, self.artist_id_generator.generate(metadata.artist)
-            ):
-                return False
+            if metadata.artist:
+                artist_id = self.artist_id_generator.generate(metadata.artist)
+                if artist_id and not self.artist_dao.insert_artist_id(metadata.artist, artist_id):
+                    return False
 
             return True
 

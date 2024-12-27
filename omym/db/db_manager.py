@@ -14,15 +14,15 @@ class DatabaseManager:
         """Initialize database manager.
 
         Args:
-            db_path: Path to database file. If None, use default path in user's home directory.
+            db_path: Path to database file. If None, use default path in project's data directory.
                    If ":memory:", use in-memory database.
         """
         if db_path == ":memory:":
             self.db_path = ":memory:"
         elif db_path is None:
-            # Use default path in user's home directory
-            home = Path.home()
-            db_dir = home / ".local" / "share" / "omym"
+            # Use default path in project's data directory
+            project_root = Path(__file__).parent.parent.parent
+            db_dir = project_root / "data"
             db_dir.mkdir(parents=True, exist_ok=True)
             self.db_path = db_dir / "omym.db"
         else:

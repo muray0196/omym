@@ -70,6 +70,12 @@ backups/
 *.swp
 *.swo
 
+# Project specific
+output/
+data/
+config/
+*.db
+
 # Ignore test artifacts
 tests/__pycache__/
 tests/*.py[cod]
