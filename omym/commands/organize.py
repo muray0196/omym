@@ -79,7 +79,7 @@ def organize_files(
 
                 # Process each file
                 for info in path_infos:
-                    source_path = Path(info.file_hash)  # Need to get actual source path
+                    source_path = Path(info.file_hash)  # file_hash contains the actual source path
                     target_path = target_dir / info.relative_path
 
                     if info.warnings:
@@ -102,11 +102,12 @@ def organize_files(
                         if force and target_path.exists():
                             target_path.unlink()
                         shutil.move(str(source_path), str(target_path))
-                        logger.info("Moved %s to %s", source_path, target_path)
                     except Exception as e:
                         logger.error("Failed to move %s: %s", source_path, e)
                         db_manager.rollback_transaction()
                         return 1
+
+                    logger.info("Moving file from %s to %s", source_path, target_path)
 
                 # Commit transaction if all operations succeeded
                 db_manager.commit_transaction()
