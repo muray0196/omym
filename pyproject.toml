@@ -28,7 +28,7 @@ omym = "omym.main:main"
 omym = ["db/*.sql"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 
 [tool.ruff.lint]
 ignore = ["F401"]

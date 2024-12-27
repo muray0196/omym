@@ -40,9 +40,7 @@ class HierarchicalFilter:
 
         return warnings
 
-    def process_file(
-        self, file_hash: str, metadata: Dict[str, Optional[str]]
-    ) -> List[str]:
+    def process_file(self, file_hash: str, metadata: Dict[str, Optional[str]]) -> List[str]:
         """Process a file and register its filter values.
 
         Args:
@@ -71,9 +69,7 @@ class HierarchicalFilter:
 
         return warnings
 
-    def _get_hierarchy_value(
-        self, name: str, metadata: Dict[str, Optional[str]]
-    ) -> Optional[str]:
+    def _get_hierarchy_value(self, name: str, metadata: Dict[str, Optional[str]]) -> Optional[str]:
         """Get value for a hierarchy from metadata.
 
         Args:

@@ -65,9 +65,7 @@ class AlbumManager:
 
         # Process each album group
         for (album_name, album_artist), file_hashes in album_files.items():
-            group = self._process_album_group(
-                album_name, album_artist, file_hashes, files
-            )
+            group = self._process_album_group(album_name, album_artist, file_hashes, files)
             album_groups.append(group)
 
         return album_groups, warnings
@@ -181,9 +179,7 @@ class AlbumManager:
                 if not self.album_dao.insert_track_position(
                     album_info.id, disc_number, track_number, file_hash
                 ):
-                    warnings.append(
-                        f"Failed to register track position for file {file_hash}"
-                    )
+                    warnings.append(f"Failed to register track position for file {file_hash}")
             except ValueError:
                 warnings.append(
                     f"Invalid track position for file {file_hash}: "
@@ -192,9 +188,7 @@ class AlbumManager:
                 )
 
         # Check track continuity
-        is_continuous, continuity_warnings = self.album_dao.check_track_continuity(
-            album_info.id
-        )
+        is_continuous, continuity_warnings = self.album_dao.check_track_continuity(album_info.id)
         if not is_continuous:
             warnings.extend(continuity_warnings)
 
