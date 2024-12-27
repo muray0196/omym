@@ -31,6 +31,36 @@ class WhitePathRichHandler(RichHandler):
         kwargs["omit_repeated_times"] = False
         super().__init__(*args, **kwargs)
 
+    def _format_path(self, path: str) -> Text:
+        """Format a path with colored separators.
+
+        Args:
+            path: Path string to format.
+
+        Returns:
+            Text: Formatted path with colored separators.
+        """
+        text = Text()
+        if "\\" in path:  # Windows path
+            parts = path.split("\\")
+            for i, part in enumerate(parts):
+                if part:  # Skip empty parts
+                    text.append(part, style=Style(color="white"))
+                    if i < len(parts) - 1:  # Add separator if not last part
+                        text.append("\\", style=Style(color="magenta"))
+        else:  # Unix path
+            if path.startswith("/"):
+                text.append("/", style=Style(color="magenta"))
+            parts = path.strip("/").split("/")
+            for i, part in enumerate(parts):
+                if part:  # Skip empty parts
+                    text.append(part, style=Style(color="white"))
+                    if i < len(parts) - 1:  # Add separator if not last part
+                        text.append("/", style=Style(color="magenta"))
+            if path.endswith("/"):
+                text.append("/", style=Style(color="magenta"))
+        return text
+
     def render_message(self, record: logging.LogRecord, message: str) -> Text:
         """Render message with white file paths.
 
@@ -44,21 +74,21 @@ class WhitePathRichHandler(RichHandler):
         text = Text()
 
         # Add level indicator with color
-        if "Processing file:" in message:
+        if "Processing" in message:
             text.append("🔍 ", style=Style(color="blue", bold=True))
-            message = message.replace("Processing file:", "")
-            text.append("Processing:      ", style=Style(color="blue"))  # Fixed width with padding
-        elif "File already processed:" in message:
+            text.append("Processing ", style=Style(color="blue"))
+            path = message.replace("Processing ", "")
+            text.append(self._format_path(path))
+            return text
+        elif "Already processed" in message:
             text.append("✓ ", style=Style(color="green", bold=True))
-            message = message.replace("File already processed:", "")
-            text.append(
-                "Already processed:", style=Style(color="green")
-            )  # Same width as "Processing:      "
+            text.append("Already processed ", style=Style(color="green"))
+            path = message.replace("Already processed ", "")
+            text.append(self._format_path(path))
+            return text
         elif "Successfully committed" in message:
             text.append("💾 ", style=Style(color="green", bold=True))
-            text.append(
-                "Successfully committed all changes to database", style=Style(color="green")
-            )
+            text.append("Successfully committed all changes to database", style=Style(color="green"))
             return text
         elif "Configuration loaded" in message:
             text.append("⚙️  ", style=Style(color="cyan", bold=True))

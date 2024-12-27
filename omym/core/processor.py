@@ -84,9 +84,7 @@ class MusicProcessor:
 
         results: List[ProcessResult] = []
         total_files = sum(
-            1
-            for f in directory.rglob("*")
-            if f.is_file() and f.suffix.lower() in self.SUPPORTED_EXTENSIONS
+            1 for f in directory.rglob("*") if f.is_file() and f.suffix.lower() in self.SUPPORTED_EXTENSIONS
         )
         processed_files = 0
 
@@ -100,13 +98,10 @@ class MusicProcessor:
                 self.db_manager.conn.execute("BEGIN TRANSACTION")
 
             for file_path in directory.rglob("*"):
-                if (
-                    not file_path.is_file()
-                    or file_path.suffix.lower() not in self.SUPPORTED_EXTENSIONS
-                ):
+                if not file_path.is_file() or file_path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
                     continue
 
-                logger.info("Processing file: %s", file_path)
+                logger.info("Processing %s", file_path)
 
                 try:
                     # Calculate file hash
@@ -114,7 +109,7 @@ class MusicProcessor:
 
                     # Check if file has already been processed
                     if self.before_dao.check_file_exists(file_hash):
-                        logger.info("File already processed: %s", file_path)
+                        logger.info("Already processed %s", file_path.name)
                         continue
 
                     # Process file
@@ -278,11 +273,14 @@ class MusicProcessor:
         Returns:
             SHA-256 hash of file.
         """
-        sha256_hash = hashlib.sha256()
+        # hashlib.sha256() returns a _Hash object, but the type is not exported
+        sha256_hash = hashlib.sha256()  # type: ignore[no-untyped-call]
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
+                # update() is a method on _Hash, but the type is not exported
+                sha256_hash.update(byte_block)  # type: ignore[attr-defined]
+        # hexdigest() is a method on _Hash, but the type is not exported
+        return sha256_hash.hexdigest()  # type: ignore[attr-defined]
 
     def _find_available_path(self, target_path: Path) -> Path:
         """Find an available path by appending a sequence number if necessary.
