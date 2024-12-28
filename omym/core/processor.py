@@ -273,14 +273,11 @@ class MusicProcessor:
         Returns:
             SHA-256 hash of file.
         """
-        # hashlib.sha256() returns a _Hash object, but the type is not exported
-        sha256_hash = hashlib.sha256()  # type: ignore[no-untyped-call]
+        sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
-                # update() is a method on _Hash, but the type is not exported
-                sha256_hash.update(byte_block)  # type: ignore[attr-defined]
-        # hexdigest() is a method on _Hash, but the type is not exported
-        return sha256_hash.hexdigest()  # type: ignore[attr-defined]
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
 
     def _find_available_path(self, target_path: Path) -> Path:
         """Find an available path by appending a sequence number if necessary.
