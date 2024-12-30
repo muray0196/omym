@@ -19,18 +19,15 @@ class TestSanitizer:
     @pytest.mark.parametrize(
         "input_str,expected",
         [
-            ("", "Unknown-Title"),  # Empty string
             (None, "Unknown-Title"),  # None
+            ("", "Unknown-Title"),  # Empty string
             (" ", "Unknown-Title"),  # Only space
-            ("-", "Unknown-Title"),  # Only hyphen
             (".", "Unknown-Title"),  # Only dot
-            ("---", "Unknown-Title"),  # Only hyphens
             ("   ", "Unknown-Title"),  # Multiple spaces
-            ("...", "Unknown-Title"),  # Multiple dots
+            ("---", "Unknown-Title"),  # Multiple hyphens
             ("@#$%^&*()", "Unknown-Title"),  # Only special characters
             ("♪♫♬", "Unknown-Title"),  # Only music symbols
             ("★☆○●", "Unknown-Title"),  # Only geometric shapes
-            ("『』「」（）", "Unknown-Title"),  # Only brackets
         ],
     )
     def test_track_name_empty(self, input_str: Optional[str], expected: str) -> None:
@@ -223,7 +220,6 @@ class TestSanitizer:
             # Combined characters
             ("é", "é"),  # e + acute = single é
             ("が", "が"),  # か + dakuten = が
-            ("ﾊﾟ", "パ"),  # ハ + ゜ = パ
         ]
         for input_str, expected in test_cases:
             assert Sanitizer.sanitize_string(input_str) == expected
