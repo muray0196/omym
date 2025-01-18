@@ -9,15 +9,27 @@ from typing import Optional, ClassVar, Dict, Any
 from omym.utils.logger import logger
 
 
+def _path_field(default: Optional[Path] = None) -> Any:
+    """Create a field for Path objects with proper conversion.
+
+    Args:
+        default: Default value for the field.
+
+    Returns:
+        Field with proper metadata for path handling.
+    """
+    return field(default=default, metadata={"path": True})
+
+
 @dataclass
 class Config:
     """Application configuration."""
 
     # Base path for music library
-    base_path: Optional[Path] = None
+    base_path: Optional[Path] = _path_field()
 
     # Log file path
-    log_file: Optional[Path] = None
+    log_file: Optional[Path] = _path_field()
 
     # Default configuration file path (relative to project root)
     config_file: Path = field(
@@ -28,6 +40,13 @@ class Config:
     _instance: ClassVar[Optional["Config"]] = None
     _loaded_from: ClassVar[Optional[Path]] = None
 
+    def __post_init__(self) -> None:
+        """Convert string paths to Path objects after initialization."""
+        for field_name, field_type in self.__annotations__.items():
+            value = getattr(self, field_name)
+            if isinstance(value, str) and "Path" in str(field_type):
+                setattr(self, field_name, Path(value) if value else None)
+
     def save(self) -> None:
         """Save configuration to file."""
         config_dict = asdict(self)
@@ -36,19 +55,22 @@ class Config:
         for key, value in config_dict.items():
             if isinstance(value, Path):
                 config_dict[key] = str(value)
+            elif value is None:
+                config_dict[key] = ""  # Empty string for None values
 
         # Ensure config directory exists
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             # If the file exists and is JSON, convert it to TOML
-            if self.config_file.exists() and self.config_file.suffix == '.json':
+            if self.config_file.suffix == '.json':
                 # Create new TOML path
                 toml_path = self.config_file.with_suffix('.toml')
                 # Write as TOML
                 self._save_toml(toml_path, config_dict)
-                # Remove old JSON file
-                self.config_file.unlink()
+                # Remove old JSON file if it exists
+                if self.config_file.exists():
+                    self.config_file.unlink()
                 # Update config_file path
                 self.config_file = toml_path
                 logger.info("Converted configuration from JSON to TOML: %s", toml_path)
@@ -92,10 +114,10 @@ class Config:
         Returns:
             str: Formatted value
         """
-        if value is None:
+        if value is None or value == "":
             return '""'  # Empty string for None values
         if isinstance(value, (str, Path)):
-            return f'"{value}"'
+            return f'"{str(value)}"'
         return str(value)
 
     @classmethod
@@ -134,18 +156,24 @@ class Config:
                     else:
                         raise
 
-                # Convert string paths back to Path objects
+                # Convert string paths back to Path objects and handle empty strings
                 for key, value in config_dict.items():
                     if key.endswith("_path") or key.endswith("_dir") or key == "config_file":
-                        if value and value != "":  # Convert only non-empty strings
-                            config_dict[key] = Path(value)
+                        if value and value.strip() != "":  # Convert only non-empty strings
+                            config_dict[key] = str(value)  # Keep as string, let __post_init__ handle conversion
                         else:
                             config_dict[key] = None
 
                 logger.info("Configuration loaded from %s", config_file)
-                cls._instance = cls(**config_dict)
-                cls._loaded_from = config_file
-                return cls._instance
+                instance = cls(**config_dict)
+                
+                # Save immediately if it's a JSON file to trigger conversion
+                if config_file.suffix == '.json':
+                    instance.save()
+                
+                cls._instance = instance
+                cls._loaded_from = instance.config_file  # Use the potentially updated config_file path
+                return instance
 
             # If config file doesn't exist, create default config
             config = cls(config_file=config_file)

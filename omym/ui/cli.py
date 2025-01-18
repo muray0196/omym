@@ -298,9 +298,12 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
         logger.error("Music path does not exist: %s", music_path)
         sys.exit(1)
 
-    target_path = Path(args.target) if args.target else music_path
+    # Set target path based on input type
     if args.target:
+        target_path = Path(args.target)
         target_path.mkdir(parents=True, exist_ok=True)
+    else:
+        target_path = music_path.parent if music_path.is_file() else music_path
 
     # Load configuration
     if args.config:

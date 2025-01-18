@@ -26,7 +26,6 @@ def test_default_config(config_file: Path) -> None:
     config = Config(config_file=config_file)
     assert config.base_path is None
     assert config.log_file is None
-    assert config.output_dir == Path("output")
     assert config.config_file == config_file
 
 
@@ -36,7 +35,6 @@ def test_save_load_toml(config_file: Path) -> None:
     original_config = Config(
         base_path=Path("/test/music"),
         log_file=Path("/test/logs/omym.log"),
-        output_dir=Path("custom_output"),
         config_file=config_file,
     )
     original_config.save()
@@ -47,7 +45,6 @@ def test_save_load_toml(config_file: Path) -> None:
     # Verify values
     assert loaded_config.base_path == Path("/test/music")
     assert loaded_config.log_file == Path("/test/logs/omym.log")
-    assert loaded_config.output_dir == Path("custom_output")
     assert loaded_config.config_file == config_file
 
 
@@ -57,7 +54,6 @@ def test_save_load_none_values(config_file: Path) -> None:
     original_config = Config(
         base_path=None,
         log_file=None,
-        output_dir=Path("output"),
         config_file=config_file,
     )
     original_config.save()
@@ -68,7 +64,6 @@ def test_save_load_none_values(config_file: Path) -> None:
     # Verify values
     assert loaded_config.base_path is None
     assert loaded_config.log_file is None
-    assert loaded_config.output_dir == Path("output")
     assert loaded_config.config_file == config_file
 
 
@@ -79,7 +74,6 @@ def test_json_to_toml_conversion(tmp_path: Path) -> None:
     config_data = {
         "base_path": "/test/music",
         "log_file": "/test/logs/omym.log",
-        "output_dir": "custom_output",
         "config_file": str(json_config),
     }
     with open(json_config, "w", encoding="utf-8") as f:
@@ -89,7 +83,6 @@ def test_json_to_toml_conversion(tmp_path: Path) -> None:
     config = Config.load(json_config)
     assert config.base_path == Path("/test/music")
     assert config.log_file == Path("/test/logs/omym.log")
-    assert config.output_dir == Path("custom_output")
 
     # Verify JSON file is converted to TOML
     assert not json_config.exists()
@@ -100,7 +93,6 @@ def test_json_to_toml_conversion(tmp_path: Path) -> None:
     converted_config = Config.load(toml_config)
     assert converted_config.base_path == Path("/test/music")
     assert converted_config.log_file == Path("/test/logs/omym.log")
-    assert converted_config.output_dir == Path("custom_output")
 
 
 def test_singleton_behavior(config_file: Path) -> None:
@@ -137,5 +129,4 @@ def test_toml_comments(config_file: Path) -> None:
     # Verify comments exist
     assert "# OMYM Configuration File" in content
     assert "# Base path for your music library" in content
-    assert "# Log file path" in content
-    assert "# Project output directory" in content 
+    assert "# Log file path" in content 

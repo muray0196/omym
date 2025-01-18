@@ -88,7 +88,7 @@ def test_main_module_entry_point(
         mock_database: Mock database fixture.
     """
     # Mock sys.argv to provide required arguments
-    mocker.patch("sys.argv", ["omym", "process", test_file])
+    mocker.patch("sys.argv", ["omym", test_file])
 
     # Import and execute the module
     import omym.__main__ as main_module
@@ -115,7 +115,7 @@ def test_main_script_entry_point(
         mock_database: Mock database fixture.
     """
     # Mock sys.argv to provide required arguments
-    mocker.patch("sys.argv", ["omym", "process", test_file])
+    mocker.patch("sys.argv", ["omym", test_file])
 
     # Import and execute the module
     import omym.main as main_module

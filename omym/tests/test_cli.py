@@ -22,7 +22,7 @@ def test_process_single_file(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_instance = mock_processor.return_value
     mock_instance.process_file.return_value.success = True
 
-    # Run CLI
+    # Run CLI with music_path argument
     args = [str(test_file)]
     process_command(args)
 
