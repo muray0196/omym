@@ -25,80 +25,53 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    # Create subparsers for commands
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    # Required positional argument for music path
+    parser.add_argument(
+        "music_path",
+        type=str,
+        help="Path to music file or directory to process",
+        metavar="MUSIC_PATH",
+    )
 
-    # Common arguments for all commands
-    common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument(
+    # Optional target path
+    parser.add_argument(
+        "--target",
+        type=str,
+        help="Target directory for organized files (defaults to music_path)",
+        metavar="TARGET_PATH",
+    )
+
+    # Common options
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview changes without applying them",
     )
-    common_parser.add_argument(
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Show detailed processing information",
     )
-    common_parser.add_argument(
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress all output except errors",
     )
-    common_parser.add_argument(
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Override safety checks",
     )
-    common_parser.add_argument(
+    parser.add_argument(
         "--config",
         type=str,
         help="Path to custom configuration file",
         metavar="FILE",
     )
-    common_parser.add_argument(
+    parser.add_argument(
         "--db",
         action="store_true",
         help="Enable database operations preview",
-    )
-
-    # Process command - for single files
-    process_parser = subparsers.add_parser(
-        "process",
-        help="Process a single music file",
-        parents=[common_parser],
-    )
-    process_parser.add_argument(
-        "path",
-        type=str,
-        help="Path to the music file to process",
-        metavar="FILE",
-    )
-
-    # Organize command - for directories
-    organize_parser = subparsers.add_parser(
-        "organize",
-        help="Process all music files in a directory",
-        parents=[common_parser],
-    )
-    organize_parser.add_argument(
-        "path",
-        type=str,
-        help="Directory containing music files to organize",
-        metavar="DIR",
-    )
-
-    # Verify command - check without changes
-    verify_parser = subparsers.add_parser(
-        "verify",
-        help="Verify file organization without changes",
-        parents=[common_parser],
-    )
-    verify_parser.add_argument(
-        "path",
-        type=str,
-        help="Directory to verify",
-        metavar="DIR",
     )
 
     return parser
@@ -319,11 +292,15 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
         log_level = logging.INFO
     setup_logger(console_level=log_level)
 
-    # Convert path to Path and verify it exists
-    path = Path(args.path)
-    if not path.exists():
-        logger.error("Path does not exist: %s", path)
+    # Convert paths to Path objects and verify they exist
+    music_path = Path(args.music_path)
+    if not music_path.exists():
+        logger.error("Music path does not exist: %s", music_path)
         sys.exit(1)
+
+    target_path = Path(args.target) if args.target else music_path
+    if args.target:
+        target_path.mkdir(parents=True, exist_ok=True)
 
     # Load configuration
     if args.config:
@@ -333,30 +310,23 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
 
     # Create processor with appropriate base path
     processor = MusicProcessor(
-        base_path=path.parent if args.command == "process" else path,
-        dry_run=args.dry_run or args.command == "verify",
+        base_path=target_path,
+        dry_run=args.dry_run,
     )
 
     try:
-        if args.command == "process":
-            if not path.is_file():
-                logger.error("Path must be a file for 'process' command: %s", path)
-                sys.exit(1)
-            results = [processor.process_file(path)]
-        else:  # organize or verify
-            if not path.is_dir():
-                logger.error("Path must be a directory for '%s' command: %s", args.command, path)
-                sys.exit(1)
-
+        if music_path.is_file():
+            results = [processor.process_file(music_path)]
+        else:
             # Process files with progress bar
             results = process_files_with_progress(
                 processor,
-                path,
+                music_path,
                 interactive=not (args.quiet or args.dry_run or args.force),
             )
 
         # Display preview in dry-run mode
-        if args.dry_run or args.command == "verify":
+        if args.dry_run:
             display_preview(results, processor.base_path, show_db=args.db)
         # Display normal results otherwise
         elif not args.quiet:

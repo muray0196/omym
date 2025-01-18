@@ -1,4 +1,4 @@
-"""Organize command implementation."""
+"""File organization operations."""
 
 import logging
 import shutil
@@ -37,11 +37,11 @@ def organize_files(
         # Determine target directory
         if target_dir is None:
             # Get project root directory (parent of omym package)
-            project_root = Path(__file__).parent.parent.parent
+            project_root = Path(__file__).parent.parent.parent.parent
             target_dir = project_root / config.output_dir
 
         # Use persistent database for caching
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent.parent
         db_dir = project_root / "data"
         db_dir.mkdir(parents=True, exist_ok=True)
         db_path = db_dir / "omym.db"
@@ -120,4 +120,4 @@ def organize_files(
 
     except Exception as e:
         logger.error("Failed to organize files: %s", e)
-        return 1
+        return 1 

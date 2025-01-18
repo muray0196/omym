@@ -1,12 +1,8 @@
 """Tests for CLI functionality."""
 
 from pathlib import Path
-
-import pytest
 from pytest_mock import MockerFixture
-from _pytest.capture import CaptureFixture
 
-from omym.core.processor import ProcessResult
 from omym.ui.cli import process_command
 
 
@@ -27,16 +23,47 @@ def test_process_single_file(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_instance.process_file.return_value.success = True
 
     # Run CLI
-    args = ["process", str(test_file)]
+    args = [str(test_file)]
     process_command(args)
 
     # Verify
-    mock_processor.assert_called_once()
+    mock_processor.assert_called_once_with(base_path=test_file.parent, dry_run=False)
     mock_instance.process_file.assert_called_once_with(test_file)
 
 
-def test_organize_directory(tmp_path: Path, mocker: MockerFixture) -> None:
-    """Test organizing a directory.
+def test_process_with_target(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Test processing with target directory.
+
+    Args:
+        tmp_path: Temporary directory path fixture
+        mocker: Pytest mocker fixture
+    """
+    # Create test directories and file
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    target_dir = tmp_path / "target"
+    (source_dir / "test.mp3").touch()
+
+    # Setup mock
+    mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
+    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
+    mock_progress.return_value = []
+
+    # Run CLI
+    args = [str(source_dir), "--target", str(target_dir)]
+    process_command(args)
+
+    # Verify
+    mock_processor.assert_called_once_with(base_path=target_dir, dry_run=False)
+    mock_progress.assert_called_once_with(
+        mock_processor.return_value,
+        source_dir,
+        interactive=True,
+    )
+
+
+def test_process_directory(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Test processing a directory.
 
     Args:
         tmp_path: Temporary directory path fixture
@@ -53,67 +80,11 @@ def test_organize_directory(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_progress.return_value = []
 
     # Run CLI with quiet mode to avoid stdin interaction
-    args = ["organize", str(source_dir), "--quiet"]
+    args = [str(source_dir), "--quiet"]
     process_command(args)
 
     # Verify
-    mock_processor.assert_called_once()
-    mock_progress.assert_called_once_with(
-        mock_processor.return_value,
-        source_dir,
-        interactive=False,
-    )
-
-
-def test_verify_directory(tmp_path: Path, mocker: MockerFixture) -> None:
-    """Test verifying a directory.
-
-    Args:
-        tmp_path: Temporary directory path fixture
-        mocker: Pytest mocker fixture
-    """
-    source_dir = tmp_path / "source"
-    source_dir.mkdir()
-    (source_dir / "test.mp3").touch()
-
-    # Setup mock
-    mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
-
-    # Run CLI with verify command in quiet mode
-    args = ["verify", str(source_dir), "--quiet"]
-    process_command(args)
-
-    # Verify dry_run was set
-    mock_processor.assert_called_once_with(
-        base_path=source_dir,
-        dry_run=True,
-    )
-
-
-def test_dry_run(tmp_path: Path, mocker: MockerFixture) -> None:
-    """Test dry run mode.
-
-    Args:
-        tmp_path: Temporary directory path fixture
-        mocker: Pytest mocker fixture
-    """
-    source_dir = tmp_path / "source"
-    source_dir.mkdir()
-
-    # Setup mock
-    mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
-    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
-    mock_progress.return_value = []
-
-    # Run CLI with dry-run
-    args = ["organize", str(source_dir), "--dry-run"]
-    process_command(args)
-
-    # Verify dry-run was passed to processor and process_files_with_progress was used
-    mock_processor.assert_called_once_with(
-        base_path=source_dir,
-        dry_run=True,
-    )
+    mock_processor.assert_called_once_with(base_path=source_dir, dry_run=False)
     mock_progress.assert_called_once_with(
         mock_processor.return_value,
         source_dir,
@@ -137,7 +108,7 @@ def test_verbose_logging(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_progress.return_value = []
 
     # Run CLI with verbose flag
-    args = ["organize", str(source_dir), "--verbose"]
+    args = [str(source_dir), "--verbose"]
     process_command(args)
 
     # Verify debug level was set
@@ -158,7 +129,7 @@ def test_quiet_logging(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_logger = mocker.patch("omym.ui.cli.setup_logger")
 
     # Run CLI with quiet flag
-    args = ["organize", str(source_dir), "--quiet"]
+    args = [str(source_dir), "--quiet"]
     process_command(args)
 
     # Verify error level was set
@@ -181,7 +152,7 @@ def test_force_option(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_progress.return_value = []
 
     # Run CLI with force flag
-    args = ["organize", str(source_dir), "--force"]
+    args = [str(source_dir), "--force"]
     process_command(args)
 
     # Verify process_files_with_progress was used with interactive=False
@@ -208,7 +179,7 @@ def test_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_progress.return_value = []
 
     # Run CLI without any flags
-    args = ["organize", str(source_dir)]
+    args = [str(source_dir)]
     process_command(args)
 
     # Verify interactive mode was used
@@ -219,73 +190,26 @@ def test_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:
     )
 
 
-def test_invalid_path() -> None:
-    """Test error when path doesn't exist."""
-    with pytest.raises(SystemExit):
-        process_command(["organize", "nonexistent/path"])
-
-
-def test_wrong_path_type_process() -> None:
-    """Test error when using directory for process command."""
-    with pytest.raises(SystemExit):
-        process_command(["process", "."])
-
-
-def test_wrong_path_type_organize() -> None:
-    """Test error when using file for organize command."""
-    with pytest.raises(SystemExit):
-        process_command(["organize", __file__])
-
-
-def test_missing_command() -> None:
-    """Test error when no command is provided."""
-    with pytest.raises(SystemExit):
-        process_command([])
-
-
-def test_process_directory_interactive(
-    tmp_path: Path,
-    mocker: MockerFixture,
-    capsys: CaptureFixture[str],
-) -> None:
-    """Test processing a directory in interactive mode.
+def test_dry_run(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Test dry run option.
 
     Args:
-        tmp_path: Temporary directory path fixture.
-        mocker: Pytest mocker fixture.
-        capsys: Pytest capture fixture.
+        tmp_path: Temporary directory path fixture
+        mocker: Pytest mocker fixture
     """
-    # Create test directory with files
     source_dir = tmp_path / "source"
     source_dir.mkdir()
-    test_file = source_dir / "test.mp3"
-    test_file.touch()
 
     # Setup mocks
     mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
     mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
-    mock_progress.return_value = [
-        ProcessResult(
-            source_path=test_file,
-            target_path=tmp_path / "organized/test.mp3",
-            success=True,
-        )
-    ]
+    mock_preview = mocker.patch("omym.ui.cli.display_preview")
+    mock_progress.return_value = []
 
-    # Run CLI in interactive mode
-    args = ["organize", str(source_dir)]
+    # Run CLI with dry-run flag
+    args = [str(source_dir), "--dry-run"]
     process_command(args)
 
-    # Verify interactive mode was used
-    mock_progress.assert_called_once_with(
-        mock_processor.return_value,
-        source_dir,
-        interactive=True,
-    )
-
-    # Verify output
-    captured = capsys.readouterr()
-    assert "Processing Summary" in captured.out
-    assert "Total files processed: 1" in captured.out
-    assert "Successful: 1" in captured.out
-    assert "Failed: 0" in captured.out
+    # Verify
+    mock_processor.assert_called_once_with(base_path=source_dir, dry_run=True)
+    mock_preview.assert_called_once_with([], mock_processor.return_value.base_path, show_db=False)

@@ -1,4 +1,4 @@
-"""Preview command implementation."""
+"""Preview operations for file organization."""
 
 import json
 import logging
@@ -116,4 +116,4 @@ def preview_files(
 
     except Exception as e:
         logger.error("Failed to preview files: %s", e)
-        return 1
+        return 1 
