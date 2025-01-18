@@ -9,7 +9,6 @@ from omym.core.music_grouper import MusicGrouper
 from omym.core.path_generator import PathGenerator
 from omym.db.dao_filter import FilterDAO
 from omym.db.db_manager import DatabaseManager
-from omym.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ def organize_files(
     Args:
         path: Path to file or directory to process.
         format_str: Format string specifying the organization structure.
-        target_dir: Optional base directory for organized files. If None, uses project output directory.
+        target_dir: Optional base directory for organized files. If None, uses input path.
         dry_run: If True, only show what would be done without moving files.
         force: If True, overwrite existing files at target paths.
 
@@ -34,11 +33,9 @@ def organize_files(
         int: Exit code (0 for success, 1 for failure).
     """
     try:
-        # Determine target directory
+        # Use input path as target directory if not specified
         if target_dir is None:
-            # Get project root directory (parent of omym package)
-            project_root = Path(__file__).parent.parent.parent.parent
-            target_dir = project_root / config.output_dir
+            target_dir = path if path.is_dir() else path.parent
 
         # Use persistent database for caching
         project_root = Path(__file__).parent.parent.parent.parent
