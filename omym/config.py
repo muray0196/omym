@@ -55,8 +55,6 @@ class Config:
         for key, value in config_dict.items():
             if isinstance(value, Path):
                 config_dict[key] = str(value)
-            elif value is None:
-                config_dict[key] = ""  # Empty string for None values
 
         # Ensure config directory exists
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -90,14 +88,24 @@ class Config:
             config: Configuration dictionary to save
         """
         toml_str = "# OMYM Configuration File\n\n"
+        
+        # Base path section
         toml_str += "# Base path for your music library (optional)\n"
         toml_str += "# This is the root directory where your music files are stored\n"
         toml_str += "# Example: base_path = \"/path/to/your/music\"\n"
-        toml_str += f'base_path = {self._format_toml_value(config["base_path"])}\n\n'
+        if config["base_path"] is not None:
+            toml_str += f'base_path = {self._format_toml_value(config["base_path"])}\n'
+        toml_str += "\n"
+        
+        # Log file section
         toml_str += "# Log file path (optional)\n"
         toml_str += "# Where to store the application logs\n"
         toml_str += "# Example: log_file = \"/path/to/logs/omym.log\"\n"
-        toml_str += f'log_file = {self._format_toml_value(config["log_file"])}\n\n'
+        if config["log_file"] is not None:
+            toml_str += f'log_file = {self._format_toml_value(config["log_file"])}\n'
+        toml_str += "\n"
+        
+        # Config file section (always present)
         toml_str += "# Configuration file path (relative to project root)\n"
         toml_str += "# Location of this configuration file\n"
         toml_str += f'config_file = "{config["config_file"]}"\n'
@@ -114,8 +122,6 @@ class Config:
         Returns:
             str: Formatted value
         """
-        if value is None or value == "":
-            return '""'  # Empty string for None values
         if isinstance(value, (str, Path)):
             return f'"{str(value)}"'
         return str(value)

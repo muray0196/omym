@@ -58,7 +58,7 @@ def test_process_with_target(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_progress.assert_called_once_with(
         mock_processor.return_value,
         source_dir,
-        interactive=True,
+        interactive=False,
     )
 
 
@@ -163,8 +163,8 @@ def test_force_option(tmp_path: Path, mocker: MockerFixture) -> None:
     )
 
 
-def test_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:
-    """Test interactive mode is enabled by default.
+def test_explicit_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Test interactive mode is enabled when explicitly requested.
 
     Args:
         tmp_path: Temporary directory path fixture
@@ -178,15 +178,42 @@ def test_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
     mock_progress.return_value = []
 
-    # Run CLI without any flags
-    args = [str(source_dir)]
+    # Run CLI with interactive flag
+    args = [str(source_dir), "--interactive"]
     process_command(args)
 
-    # Verify interactive mode was used
+    # Verify interactive mode was used when explicitly requested
     mock_progress.assert_called_once_with(
         mock_processor.return_value,
         source_dir,
         interactive=True,
+    )
+
+
+def test_default_non_interactive_mode(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Test that non-interactive is the default mode.
+
+    Args:
+        tmp_path: Temporary directory path fixture
+        mocker: Pytest mocker fixture
+    """
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+
+    # Setup mocks
+    mock_processor = mocker.patch("omym.ui.cli.MusicProcessor")
+    mock_progress = mocker.patch("omym.ui.cli.process_files_with_progress")
+    mock_progress.return_value = []
+
+    # Run CLI without any mode flags
+    args = [str(source_dir)]
+    process_command(args)
+
+    # Verify non-interactive mode is the default
+    mock_progress.assert_called_once_with(
+        mock_processor.return_value,
+        source_dir,
+        interactive=False,
     )
 
 

@@ -40,8 +40,7 @@ def test_format_text_output(path_infos: list[PathInfo]) -> None:
     output = format_text_output(path_infos)
     expected = (
         "hash1: artist1/album1/track1.mp3\n"
-        "hash2: artist2/album2/track2.mp3\n"
-        "  Warnings: Warning 1, Warning 2"
+        "hash2: artist2/album2/track2.mp3\n  Warnings: Warning 1, Warning 2"
     )
     assert output == expected
 

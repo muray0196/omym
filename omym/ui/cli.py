@@ -63,6 +63,11 @@ def create_parser() -> argparse.ArgumentParser:
         help="Override safety checks",
     )
     parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Enable interactive mode",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         help="Path to custom configuration file",
@@ -325,7 +330,7 @@ def process_command(args_list: Optional[List[str]] = None) -> None:
             results = process_files_with_progress(
                 processor,
                 music_path,
-                interactive=not (args.quiet or args.dry_run or args.force),
+                interactive=args.interactive,
             )
 
         # Display preview in dry-run mode
