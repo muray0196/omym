@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.tree import Tree
 from rich.table import Table
 
-from omym.core.processor import MusicProcessor, ProcessResult
+from omym.core.metadata.music_file_processor import MusicProcessor, ProcessResult
 from omym.utils.logger import logger, setup_logger
 from omym.config import Config
 
