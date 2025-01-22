@@ -39,7 +39,3 @@ OMYM_OUTPUT_DIR=/path/to/organized/music
 OMYM_FILE_FORMAT="{artist}/{album}/{track} - {title}"
 OMYM_LOG_LEVEL=INFO
 ```
-
-## License
-
-MIT License 
