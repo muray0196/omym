@@ -6,68 +6,72 @@ This document details the essential organization of OMYM's files and directories
 ## Directory Structure
 
 ```
-omym/                      # Project root
+omym/
 ├── README.md
-├── config/
-│   └── config.toml
-├── data/
-│   └── omym.db
+├── docs/
+│   ├── file_structure.md
+│   ├── project_requirements.md
+│   ├── tech_stack.md
+│   ├── tool_flow.md
+│   ├── tool_logic_structure.md
+│   └── ui_guidelines.md
 ├── omym/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── config.py
-│   ├── main.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── metadata/
-│   │   │   ├── __init__.py
-│   │   │   ├── metadata.py
-│   │   │   ├── metadata_extractor.py
-│   │   │   ├── processor.py
-│   │   │   └── types/
-│   │   │       ├── __init__.py
-│   │   │       ├── langid_types.pyi
-│   │   │       └── mutagen_types.py
-│   │   ├── operations/
-│   │   │   ├── __init__.py
-│   │   │   ├── organize.py
-│   │   │   └── preview.py
-│   │   ├── organization/
-│   │   │   ├── __init__.py
-│   │   │   ├── album_manager.py
-│   │   │   ├── filtering.py
-│   │   │   └── music_grouper.py
-│   │   └── path/
-│   │       ├── __init__.py
-│   │       ├── path_components.py
-│   │       ├── path_generator.py
-│   │       ├── renaming_logic.py
-│   │       └── sanitizer.py
-│   ├── db/
-│   │   ├── __init__.py
-│   │   ├── db_manager.py
-│   │   ├── cache/
-│   │   │   ├── __init__.py
-│   │   │   └── dao_artist_cache.py
-│   │   ├── daos/
-│   │   │   ├── __init__.py
-│   │   │   ├── dao_albums.py
-│   │   │   ├── dao_filter.py
-│   │   │   ├── dao_path_components.py
-│   │   │   ├── dao_processing_after.py
-│   │   │   └── dao_processing_before.py
-│   │   └── migrations/
-│   │       ├── __init__.py
-│   │       ├── schema.sql
-│   │       └── versions/
-│   │           └── 001_initial.sql
-│   ├── ui/
-│   │   ├── __init__.py
-│   │   └── cli.py
-│   └── utils/
-│       ├── __init__.py
-│       └── logger.py
-└── pyproject.toml
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── config.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── commands/
+│   │   │   ├── __init__.py
+│   │   │   ├── organize_command.py
+│   │   │   └── preview_command.py
+│   │   ├── metadata/
+│   │   │   ├── __init__.py
+│   │   │   ├── music_file_processor.py
+│   │   │   ├── track_metadata.py
+│   │   │   └── track_metadata_extractor.py
+│   │   ├── organization/
+│   │   │   ├── __init__.py
+│   │   │   ├── album_manager.py
+│   │   │   ├── filter_engine.py
+│   │   │   └── group_manager.py
+│   │   └── path/
+│   │       ├── __init__.py
+│   │       ├── music_file_renamer.py
+│   │       ├── path_elements.py
+│   │       ├── path_generator.py
+│   │       └── sanitizer.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── cache/
+│   │   │   ├── __init__.py
+│   │   │   └── artist_cache_dao.py
+│   │   ├── daos/
+│   │   │   ├── __init__.py
+│   │   │   ├── albums_dao.py
+│   │   │   ├── filter_dao.py
+│   │   │   ├── path_elements_dao.py
+│   │   │   ├── processing_after_dao.py
+│   │   │   └── processing_before_dao.py
+│   │   ├── db_manager.py
+│   │   └── migrations
+│   │       ├── __init__.py
+│   │       ├── schema.sql
+│   │       └── versions
+│   │           └── 001_initial.sql
+│   ├── main.py
+│   ├── types/
+│   │   ├── __init__.py
+│   │   ├── langid_types.pyi
+│   │   └── mutagen_types.py
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   └── cli.py
+│   └── utils/
+│       ├── __init__.py
+│       └── logger.py
+├── pyproject.toml
+└── tests/
 ```
 
 ## File Naming Conventions
