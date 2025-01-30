@@ -3,6 +3,7 @@ config/
 data/
 # Editor
 .vscode/
+.cursor/
 .cursorrules
 .cursorignore
 # Python
