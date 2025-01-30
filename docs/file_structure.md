@@ -1,7 +1,7 @@
 # OMYM File Structure Documentation
 
 ## Overview
-This document details the essential organization of OMYM's files and directories.
+This document details the essential organization of OMYM's files and directories, providing a clear understanding of the project's structure and component purposes.
 
 ## Directory Structure
 
@@ -9,67 +9,63 @@ This document details the essential organization of OMYM's files and directories
 omym/
 ├── README.md
 ├── docs/
-│   ├── file_structure.md
-│   ├── project_requirements.md
-│   ├── tech_stack.md
-│   ├── tool_flow.md
-│   ├── tool_logic_structure.md
-│   └── ui_guidelines.md
+│   ├── file_structure.md
+│   ├── project_requirements.md
+│   ├── tech_stack.md
+│   ├── tool_flow.md
+│   ├── tool_logic_structure.md
+│   └── ui_guidelines.md
 ├── omym/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── config.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── commands/
-│   │   │   ├── __init__.py
-│   │   │   ├── organize_command.py
-│   │   │   └── preview_command.py
-│   │   ├── metadata/
-│   │   │   ├── __init__.py
-│   │   │   ├── music_file_processor.py
-│   │   │   ├── track_metadata.py
-│   │   │   └── track_metadata_extractor.py
-│   │   ├── organization/
-│   │   │   ├── __init__.py
-│   │   │   ├── album_manager.py
-│   │   │   ├── filter_engine.py
-│   │   │   └── group_manager.py
-│   │   └── path/
-│   │       ├── __init__.py
-│   │       ├── music_file_renamer.py
-│   │       ├── path_elements.py
-│   │       ├── path_generator.py
-│   │       └── sanitizer.py
-│   ├── db/
-│   │   ├── __init__.py
-│   │   ├── cache/
-│   │   │   ├── __init__.py
-│   │   │   └── artist_cache_dao.py
-│   │   ├── daos/
-│   │   │   ├── __init__.py
-│   │   │   ├── albums_dao.py
-│   │   │   ├── filter_dao.py
-│   │   │   ├── path_elements_dao.py
-│   │   │   ├── processing_after_dao.py
-│   │   │   └── processing_before_dao.py
-│   │   ├── db_manager.py
-│   │   └── migrations
-│   │       ├── __init__.py
-│   │       ├── schema.sql
-│   │       └── versions
-│   │           └── 001_initial.sql
-│   ├── main.py
-│   ├── types/
-│   │   ├── __init__.py
-│   │   ├── langid_types.pyi
-│   │   └── mutagen_types.py
-│   ├── ui/
-│   │   ├── __init__.py
-│   │   └── cli.py
-│   └── utils/
-│       ├── __init__.py
-│       └── logger.py
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── config.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── metadata/
+│   │   │   ├── __init__.py
+│   │   │   ├── music_file_processor.py
+│   │   │   ├── track_metadata.py
+│   │   │   └── track_metadata_extractor.py
+│   │   ├── organization/
+│   │   │   ├── __init__.py
+│   │   │   ├── album_manager.py
+│   │   │   ├── filter_engine.py
+│   │   │   └── group_manager.py
+│   │   └── path/
+│   │       ├── __init__.py
+│   │       ├── music_file_renamer.py
+│   │       ├── path_elements.py
+│   │       ├── path_generator.py
+│   │       └── sanitizer.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── cache/
+│   │   │   ├── __init__.py
+│   │   │   └── artist_cache_dao.py
+│   │   ├── daos/
+│   │   │   ├── __init__.py
+│   │   │   ├── albums_dao.py
+│   │   │   ├── filter_dao.py
+│   │   │   ├── path_elements_dao.py
+│   │   │   ├── processing_after_dao.py
+│   │   │   └── processing_before_dao.py
+│   │   ├── db_manager.py
+│   │   └── migrations/
+│   │       ├── __init__.py
+│   │       ├── schema.sql
+│   │       └── versions/
+│   │           └── 001_initial.sql
+│   ├── main.py
+│   ├── types/
+│   │   ├── __init__.py
+│   │   ├── langid_types.pyi
+│   │   └── mutagen_types.py
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   └── cli.py
+│   └── utils/
+│       ├── __init__.py
+│       └── logger.py
 ├── pyproject.toml
 └── tests/
 ```
@@ -90,18 +86,12 @@ omym/
 ## Directory Purposes
 
 ### 1. Root Level Directories
-- `config/` - Application configuration files (TOML format)
-  - Contains `config.toml` for application settings
-  - Supports environment-specific configurations
-- `data/` - Database storage
-  - Contains `omym.db` SQLite database file
-  - Stores processed music metadata and cache
-  - Maintains processing state and artist information
 - `docs/` - Project documentation in Markdown
   - Each document focuses on a specific aspect of the project
   - Follows Google Style Markdown conventions
   - Includes diagrams and structured documentation
 - `omym/` - Main Python package
+- `tests/` - Test suite directory mirroring the main package structure
 
 ### 2. Main Package (`omym/`)
 - Entry point (`__main__.py`)
@@ -112,11 +102,7 @@ omym/
 ### 3. Core Module (`core/`)
 - Metadata handling (`metadata/`)
   - Music metadata extraction and processing
-  - Type definitions for external libraries
   - Metadata models and processors
-- Operations (`operations/`)
-  - High-level operations like organize and preview
-  - Command execution logic
 - Organization (`organization/`)
   - Album and artist management
   - File filtering and grouping
@@ -129,25 +115,32 @@ omym/
 ### 4. Database Module (`db/`)
 - Data Access Objects (`daos/`)
   - Album and artist management
-  - Processing state (before/after)
+  - Processing state tracking
   - Path components and filters
 - Cache management (`cache/`)
   - Artist ID caching
   - Performance optimization
-- Database management and migrations
-  - Version-controlled schema changes in `migrations/versions/`
-  - Each migration is timestamped and reversible
-  - Automatic migration application on startup
-- SQL schema definition
-  - Base schema in `migrations/schema.sql`
-  - Defines tables, indices, and constraints
-  - Documents table relationships and purposes
+- Database management (`migrations/`)
+  - Version-controlled schema changes
+  - Automatic migration application
+  - Base schema and table definitions
 
-### 5. UI Module (`ui/`)
+### 5. Types Module (`types/`)
+- Purpose: Resolves type-related issues and enhances type safety
+- Contains type definitions and stubs for external libraries
+- Provides type hints for project-specific components
+- Helps maintain strict type checking across the codebase
+- Includes:
+  - Stub files (`.pyi`) for external library type definitions
+  - Custom type definitions for project-specific types
+  - Type aliases and protocols for complex types
+
+### 6. UI Module (`ui/`)
 - Command-line interface implementation (`cli.py`)
-- User input processing
-- Output formatting
+- User input processing and validation
+- Output formatting and display
 
-### 6. Utils Module (`utils/`)
+### 7. Utils Module (`utils/`)
 - Logging configuration and management (`logger.py`)
 - General utility functions and helpers
+- Common functionality used across modules
