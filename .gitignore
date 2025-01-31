@@ -6,6 +6,7 @@ data/
 .cursor/
 .cursorrules
 .cursorignore
+.windsurfrules
 # Python
 __pycache__/
 *.egg-info/
