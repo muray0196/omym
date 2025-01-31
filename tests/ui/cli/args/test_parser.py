@@ -3,11 +3,12 @@
 import logging
 import shutil
 import pytest
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 from pytest_mock import MockerFixture
+from argparse import Namespace
 
-from omym.ui.cli.args.parser import create_parser, process_args
+from omym.ui.cli.args import ArgumentParser, Args
 
 
 @pytest.fixture
@@ -29,10 +30,10 @@ def test_dir() -> Generator[Path, None, None]:
 
 def test_create_parser() -> None:
     """Test argument parser creation."""
-    parser = create_parser()
-    
+    parser = ArgumentParser.create_parser()
+
     # Test with minimum required arguments
-    args = parser.parse_args(["test_path"])
+    args: Namespace = parser.parse_args(["test_path"])
     assert args.music_path == "test_path"
     assert not args.target
     assert not args.dry_run
@@ -44,16 +45,20 @@ def test_create_parser() -> None:
     assert not args.db
 
     # Test with all arguments
-    args = parser.parse_args([
-        "test_path",
-        "--target", "target_path",
-        "--dry-run",
-        "--verbose",
-        "--force",
-        "--interactive",
-        "--config", "config.yaml",
-        "--db"
-    ])
+    args = parser.parse_args(
+        [
+            "test_path",
+            "--target",
+            "target_path",
+            "--dry-run",
+            "--verbose",
+            "--force",
+            "--interactive",
+            "--config",
+            "config.yaml",
+            "--db",
+        ]
+    )
     assert args.music_path == "test_path"
     assert args.target == "target_path"
     assert args.dry_run
@@ -76,7 +81,7 @@ def test_process_args(test_dir: Path, mocker: MockerFixture) -> None:
     mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
 
     # Test with minimum required arguments
-    args = process_args([str(test_dir)])
+    args: Args = ArgumentParser.process_args([str(test_dir)])
     assert args.music_path == test_dir
     assert args.target_path == test_dir
     assert not args.dry_run
@@ -92,16 +97,20 @@ def test_process_args(test_dir: Path, mocker: MockerFixture) -> None:
     # Test with all arguments
     target_path = test_dir / "target"
     config_path = test_dir / "config.yaml"
-    args = process_args([
-        str(test_dir),
-        "--target", str(target_path),
-        "--dry-run",
-        "--verbose",
-        "--force",
-        "--interactive",
-        "--config", str(config_path),
-        "--db"
-    ])
+    args = ArgumentParser.process_args(
+        [
+            str(test_dir),
+            "--target",
+            str(target_path),
+            "--dry-run",
+            "--verbose",
+            "--force",
+            "--interactive",
+            "--config",
+            str(config_path),
+            "--db",
+        ]
+    )
     assert args.music_path == test_dir
     assert args.target_path == target_path
     assert args.dry_run
@@ -124,7 +133,7 @@ def test_process_args_invalid_path(mocker: MockerFixture) -> None:
     mock_exit = mocker.patch("sys.exit")
 
     # Test with non-existent path
-    process_args(["non_existent_path"])
+    _ = ArgumentParser.process_args(["non_existent_path"])
     mock_exit.assert_called_once_with(1)
 
 
@@ -139,6 +148,6 @@ def test_process_args_quiet_mode(test_dir: Path, mocker: MockerFixture) -> None:
     mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
 
     # Test with quiet mode
-    args = process_args([str(test_dir), "--quiet"])
+    args: Args = ArgumentParser.process_args([str(test_dir), "--quiet"])
     assert args.quiet
-    mock_setup_logger.assert_called_with(console_level=logging.ERROR) 
+    mock_setup_logger.assert_called_with(console_level=logging.ERROR)

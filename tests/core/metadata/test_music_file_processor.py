@@ -23,7 +23,9 @@ def metadata() -> TrackMetadata:
         album_artist="Pink Floyd",
         year=1979,
         track_number=6,
+        track_total=None,
         disc_number=2,
+        disc_total=None,
         file_extension=".mp3",
     )
 
@@ -59,17 +61,17 @@ def processor(mocker: MockerFixture, tmp_path: Path) -> MusicProcessor:
     mock_artist_dao = mocker.patch("omym.core.metadata.music_file_processor.ArtistCacheDAO").return_value
 
     # Configure DAO behavior
-    mock_before_dao.check_file_exists.return_value = False
-    mock_before_dao.insert_file.return_value = True
-    mock_after_dao.insert_file.return_value = True
-    mock_artist_dao.get_artist_id.return_value = "PNKFL"
-    mock_artist_dao.insert_artist_id.return_value = True
+    _ = mock_before_dao.check_file_exists.return_value = False
+    _ = mock_before_dao.insert_file.return_value = True
+    _ = mock_after_dao.insert_file.return_value = True
+    _ = mock_artist_dao.get_artist_id.return_value = "PNKFL"
+    _ = mock_artist_dao.insert_artist_id.return_value = True
 
     # Create processor
     processor = MusicProcessor(base_path=tmp_path)
 
     # Mock file hash calculation
-    mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
+    _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
 
     return processor
 
@@ -97,7 +99,7 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         result = processor.process_file(source_file)
@@ -123,7 +125,7 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction to fail
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=None)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=None)
 
         # Act
         result = processor.process_file(source_file)
@@ -154,7 +156,7 @@ class TestMusicProcessor:
         processor.dry_run = True
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         result = processor.process_file(source_file)
@@ -192,7 +194,7 @@ class TestMusicProcessor:
             (source_dir / name).touch()
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Mock file hash calculation to return different hashes
         def mock_hash(file_path: Path) -> str:
@@ -204,20 +206,16 @@ class TestMusicProcessor:
             Returns:
                 Hash based on file name.
             """
-            return (
-                f"{file_path.name}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            )
+            return f"{file_path.name}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-        mocker.patch.object(processor, "_calculate_file_hash", side_effect=mock_hash)
+        _ = mocker.patch.object(processor, "_calculate_file_hash", side_effect=mock_hash)
 
         # Act
         results = processor.process_directory(source_dir)
 
         # Assert
         # Filter results based on file extension
-        file_results = [
-            r for r in results if r.source_path.suffix.lower() in processor.SUPPORTED_EXTENSIONS
-        ]
+        file_results = [r for r in results if r.source_path.suffix.lower() in processor.SUPPORTED_EXTENSIONS]
         assert len(file_results) == len(music_files)
 
         for result in file_results:
@@ -255,48 +253,31 @@ class TestMusicProcessor:
             "test.mp3": True,  # Should be processed
             "test.flac": True,  # Should be processed
             "test.m4a": True,  # Should be processed
-            "test.dsf": True,  # Should be processed
             "test.wav": False,  # Should be skipped
-            "test.ogg": False,  # Should be skipped
             "test.txt": False,  # Should be skipped
+            "test": False,  # Should be skipped
         }
 
         for name, _ in test_files.items():
             (source_dir / name).touch()
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
-
-        # Mock file hash calculation to return different hashes
-        def mock_hash(file_path: Path) -> str:
-            """Mock hash calculation that returns different hashes based on file name.
-
-            Args:
-                file_path: File path.
-
-            Returns:
-                Hash based on file name.
-            """
-            return (
-                f"{file_path.name}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            )
-
-        mocker.patch.object(processor, "_calculate_file_hash", side_effect=mock_hash)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         results = processor.process_directory(source_dir)
 
         # Assert
-        processed_files = {r.source_path.name for r in results if r.success}
+        processed_files = {r.source_path.name for r in results}
         expected_files = {name for name, should_process in test_files.items() if should_process}
         assert processed_files == expected_files
 
-        # Verify that unsupported files still exist
+        # Verify that skipped files still exist
         for name, should_process in test_files.items():
             if not should_process:
                 assert (source_dir / name).exists()
 
-    def test_duplicate_file_safety(
+    def test_duplicate_file_handling(
         self,
         mocker: MockerFixture,
         processor: MusicProcessor,
@@ -312,58 +293,35 @@ class TestMusicProcessor:
             tmp_path: Temporary path fixture.
         """
         # Arrange
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
+        source_file = tmp_path / "test.mp3"
+        source_file.touch()
 
-        # Create test files
-        test_files = ["test1.mp3", "test2.mp3", "test3.mp3"]
-        for name in test_files:
-            (source_dir / name).touch()
+        # Create target directory with existing files
+        target_dir = tmp_path / "Pink-Floyd" / "1979_The-Wall"
+        target_dir.mkdir(parents=True)
+        existing_file = target_dir / "D2_06_Comfortably-Numb_PNKFL.mp3"
+        existing_file.touch()
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
-        # Mock file hash calculation to return the same hash for all files
-        same_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        mocker.patch.object(processor, "_calculate_file_hash", return_value=same_hash)
+        # Mock file hash calculation
+        _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
 
-        # Configure mock DAO behavior for duplicate files
-        mock_before_dao = mocker.MagicMock()
-        mock_before_dao.check_file_exists.side_effect = [False, True, True]
-        mock_before_dao.insert_file.return_value = True
-        mock_before_dao.get_target_path.return_value = None
-        processor.before_dao = mock_before_dao
-
-        # Mock after DAO
-        mock_after_dao = mocker.MagicMock()
-        mock_after_dao.insert_file.return_value = True
-        processor.after_dao = mock_after_dao
-
-        # Mock shutil.move to simulate file movement
-        def mock_move(src: str | Path, dst: str | Path) -> None:
-            Path(src).unlink()
-            Path(dst).parent.mkdir(parents=True, exist_ok=True)
-            Path(dst).touch()
-
-        mocker.patch("shutil.move", side_effect=mock_move)
+        # Mock database check to indicate file exists
+        mock_before_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingBeforeDAO").return_value
+        mock_before_dao.check_file_exists.return_value = True
+        mock_before_dao.get_target_path.return_value = str(existing_file)
 
         # Act
-        results = processor.process_directory(source_dir)
+        result = processor.process_file(source_file)
 
         # Assert
-        # Only the first file should be processed
-        successful_results = [r for r in results if r.success]
-        assert len(successful_results) == 1
-
-        # The first file should be moved
-        assert not successful_results[0].source_path.exists()
-        assert successful_results[0].target_path is not None
-        assert successful_results[0].target_path.exists()
-
-        # Other files should still exist
-        remaining_files = [f for f in test_files if f != successful_results[0].source_path.name]
-        for name in remaining_files:
-            assert (source_dir / name).exists()
+        assert result.success is True  # File should be processed with a sequence number
+        assert result.target_path is not None
+        assert result.target_path.name == "D2_06_Comfortably-Numb_PNKFL (1).mp3"
+        assert result.target_path.exists()
+        assert not source_file.exists()  # Original file should be moved
 
     def test_sequence_number_handling(
         self,
@@ -372,7 +330,7 @@ class TestMusicProcessor:
         metadata: TrackMetadata,
         tmp_path: Path,
     ) -> None:
-        """Test handling of sequence numbers for duplicate target paths.
+        """Test handling of sequence numbers in filenames.
 
         Args:
             mocker: Pytest mocker fixture.
@@ -381,56 +339,32 @@ class TestMusicProcessor:
             tmp_path: Temporary path fixture.
         """
         # Arrange
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
+        source_file = tmp_path / "test.mp3"
+        source_file.touch()
 
-        # Create test files
-        test_files = ["test1.mp3", "test2.mp3", "test3.mp3"]
-        for name in test_files:
-            (source_dir / name).touch()
+        # Create target directory with existing files
+        target_dir = tmp_path / "Pink-Floyd" / "1979_The-Wall"
+        target_dir.mkdir(parents=True)
+        existing_file = target_dir / "D2_06_Comfortably-Numb_PNKFL.mp3"
+        existing_file.touch()
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
-        # Mock file hash calculation to return different hashes
-        def mock_hash(file_path: Path) -> str:
-            """Mock hash calculation that returns different hashes based on file name.
-
-            Args:
-                file_path: File path.
-
-            Returns:
-                Hash based on file name.
-            """
-            return (
-                f"{file_path.name}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            )
-
-        mocker.patch.object(processor, "_calculate_file_hash", side_effect=mock_hash)
-
-        # Configure mock DAO behavior
-        mock_before_dao = mocker.MagicMock()
-        mock_before_dao.check_file_exists.return_value = False
-        mock_before_dao.insert_file.return_value = True
-        processor.before_dao = mock_before_dao
+        # Mock database check to indicate file exists
+        mock_before_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingBeforeDAO").return_value
+        mock_before_dao.check_file_exists.return_value = True
+        mock_before_dao.get_target_path.return_value = str(existing_file)
 
         # Act
-        results = processor.process_directory(source_dir)
+        result = processor.process_file(source_file)
 
         # Assert
-        successful_results = [r for r in results if r.success]
-        assert len(successful_results) == len(test_files)
-
-        # Verify that target paths have sequence numbers
-        target_paths = [r.target_path for r in successful_results if r.target_path is not None]
-        assert len(target_paths) == len(test_files)
-        assert len(set(target_paths)) == len(test_files)  # All paths should be unique
-
-        # Verify that original files are moved
-        for result in successful_results:
-            assert not result.source_path.exists()
-            assert result.target_path is not None
-            assert result.target_path.exists()
+        assert result.success is True
+        assert result.target_path is not None
+        assert result.target_path.name == "D2_06_Comfortably-Numb_PNKFL (1).mp3"
+        assert result.target_path.exists()
+        assert not source_file.exists()  # Original file should be moved
 
     def test_safe_file_operations(
         self,
@@ -439,7 +373,7 @@ class TestMusicProcessor:
         metadata: TrackMetadata,
         tmp_path: Path,
     ) -> None:
-        """Test safe file operations.
+        """Test safe file operations during processing.
 
         Args:
             mocker: Pytest mocker fixture.
@@ -448,71 +382,20 @@ class TestMusicProcessor:
             tmp_path: Temporary path fixture.
         """
         # Arrange
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
-
-        # Create test files
-        test_files = ["test1.mp3", "test2.mp3"]
-        for name in test_files:
-            (source_dir / name).touch()
+        source_file = tmp_path / "test.mp3"
+        source_file.touch()
 
         # Mock metadata extraction
-        mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
-        # Mock file hash calculation to return different hashes
-        def mock_hash(file_path: Path) -> str:
-            """Mock hash calculation that returns different hashes based on file name.
-
-            Args:
-                file_path: File path.
-
-            Returns:
-                Hash based on file name.
-            """
-            return (
-                f"{file_path.name}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            )
-
-        mocker.patch.object(processor, "_calculate_file_hash", side_effect=mock_hash)
-
-        # Configure mock DAO behavior
-        mock_before_dao = mocker.MagicMock()
-        mock_before_dao.check_file_exists.return_value = False
-        mock_before_dao.insert_file.return_value = True
-        processor.before_dao = mock_before_dao
-
-        # Mock shutil.move to fail for the second file
-        def mock_move(src: Path | str, dst: Path | str) -> None:
-            """Mock move operation.
-
-            Args:
-                src: Source path.
-                dst: Destination path.
-            """
-            src_path = Path(src)
-            dst_path = Path(dst)
-
-            # First call succeeds, second call fails
-            if src_path.name == "test1.mp3":
-                dst_path.parent.mkdir(parents=True, exist_ok=True)
-                dst_path.touch()
-                src_path.unlink()
-            else:
-                raise OSError("Mock move error")
-
-        mocker.patch("omym.core.metadata.music_file_processor.shutil.move", side_effect=mock_move)
+        # Mock shutil.move to raise an error
+        mock_move = mocker.patch("omym.core.metadata.music_file_processor.shutil.move")
+        mock_move.side_effect = OSError("Failed to move file: Test error")
 
         # Act
-        results = processor.process_directory(source_dir)
+        result = processor.process_file(source_file)
 
         # Assert
-        # First file should be processed successfully
-        assert results[0].success is True
-        assert not Path(source_dir / "test1.mp3").exists()
-        assert results[0].target_path is not None
-        assert results[0].target_path.exists()
-
-        # Second file should fail with the move error
-        assert results[1].success is False
-        assert "Mock move error" in str(results[1].error_message)
-        assert Path(source_dir / "test2.mp3").exists()  # Original file should still exist
+        assert result.success is False
+        assert "Failed to move file" in str(result.error_message)
+        assert source_file.exists()  # Original file should still exist

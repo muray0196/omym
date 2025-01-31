@@ -1,11 +1,11 @@
 """Tests for the filtering engine."""
 
 import sqlite3
-from typing import Dict, Optional
 
 import pytest
 
-from omym.core.organization.filter_engine import FilterDAO, HierarchicalFilter
+from omym.core.organization.filter_engine import HierarchicalFilter
+from omym.db.daos.filter_dao import FilterDAO
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def conn() -> sqlite3.Connection:
     """
     conn = sqlite3.connect(":memory:")
     with conn:
-        conn.executescript(
+        _ = conn.executescript(
             """
             CREATE TABLE filter_hierarchies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,6 +70,7 @@ def test_register_hierarchies(filter_engine: HierarchicalFilter) -> None:
     """Test registering filter hierarchies."""
     path_format = "AlbumArtist/Album"
     warnings = filter_engine.register_hierarchies(path_format)
+    assert isinstance(warnings, list)
     assert len(warnings) == 0
 
 
@@ -78,15 +79,17 @@ def test_process_file(filter_engine: HierarchicalFilter) -> None:
     # Register hierarchies
     path_format = "AlbumArtist/Album"
     warnings = filter_engine.register_hierarchies(path_format)
+    assert isinstance(warnings, list)
     assert len(warnings) == 0
 
     # Process file
     file_hash = "test_hash"
-    metadata: Dict[str, Optional[str]] = {
+    metadata: dict[str, str | None] = {
         "albumartist": "Test Artist",
         "album": "Test Album",
     }
     warnings = filter_engine.process_file(file_hash, metadata)
+    assert isinstance(warnings, list)
     assert len(warnings) == 0
 
 
@@ -95,15 +98,17 @@ def test_process_file_missing_values(filter_engine: HierarchicalFilter) -> None:
     # Register hierarchies
     path_format = "AlbumArtist/Album"
     warnings = filter_engine.register_hierarchies(path_format)
+    assert isinstance(warnings, list)
     assert len(warnings) == 0
 
     # Process file with missing values
     file_hash = "test_hash"
-    metadata: Dict[str, Optional[str]] = {
+    metadata: dict[str, str | None] = {
         "albumartist": "Test Artist",
         # Missing album
     }
     warnings = filter_engine.process_file(file_hash, metadata)
+    assert isinstance(warnings, list)
     assert len(warnings) == 1
     assert "Missing value for hierarchy 'Album'" in warnings[0]
 
@@ -113,12 +118,14 @@ def test_process_file_unknown_hierarchy(filter_engine: HierarchicalFilter) -> No
     # Register hierarchies
     path_format = "Unknown"
     warnings = filter_engine.register_hierarchies(path_format)
+    assert isinstance(warnings, list)
     assert len(warnings) == 0
 
     # Process file with unknown hierarchy
     file_hash = "test_hash"
-    metadata: Dict[str, Optional[str]] = {
+    metadata: dict[str, str | None] = {
         "unknown": "Test Value",
     }
     warnings = filter_engine.process_file(file_hash, metadata)
+    assert isinstance(warnings, list)
     assert len(warnings) == 0

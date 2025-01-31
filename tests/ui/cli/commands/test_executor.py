@@ -5,13 +5,12 @@ from pathlib import Path
 from collections.abc import Generator
 import shutil
 from pytest_mock import MockerFixture
-from typing import Any
+from unittest.mock import MagicMock
 
 from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.music_file_processor import ProcessResult, MusicProcessor
+from omym.core.metadata.music_file_processor import ProcessResult
 from omym.ui.cli.args.options import Args
 from omym.ui.cli.commands import FileCommand, DirectoryCommand
-from omym.ui.cli.display import PreviewDisplay, ProgressDisplay, ResultDisplay
 
 
 @pytest.fixture
@@ -55,16 +54,16 @@ def test_args(test_dir: Path) -> Args:
 
 
 @pytest.fixture
-def mock_processor(mocker: MockerFixture) -> MusicProcessor:
+def mock_processor(mocker: MockerFixture) -> MagicMock:
     """Create a mock processor.
 
     Args:
         mocker: Pytest mocker fixture.
 
     Returns:
-        MusicProcessor: Mock processor instance.
+        MagicMock: Mock processor instance.
     """
-    mock = mocker.patch("omym.ui.cli.commands.executor.MusicProcessor")
+    mock = mocker.patch("omym.ui.cli.commands.executor.MusicProcessor", autospec=True)
     mock_instance = mock.return_value
 
     # Setup mock process_file method
@@ -92,7 +91,7 @@ def mock_processor(mocker: MockerFixture) -> MusicProcessor:
     return mock_instance
 
 
-def test_file_command(test_args: Args, mock_processor: MockerFixture, mocker: MockerFixture) -> None:
+def test_file_command(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test file command execution.
 
     Args:
@@ -101,9 +100,9 @@ def test_file_command(test_args: Args, mock_processor: MockerFixture, mocker: Mo
         mocker: Pytest mocker fixture.
     """
     # Mock displays
-    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
-    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
+    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
+    _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
+    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay", autospec=True)
 
     # Create and execute command
     command = FileCommand(test_args)
@@ -116,7 +115,7 @@ def test_file_command(test_args: Args, mock_processor: MockerFixture, mocker: Mo
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_directory_command(test_args: Args, mock_processor: MockerFixture, mocker: MockerFixture) -> None:
+def test_directory_command(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test directory command execution.
 
     Args:
@@ -125,9 +124,9 @@ def test_directory_command(test_args: Args, mock_processor: MockerFixture, mocke
         mocker: Pytest mocker fixture.
     """
     # Mock displays
-    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
-    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
+    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
+    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
+    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay", autospec=True)
 
     # Setup mock progress display
     mock_progress_instance = mock_progress.return_value
@@ -146,21 +145,20 @@ def test_directory_command(test_args: Args, mock_processor: MockerFixture, mocke
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_dry_run_mode(test_args: Args, mock_processor: MockerFixture, mocker: MockerFixture) -> None:
+def test_dry_run_mode(test_args: Args, mocker: MockerFixture) -> None:
     """Test command execution in dry-run mode.
 
     Args:
         test_args: Test arguments fixture.
-        mock_processor: Mock processor fixture.
         mocker: Pytest mocker fixture.
     """
     # Enable dry-run mode
     test_args.dry_run = True
 
     # Mock displays
-    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
-    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
+    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
+    _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
+    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay", autospec=True)
 
     # Create and execute command
     command = FileCommand(test_args)
@@ -172,7 +170,7 @@ def test_dry_run_mode(test_args: Args, mock_processor: MockerFixture, mocker: Mo
     mock_result.return_value.show_results.assert_not_called()
 
 
-def test_file_command_error(test_args: Args, mock_processor: MusicProcessor, mocker: MockerFixture) -> None:
+def test_file_command_error(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test file command error handling.
 
     Args:
@@ -181,9 +179,9 @@ def test_file_command_error(test_args: Args, mock_processor: MusicProcessor, moc
         mocker: Pytest mocker fixture.
     """
     # Mock displays
-    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
-    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
+    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
+    _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
+    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay", autospec=True)
 
     # Setup error result
     mock_processor.process_file.return_value = ProcessResult(
@@ -201,7 +199,7 @@ def test_file_command_error(test_args: Args, mock_processor: MusicProcessor, moc
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_directory_command_interactive(test_args: Args, mock_processor: MusicProcessor, mocker: MockerFixture) -> None:
+def test_directory_command_interactive(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test directory command in interactive mode.
 
     Args:
@@ -213,9 +211,9 @@ def test_directory_command_interactive(test_args: Args, mock_processor: MusicPro
     test_args.interactive = True
 
     # Mock displays
-    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
-    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
+    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
+    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
+    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay", autospec=True)
 
     # Setup mock progress display
     mock_progress_instance = mock_progress.return_value
@@ -234,21 +232,20 @@ def test_directory_command_interactive(test_args: Args, mock_processor: MusicPro
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_quiet_mode(test_args: Args, mock_processor: MusicProcessor, mocker: MockerFixture) -> None:
+def test_quiet_mode(test_args: Args, mocker: MockerFixture) -> None:
     """Test command execution in quiet mode.
 
     Args:
         test_args: Test arguments fixture.
-        mock_processor: Mock processor fixture.
         mocker: Pytest mocker fixture.
     """
     # Enable quiet mode
     test_args.quiet = True
 
     # Mock displays
-    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
-    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
+    mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
+    _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
+    mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay", autospec=True)
 
     # Create and execute command
     command = FileCommand(test_args)

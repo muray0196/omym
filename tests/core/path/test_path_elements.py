@@ -1,6 +1,7 @@
 """Tests for path component functionality."""
 
 import pytest
+from typing import override
 
 from omym.core.path.path_elements import (
     ComponentValue,
@@ -136,6 +137,7 @@ def test_path_component_factory_create_unknown() -> None:
 class MockPathComponent(PathComponent):
     """Mock implementation of PathComponent for testing."""
 
+    @override
     def get_value(self, metadata: TrackMetadata) -> ComponentValue:
         """Get test value.
 
@@ -148,6 +150,7 @@ class MockPathComponent(PathComponent):
         return ComponentValue(value="test", order=self.order, type=self.component_type)
 
     @property
+    @override
     def component_type(self) -> str:
         """Get component type.
 
@@ -166,4 +169,4 @@ def test_path_component_factory_register_component() -> None:
     component = PathComponentFactory.create("Test", 3)
     assert isinstance(component, MockPathComponent)
     assert component.order == 3
-    assert component.component_type == "Test" 
+    assert component.component_type == "Test"

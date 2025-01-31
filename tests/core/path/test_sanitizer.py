@@ -1,7 +1,6 @@
 """Tests for file and path name sanitization functionality."""
 
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -30,7 +29,7 @@ class TestSanitizer:
             ("★☆○●", "Unknown-Title"),  # Only geometric shapes
         ],
     )
-    def test_track_name_empty(self, input_str: Optional[str], expected: str) -> None:
+    def test_track_name_empty(self, input_str: str | None, expected: str) -> None:
         """Test handling of empty track names.
 
         Args:

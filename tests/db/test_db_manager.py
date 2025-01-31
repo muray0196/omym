@@ -2,7 +2,7 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 
@@ -31,7 +31,7 @@ def test_database_transaction(db_manager: DatabaseManager) -> None:
     conn = db_manager.conn
     assert conn is not None
     cursor = conn.cursor()
-    cursor.execute(
+    _ = cursor.execute(
         """
         INSERT INTO processing_before (file_hash, file_path)
         VALUES (?, ?)
@@ -43,9 +43,7 @@ def test_database_transaction(db_manager: DatabaseManager) -> None:
     db_manager.commit_transaction()
 
     # Verify data was inserted
-    cursor.execute(
-        "SELECT file_hash FROM processing_before WHERE file_path = ?", ("/test/source/path_1",)
-    )
+    _ = cursor.execute("SELECT file_hash FROM processing_before WHERE file_path = ?", ("/test/source/path_1",))
     result = cursor.fetchone()
     assert result is not None
     assert result[0] == "test_hash_1"
@@ -60,7 +58,7 @@ def test_database_rollback(db_manager: DatabaseManager) -> None:
     conn = db_manager.conn
     assert conn is not None
     cursor = conn.cursor()
-    cursor.execute(
+    _ = cursor.execute(
         """
         INSERT INTO processing_before (file_hash, file_path)
         VALUES (?, ?)
@@ -72,9 +70,7 @@ def test_database_rollback(db_manager: DatabaseManager) -> None:
     db_manager.rollback_transaction()
 
     # Verify data was not inserted
-    cursor.execute(
-        "SELECT file_hash FROM processing_before WHERE file_path = ?", ("/test/source/path_2",)
-    )
+    _ = cursor.execute("SELECT file_hash FROM processing_before WHERE file_path = ?", ("/test/source/path_2",))
     result = cursor.fetchone()
     assert result is None
 
@@ -92,7 +88,7 @@ def test_database_connection() -> None:
 
         # Check if we can execute queries
         cursor = manager.conn.cursor()
-        cursor.execute("SELECT 1")
+        _ = cursor.execute("SELECT 1")
         result = cursor.fetchone()
         assert result is not None
         assert result[0] == 1
@@ -121,7 +117,7 @@ def test_database_migration(tmp_path: Path) -> None:
         conn = manager.conn
         assert conn is not None, "Database connection is None"
         cursor = conn.cursor()
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT name
             FROM sqlite_master
@@ -142,7 +138,7 @@ def test_database_migration(tmp_path: Path) -> None:
         assert tables.issuperset(expected_tables), f"Missing tables: {expected_tables - tables}"
 
         # Check processing_before schema
-        cursor.execute("PRAGMA table_info(processing_before)")
+        _ = cursor.execute("PRAGMA table_info(processing_before)")
         columns = {row[1] for row in cursor.fetchall()}
         expected_columns = {
             "file_hash",
@@ -160,9 +156,7 @@ def test_database_migration(tmp_path: Path) -> None:
             "created_at",
             "updated_at",
         }
-        assert columns.issuperset(
-            expected_columns
-        ), f"Missing columns: {expected_columns - columns}"
+        assert columns.issuperset(expected_columns), f"Missing columns: {expected_columns - columns}"
 
     finally:
         manager.close()

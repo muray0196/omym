@@ -2,12 +2,12 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 
 from omym.core.path.path_generator import PathGenerator
-from omym.core.organization.filter_engine import FilterDAO
+from omym.db.daos.filter_dao import FilterDAO
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def conn() -> Generator[sqlite3.Connection, None, None]:
     """
     conn = sqlite3.connect(":memory:")
     with conn:
-        conn.executescript(
+        _ = conn.executescript(
             """
             CREATE TABLE processing_before (
                 file_hash TEXT PRIMARY KEY,
@@ -162,9 +162,7 @@ def test_generate_paths_single_file(path_generator: PathGenerator, filter_dao: F
     assert len(path_info.warnings) == 0
 
 
-def test_generate_paths_multiple_hierarchies(
-    path_generator: PathGenerator, filter_dao: FilterDAO
-) -> None:
+def test_generate_paths_multiple_hierarchies(path_generator: PathGenerator, filter_dao: FilterDAO) -> None:
     """Test generating paths with multiple hierarchies.
 
     Args:
@@ -192,9 +190,7 @@ def test_generate_paths_multiple_hierarchies(
     assert len(path_info.warnings) == 0
 
 
-def test_generate_paths_multiple_files(
-    path_generator: PathGenerator, filter_dao: FilterDAO
-) -> None:
+def test_generate_paths_multiple_files(path_generator: PathGenerator, filter_dao: FilterDAO) -> None:
     """Test generating paths for multiple files.
 
     Args:
@@ -232,9 +228,7 @@ def test_generate_paths_multiple_files(
     assert len(path2.warnings) == 0
 
 
-def test_generate_paths_missing_values(
-    path_generator: PathGenerator, filter_dao: FilterDAO
-) -> None:
+def test_generate_paths_missing_values(path_generator: PathGenerator, filter_dao: FilterDAO) -> None:
     """Test generating paths with missing values.
 
     Args:

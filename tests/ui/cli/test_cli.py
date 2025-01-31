@@ -9,8 +9,7 @@ from unittest.mock import MagicMock
 
 from omym.core.metadata.track_metadata import TrackMetadata
 from omym.core.metadata.music_file_processor import ProcessResult
-from omym.ui.cli.cli import process_command
-from omym.ui.cli.display import PreviewDisplay, ProgressDisplay, ResultDisplay
+from omym.ui.cli import CommandProcessor
 
 
 @pytest.fixture
@@ -91,12 +90,12 @@ def test_process_single_file(test_dir: Path, mock_processor: MagicMock, mocker: 
     """
     # Mock displays
     mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
+    _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
     mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
 
     # Process single file
     test_file = test_dir / "test.mp3"
-    process_command([str(test_file)])
+    CommandProcessor.process_command([str(test_file)])
 
     # Verify
     mock_processor.process_file.assert_called_once_with(test_file)
@@ -122,7 +121,7 @@ def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: Mo
     mock_progress_instance.process_files_with_progress.return_value = [mock_processor.process_file.return_value]
 
     # Process directory
-    process_command([str(test_dir)])
+    CommandProcessor.process_command([str(test_dir)])
 
     # Verify
     mock_progress_instance.process_files_with_progress.assert_called_once_with(
@@ -132,21 +131,20 @@ def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: Mo
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_dry_run_mode(test_dir: Path, mock_processor: MagicMock, mocker: MockerFixture) -> None:
+def test_dry_run_mode(test_dir: Path, mocker: MockerFixture) -> None:
     """Test dry-run mode.
 
     Args:
         test_dir: Test directory fixture.
-        mock_processor: Mock processor fixture.
         mocker: Pytest mocker fixture.
     """
     # Mock displays
     mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay")
-    mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
+    _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
     mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
 
     # Process in dry-run mode
-    process_command([str(test_dir), "--dry-run"])
+    CommandProcessor.process_command([str(test_dir), "--dry-run"])
 
     # Verify
     mock_preview.return_value.show_preview.assert_called_once()
@@ -172,7 +170,7 @@ def test_error_handling(
 
     # Process file (should catch exception)
     test_file = test_dir / "test.mp3"
-    process_command([str(test_file)])
+    CommandProcessor.process_command([str(test_file)])
 
     # Verify
     mock_logger.error.assert_called_once_with("An unexpected error occurred: %s", "Test error")
@@ -198,7 +196,7 @@ def test_keyboard_interrupt(
 
     # Process file (should catch KeyboardInterrupt)
     test_file = test_dir / "test.mp3"
-    process_command([str(test_file)])
+    CommandProcessor.process_command([str(test_file)])
 
     # Verify
     mock_logger.info.assert_called_once_with("\nOperation cancelled by user")
