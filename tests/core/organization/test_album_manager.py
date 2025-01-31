@@ -202,5 +202,5 @@ def test_get_latest_year(album_manager: AlbumManager) -> None:
     file_hashes = {"hash1", "hash2", "hash3", "hash4"}
 
     # pylint: disable=protected-access
-    year = album_manager._get_latest_year(file_hashes, files)  # type: ignore
+    year = album_manager._get_latest_year(file_hashes, files)
     assert year == 2021

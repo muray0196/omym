@@ -1,8 +1,8 @@
 """Data access object for album management."""
 
-from typing import List, Optional, Dict, Tuple
-from dataclasses import dataclass
 from sqlite3 import Connection
+from dataclasses import dataclass
+from typing import final
 
 from omym.utils.logger import logger
 
@@ -14,9 +14,9 @@ class AlbumInfo:
     id: int
     album_name: str
     album_artist: str
-    year: Optional[int]
-    total_tracks: Optional[int]
-    total_discs: Optional[int]
+    year: int | None
+    total_tracks: int | None
+    total_discs: int | None
 
 
 @dataclass
@@ -28,8 +28,11 @@ class TrackPosition:
     file_hash: str
 
 
+@final
 class AlbumDAO:
     """Data access object for album management."""
+
+    conn: Connection
 
     def __init__(self, conn: Connection):
         """Initialize DAO.
@@ -43,10 +46,10 @@ class AlbumDAO:
         self,
         album_name: str,
         album_artist: str,
-        year: Optional[int] = None,
-        total_tracks: Optional[int] = None,
-        total_discs: Optional[int] = None,
-    ) -> Optional[int]:
+        year: int | None = None,
+        total_tracks: int | None = None,
+        total_discs: int | None = None,
+    ) -> int | None:
         """Insert an album.
 
         Args:
@@ -57,11 +60,11 @@ class AlbumDAO:
             total_discs: Total number of discs.
 
         Returns:
-            Optional[int]: Album ID if successful, None otherwise.
+            int | None: Album ID if successful, None otherwise.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO albums (
                     album_name, album_artist, year, total_tracks, total_discs
@@ -77,7 +80,7 @@ class AlbumDAO:
             self.conn.rollback()
             return None
 
-    def get_album(self, album_name: str, album_artist: str) -> Optional[AlbumInfo]:
+    def get_album(self, album_name: str, album_artist: str) -> AlbumInfo | None:
         """Get album information.
 
         Args:
@@ -85,11 +88,11 @@ class AlbumDAO:
             album_artist: Album artist name.
 
         Returns:
-            Optional[AlbumInfo]: Album information if found.
+            AlbumInfo | None: Album information if found.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT id, year, total_tracks, total_discs
                 FROM albums
@@ -113,9 +116,7 @@ class AlbumDAO:
             logger.error("Failed to get album: %s", e)
             return None
 
-    def insert_track_position(
-        self, album_id: int, disc_number: int, track_number: int, file_hash: str
-    ) -> bool:
+    def insert_track_position(self, album_id: int, disc_number: int, track_number: int, file_hash: str) -> bool:
         """Insert a track position.
 
         Args:
@@ -129,7 +130,7 @@ class AlbumDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO track_positions (
                     album_id, disc_number, track_number, file_hash
@@ -145,18 +146,18 @@ class AlbumDAO:
             self.conn.rollback()
             return False
 
-    def get_album_tracks(self, album_id: int) -> List[TrackPosition]:
+    def get_album_tracks(self, album_id: int) -> list[TrackPosition]:
         """Get all tracks in an album.
 
         Args:
             album_id: Album ID.
 
         Returns:
-            List[TrackPosition]: List of track positions.
+            list[TrackPosition]: List of track positions.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT disc_number, track_number, file_hash
                 FROM track_positions
@@ -178,21 +179,21 @@ class AlbumDAO:
             logger.error("Failed to get album tracks: %s", e)
             return []
 
-    def check_track_continuity(self, album_id: int) -> Tuple[bool, List[str]]:
+    def check_track_continuity(self, album_id: int) -> tuple[bool, list[str]]:
         """Check track number continuity in an album.
 
         Args:
             album_id: Album ID.
 
         Returns:
-            Tuple[bool, List[str]]: (is_continuous, list of warnings)
+            tuple[bool, list[str]]: (is_continuous, list of warnings)
         """
         tracks = self.get_album_tracks(album_id)
         if not tracks:
             return False, ["No tracks found in album"]
 
-        warnings: List[str] = []
-        disc_tracks: Dict[int, List[int]] = {}
+        warnings: list[str] = []
+        disc_tracks: dict[int, list[int]] = {}
 
         # Group tracks by disc
         for track in tracks:
@@ -207,9 +208,7 @@ class AlbumDAO:
             if track_nums != expected:
                 missing = set(expected) - set(track_nums)
                 if missing:
-                    warnings.append(
-                        f"Missing tracks in disc {disc_num}: {sorted(missing)}"
-                    )
+                    warnings.append(f"Missing tracks in disc {disc_num}: {sorted(missing)}")
 
         # Check disc number continuity
         disc_nums = sorted(disc_tracks.keys())

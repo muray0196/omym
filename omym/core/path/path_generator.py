@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from sqlite3 import Connection
-from typing import Dict, List, Optional, Set, Tuple
+from typing import final
 from dataclasses import dataclass
 
 from omym.utils.logger import logger
@@ -22,11 +22,17 @@ class PathInfo:
 
     file_hash: str
     relative_path: Path
-    warnings: List[str]
+    warnings: list[str]
 
 
+@final
 class PathGenerator:
     """Path generator for organizing music files."""
+
+    conn: Connection
+    base_path: Path
+    filter_dao: FilterDAO
+    album_dao: AlbumDAO
 
     def __init__(self, conn: Connection, base_path: Path):
         """Initialize path generator.
@@ -40,9 +46,7 @@ class PathGenerator:
         self.filter_dao = FilterDAO(conn)
         self.album_dao = AlbumDAO(conn)
 
-    def generate_paths(
-        self, grouped_files: Optional[Dict[str, Dict[str, Optional[str]]]] = None
-    ) -> List[PathInfo]:
+    def generate_paths(self, grouped_files: dict[str, dict[str, str | None]] | None = None) -> list[PathInfo]:
         """Generate paths for all files.
 
         Args:
@@ -50,32 +54,30 @@ class PathGenerator:
                 If provided, uses this for path generation instead of filters.
 
         Returns:
-            List[PathInfo]: List of path information for each file.
+            list[PathInfo]: List of path information for each file.
                 Each PathInfo contains the file hash, relative path, and any warnings.
         """
         if grouped_files is not None:
             return self._generate_paths_from_groups(grouped_files)
         return self._generate_paths_from_filters()
 
-    def _generate_paths_from_groups(
-        self, grouped_files: Dict[str, Dict[str, Optional[str]]]
-    ) -> List[PathInfo]:
+    def _generate_paths_from_groups(self, grouped_files: dict[str, dict[str, str | None]]) -> list[PathInfo]:
         """Generate paths from grouped files.
 
         Args:
             grouped_files: Dictionary mapping file paths to metadata.
 
         Returns:
-            List[PathInfo]: List of path information for each file.
+            list[PathInfo]: List of path information for each file.
         """
-        paths: List[PathInfo] = []
+        paths: list[PathInfo] = []
 
         for file_path, metadata in grouped_files.items():
-            warnings: List[str] = []
+            warnings: list[str] = []
             relative_path = Path()
 
             # Build relative path components
-            components: List[str] = []
+            components: list[str] = []
 
             # Add album artist
             album_artist = metadata.get("album_artist") or metadata.get("artist")
@@ -103,20 +105,20 @@ class PathGenerator:
 
         return paths
 
-    def _generate_paths_from_filters(self) -> List[PathInfo]:
+    def _generate_paths_from_filters(self) -> list[PathInfo]:
         """Generate paths using the filter system.
 
         Returns:
-            List[PathInfo]: List of path information for each file.
+            list[PathInfo]: List of path information for each file.
         """
-        paths: List[PathInfo] = []
+        paths: list[PathInfo] = []
         hierarchies = self.filter_dao.get_hierarchies()
         if not hierarchies:
             logger.error("No hierarchies found")
             return paths
 
         # Get all values for each hierarchy
-        hierarchy_values: Dict[int, List[FilterValue]] = {}
+        hierarchy_values: dict[int, list[FilterValue]] = {}
         for hierarchy in hierarchies:
             values = self.filter_dao.get_values(hierarchy.id)
             hierarchy_values[hierarchy.id] = values
@@ -133,9 +135,9 @@ class PathGenerator:
 
     def _group_files_by_hierarchies(
         self,
-        hierarchies: List[FilterHierarchy],
-        hierarchy_values: Dict[int, List[FilterValue]],
-    ) -> Dict[Tuple[str, ...], Set[str]]:
+        hierarchies: list[FilterHierarchy],
+        hierarchy_values: dict[int, list[FilterValue]],
+    ) -> dict[tuple[str, ...], set[str]]:
         """Group files by hierarchy values.
 
         Args:
@@ -143,25 +145,23 @@ class PathGenerator:
             hierarchy_values: Dictionary mapping hierarchy IDs to their filter values.
 
         Returns:
-            Dict[Tuple[str, ...], Set[str]]: Dictionary mapping hierarchy value tuples
+            dict[tuple[str, ...], set[str]]: Dictionary mapping hierarchy value tuples
                 to sets of file hashes. Each tuple contains the values for each hierarchy
                 in order.
         """
-        groups: Dict[Tuple[str, ...], Set[str]] = {}
+        groups: dict[tuple[str, ...], set[str]] = {}
 
         # Get all file hashes
-        file_hashes: Set[str] = set()
+        file_hashes: set[str] = set()
         for values in hierarchy_values.values():
             for value in values:
                 file_hashes.add(value.file_hash)
 
         # Group files by hierarchy values
         for file_hash in file_hashes:
-            group_key: List[str] = []
+            group_key: list[str] = []
             for hierarchy in hierarchies:
-                value = self._find_value_for_file(
-                    hierarchy.id, file_hash, hierarchy_values[hierarchy.id]
-                )
+                value = self._find_value_for_file(hierarchy.id, file_hash, hierarchy_values[hierarchy.id])
                 if not value:
                     logger.warning(
                         "Missing value for hierarchy %s, file %s",
@@ -178,9 +178,7 @@ class PathGenerator:
 
         return groups
 
-    def _find_value_for_file(
-        self, hierarchy_id: int, file_hash: str, values: List[FilterValue]
-    ) -> Optional[str]:
+    def _find_value_for_file(self, hierarchy_id: int, file_hash: str, values: list[FilterValue]) -> str | None:
         """Find value for a file in a hierarchy.
 
         Args:
@@ -189,7 +187,7 @@ class PathGenerator:
             values: List of filter values to search through.
 
         Returns:
-            Optional[str]: The value for the file in the hierarchy if found,
+            str | None: The value for the file in the hierarchy if found,
                 None if not found.
         """
         for value in values:
@@ -199,10 +197,10 @@ class PathGenerator:
 
     def _generate_group_paths(
         self,
-        hierarchies: List[FilterHierarchy],
-        group_values: Tuple[str, ...],
-        file_hashes: Set[str],
-    ) -> List[PathInfo]:
+        hierarchies: list[FilterHierarchy],
+        group_values: tuple[str, ...],
+        file_hashes: set[str],
+    ) -> list[PathInfo]:
         """Generate paths for a group of files.
 
         Args:
@@ -211,19 +209,21 @@ class PathGenerator:
             file_hashes: Set of file hashes to generate paths for.
 
         Returns:
-            List[PathInfo]: List of path information for each file in the group.
+            list[PathInfo]: List of path information for each file in the group.
                 Each PathInfo contains the file hash, relative path, and any warnings.
         """
-        paths: List[PathInfo] = []
+        paths: list[PathInfo] = []
         relative_path = Path()
 
-        # Build relative path
-        for value in group_values:
+        # Build relative path using hierarchy values
+        for i, value in enumerate(group_values):
+            if i < len(hierarchies):
+                logger.debug("Using hierarchy %s with value %s", hierarchies[i].name, value)
             relative_path = relative_path / value
 
         # Generate paths for each file
         for file_hash in file_hashes:
-            warnings: List[str] = []
+            warnings: list[str] = []
             path_info = PathInfo(
                 file_hash=file_hash,
                 relative_path=relative_path,

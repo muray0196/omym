@@ -2,13 +2,16 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import final
 
 from omym.utils.logger import logger
 
 
+@final
 class ProcessingBeforeDAO:
     """Data access object for processing_before table."""
+
+    conn: sqlite3.Connection
 
     def __init__(self, conn: sqlite3.Connection) -> None:
         """Initialize DAO.
@@ -30,7 +33,7 @@ class ProcessingBeforeDAO:
         try:
             cursor = self.conn.cursor()
             # Check if file exists in processing_before and has a matching entry in processing_after
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT pa.target_path
                 FROM processing_before pb
@@ -73,7 +76,7 @@ class ProcessingBeforeDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO processing_before (
                     file_hash,
@@ -90,7 +93,7 @@ class ProcessingBeforeDAO:
             logger.error("Database error: %s", e)
             return False
 
-    def get_source_path(self, file_hash: str) -> Optional[Path]:
+    def get_source_path(self, file_hash: str) -> Path | None:
         """Get source path for a file.
 
         Args:
@@ -101,7 +104,7 @@ class ProcessingBeforeDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 "SELECT file_path FROM processing_before WHERE file_hash = ?",
                 (file_hash,),
             )
@@ -111,7 +114,7 @@ class ProcessingBeforeDAO:
             logger.error("Database error: %s", e)
             return None
 
-    def get_target_path(self, file_hash: str) -> Optional[Path]:
+    def get_target_path(self, file_hash: str) -> Path | None:
         """Get target path for a file.
 
         Args:
@@ -122,7 +125,7 @@ class ProcessingBeforeDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT pa.target_path
                 FROM processing_before pb
@@ -137,7 +140,7 @@ class ProcessingBeforeDAO:
             logger.error("Database error: %s", e)
             return None
 
-    def get_file_path(self, file_hash: str) -> Optional[Path]:
+    def get_file_path(self, file_hash: str) -> Path | None:
         """Get file path for a file.
 
         Args:
@@ -148,7 +151,7 @@ class ProcessingBeforeDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 "SELECT file_path FROM processing_before WHERE file_hash = ?",
                 (file_hash,),
             )

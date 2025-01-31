@@ -1,21 +1,24 @@
 """Preview display functionality for CLI."""
 
 from pathlib import Path
-from typing import List
+from typing import final
 from rich.console import Console
 from rich.tree import Tree
 
 from omym.core.metadata.music_file_processor import ProcessResult
 
 
+@final
 class PreviewDisplay:
     """Handles preview display in CLI."""
+
+    console: Console
 
     def __init__(self) -> None:
         """Initialize preview display."""
         self.console = Console()
 
-    def show_preview(self, results: List[ProcessResult], base_path: Path, show_db: bool = False) -> None:
+    def show_preview(self, results: list[ProcessResult], base_path: Path, show_db: bool = False) -> None:
         """Display a preview of the planned file organization.
 
         Args:
@@ -33,10 +36,7 @@ class PreviewDisplay:
         album_node = None
 
         # Sort results by target path to group by artist/album
-        sorted_results = sorted(
-            [r for r in results if r.target_path],
-            key=lambda r: str(r.target_path)
-        )
+        sorted_results = sorted([r for r in results if r.target_path], key=lambda r: str(r.target_path))
 
         for result in sorted_results:
             if not result.target_path:
@@ -65,7 +65,7 @@ class PreviewDisplay:
                     if result.dry_run
                     else "[green]Done[/green]"
                 )
-                album_node.add(f"{icon} {parts[-1]} {status}")
+                _ = album_node.add(f"{icon} {parts[-1]} {status}")
 
         # Print the tree
         self.console.print(tree)
@@ -77,7 +77,7 @@ class PreviewDisplay:
         # Print summary
         self._show_summary(results)
 
-    def _show_db_preview(self, results: List[ProcessResult]) -> None:
+    def _show_db_preview(self, results: list[ProcessResult]) -> None:
         """Display a preview of database operations.
 
         Args:
@@ -89,19 +89,19 @@ class PreviewDisplay:
 
         # Create tables for each database operation type
         artist_table = Table(title="Artist Cache Updates")
-        artist_table.add_column("Artist Name", style="cyan")
-        artist_table.add_column("Artist ID", style="green")
-        artist_table.add_column("Operation", style="yellow")
+        _ = artist_table.add_column("Artist Name", style="cyan")
+        _ = artist_table.add_column("Artist ID", style="green")
+        _ = artist_table.add_column("Operation", style="yellow")
 
         before_table = Table(title="Processing Before Records")
-        before_table.add_column("File Hash", style="cyan", no_wrap=True)
-        before_table.add_column("Source Path", style="blue")
-        before_table.add_column("Metadata", style="green")
+        _ = before_table.add_column("File Hash", style="cyan", no_wrap=True)
+        _ = before_table.add_column("Source Path", style="blue")
+        _ = before_table.add_column("Metadata", style="green")
 
         after_table = Table(title="Processing After Records")
-        after_table.add_column("File Hash", style="cyan", no_wrap=True)
-        after_table.add_column("Target Path", style="blue")
-        after_table.add_column("Status", style="yellow")
+        _ = after_table.add_column("File Hash", style="cyan", no_wrap=True)
+        _ = after_table.add_column("Target Path", style="blue")
+        _ = after_table.add_column("Status", style="yellow")
 
         # Collect unique artists and their IDs
         artists_seen: dict[str, str] = {}  # artist_name -> artist_id
@@ -118,7 +118,7 @@ class PreviewDisplay:
 
         # Add rows to artist table
         for artist, artist_id in sorted(artists_seen.items()):
-            artist_table.add_row(
+            _ = artist_table.add_row(
                 artist,
                 artist_id,
                 "Cache Update",
@@ -128,14 +128,14 @@ class PreviewDisplay:
         for result in results:
             if result.file_hash:
                 # Before record
-                before_table.add_row(
+                _ = before_table.add_row(
                     result.file_hash,
                     str(result.source_path),
                     str(result.metadata) if result.metadata else "N/A",
                 )
 
                 # After record
-                after_table.add_row(
+                _ = after_table.add_row(
                     result.file_hash,
                     str(result.target_path) if result.target_path else "N/A",
                     "Success" if result.success else f"Error: {result.error_message}",
@@ -147,7 +147,7 @@ class PreviewDisplay:
         self.console.print(before_table)
         self.console.print(after_table)
 
-    def _show_summary(self, results: List[ProcessResult]) -> None:
+    def _show_summary(self, results: list[ProcessResult]) -> None:
         """Display a summary of processing results.
 
         Args:
@@ -165,6 +165,4 @@ class PreviewDisplay:
                 self.console.print(f"[red]Will fail: {failed_count}[/red]")
                 for result in results:
                     if not result.success:
-                        self.console.print(
-                            f"[red]  • {result.source_path}: {result.error_message}[/red]"
-                        ) 
+                        self.console.print(f"[red]  • {result.source_path}: {result.error_message}[/red]")

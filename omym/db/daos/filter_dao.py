@@ -1,8 +1,8 @@
 """Data access object for filter management."""
 
-from typing import List, Optional
 from dataclasses import dataclass
 from sqlite3 import Connection
+from typing import final
 
 from omym.utils.logger import logger
 
@@ -25,8 +25,11 @@ class FilterValue:
     value: str
 
 
+@final
 class FilterDAO:
     """Data access object for filter management."""
+
+    conn: Connection
 
     def __init__(self, conn: Connection):
         """Initialize DAO.
@@ -36,7 +39,7 @@ class FilterDAO:
         """
         self.conn = conn
 
-    def insert_hierarchy(self, name: str, priority: int) -> Optional[int]:
+    def insert_hierarchy(self, name: str, priority: int) -> int | None:
         """Insert a filter hierarchy.
 
         Args:
@@ -44,11 +47,11 @@ class FilterDAO:
             priority: Priority value.
 
         Returns:
-            Optional[int]: Hierarchy ID if successful, None otherwise.
+            int | None: Hierarchy ID if successful, None otherwise.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO filter_hierarchies (name, priority)
                 VALUES (?, ?)
@@ -63,15 +66,15 @@ class FilterDAO:
             self.conn.rollback()
             return None
 
-    def get_hierarchies(self) -> List[FilterHierarchy]:
+    def get_hierarchies(self) -> list[FilterHierarchy]:
         """Get all filter hierarchies.
 
         Returns:
-            List[FilterHierarchy]: List of filter hierarchies.
+            list[FilterHierarchy]: List of filter hierarchies.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT id, name, priority
                 FROM filter_hierarchies
@@ -104,7 +107,7 @@ class FilterDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO filter_values (hierarchy_id, file_hash, value)
                 VALUES (?, ?, ?)
@@ -119,18 +122,18 @@ class FilterDAO:
             self.conn.rollback()
             return False
 
-    def get_values(self, hierarchy_id: int) -> List[FilterValue]:
+    def get_values(self, hierarchy_id: int) -> list[FilterValue]:
         """Get all values for a hierarchy.
 
         Args:
             hierarchy_id: ID of the hierarchy.
 
         Returns:
-            List[FilterValue]: List of filter values.
+            list[FilterValue]: List of filter values.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT file_hash, value
                 FROM filter_values
@@ -152,7 +155,7 @@ class FilterDAO:
             logger.error("Failed to get filter values: %s", e)
             return []
 
-    def get_file_value(self, hierarchy_id: int, file_hash: str) -> Optional[str]:
+    def get_file_value(self, hierarchy_id: int, file_hash: str) -> str | None:
         """Get value for a specific file and hierarchy.
 
         Args:
@@ -160,11 +163,11 @@ class FilterDAO:
             file_hash: Hash of the file.
 
         Returns:
-            Optional[str]: Filter value if found, None otherwise.
+            str | None: Filter value if found, None otherwise.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT value
                 FROM filter_values

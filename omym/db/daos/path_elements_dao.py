@@ -1,14 +1,17 @@
 """Data access object for path components."""
 
-from typing import List, Optional
 from sqlite3 import Connection
+from typing import final
 
 from omym.core.path.path_elements import ComponentValue
 from omym.utils.logger import logger
 
 
+@final
 class PathComponentDAO:
     """Data access object for path components."""
+
+    conn: Connection
 
     def __init__(self, conn: Connection):
         """Initialize DAO.
@@ -30,7 +33,7 @@ class PathComponentDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO path_components (
                     file_hash, component_type, component_value, component_order
@@ -44,18 +47,18 @@ class PathComponentDAO:
             logger.error("Failed to insert path component: %s", e)
             return False
 
-    def get_components(self, file_hash: str) -> List[ComponentValue]:
+    def get_components(self, file_hash: str) -> list[ComponentValue]:
         """Get all path components for a file.
 
         Args:
             file_hash: Hash of the file.
 
         Returns:
-            List[ComponentValue]: List of component values.
+            list[ComponentValue]: List of component values.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT component_type, component_value, component_order
                 FROM path_components
@@ -77,9 +80,7 @@ class PathComponentDAO:
             logger.error("Failed to get path components: %s", e)
             return []
 
-    def get_component_by_type(
-        self, file_hash: str, component_type: str
-    ) -> Optional[ComponentValue]:
+    def get_component_by_type(self, file_hash: str, component_type: str) -> ComponentValue | None:
         """Get a specific component for a file.
 
         Args:
@@ -87,11 +88,11 @@ class PathComponentDAO:
             component_type: Type of component to get.
 
         Returns:
-            Optional[ComponentValue]: Component value if found.
+            ComponentValue | None: Component value if found.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT component_value, component_order
                 FROM path_components
@@ -112,9 +113,7 @@ class PathComponentDAO:
             logger.error("Failed to get path component: %s", e)
             return None
 
-    def get_files_by_component(
-        self, component_type: str, component_value: str
-    ) -> List[str]:
+    def get_files_by_component(self, component_type: str, component_value: str) -> list[str]:
         """Get all files that have a specific component value.
 
         Args:
@@ -122,11 +121,11 @@ class PathComponentDAO:
             component_value: Value to match.
 
         Returns:
-            List[str]: List of file hashes.
+            list[str]: List of file hashes.
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT file_hash
                 FROM path_components

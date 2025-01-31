@@ -2,15 +2,19 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Optional, Union
+from typing import final, Any
 
 from omym.utils.logger import logger
 
 
+@final
 class DatabaseManager:
     """Database manager for OMYM."""
 
-    def __init__(self, db_path: Optional[Union[Path, str]] = None) -> None:
+    db_path: str | Path
+    conn: sqlite3.Connection | None
+
+    def __init__(self, db_path: Path | str | None = None) -> None:
         """Initialize database manager.
 
         Args:
@@ -27,7 +31,7 @@ class DatabaseManager:
             self.db_path = db_dir / "omym.db"
         else:
             self.db_path = Path(db_path) if isinstance(db_path, str) else db_path
-        self.conn: Optional[sqlite3.Connection] = None
+        self.conn = None
 
     def connect(self) -> None:
         """Connect to database and initialize schema."""
@@ -51,10 +55,10 @@ class DatabaseManager:
 
             # Enable foreign key support and proper synchronization
             if self.conn:
-                self.conn.execute("PRAGMA foreign_keys = ON")
-                self.conn.execute("PRAGMA synchronous = NORMAL")
-                self.conn.execute("PRAGMA journal_mode = WAL")
-                self.conn.execute("PRAGMA busy_timeout = 30000")  # 30 seconds in milliseconds
+                _ = self.conn.execute("PRAGMA foreign_keys = ON")
+                _ = self.conn.execute("PRAGMA synchronous = NORMAL")
+                _ = self.conn.execute("PRAGMA journal_mode = WAL")
+                _ = self.conn.execute("PRAGMA busy_timeout = 30000")  # 30 seconds in milliseconds
 
                 # Initialize schema
                 self._init_schema()
@@ -72,7 +76,7 @@ class DatabaseManager:
             cursor = self.conn.cursor()
 
             # Check if tables exist
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT name FROM sqlite_master
                 WHERE type='table' AND name IN (
@@ -93,7 +97,7 @@ class DatabaseManager:
                 return
 
             # Create processing_before table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS processing_before (
                     file_hash TEXT PRIMARY KEY,
@@ -115,7 +119,7 @@ class DatabaseManager:
             )
 
             # Create processing_after table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS processing_after (
                     file_hash TEXT PRIMARY KEY,
@@ -129,7 +133,7 @@ class DatabaseManager:
             )
 
             # Create albums table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS albums (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,7 +150,7 @@ class DatabaseManager:
             )
 
             # Create track_positions table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS track_positions (
                     album_id INTEGER NOT NULL,
@@ -163,7 +167,7 @@ class DatabaseManager:
             )
 
             # Create filter_hierarchies table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS filter_hierarchies (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -177,7 +181,7 @@ class DatabaseManager:
             )
 
             # Create filter_values table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS filter_values (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,7 +197,7 @@ class DatabaseManager:
             )
 
             # Create artist_cache table
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS artist_cache (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,21 +211,11 @@ class DatabaseManager:
             )
 
             # Create indexes for better performance
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_albums_name_artist ON albums(album_name, album_artist)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_track_positions_file_hash ON track_positions(file_hash)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_filter_values_file_hash ON filter_values(file_hash)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_filter_values_hierarchy ON filter_values(hierarchy_id)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_artist_cache_name ON artist_cache(artist_name)"
-            )
+            _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_albums_name_artist ON albums(album_name, album_artist)")
+            _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_track_positions_file_hash ON track_positions(file_hash)")
+            _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_filter_values_file_hash ON filter_values(file_hash)")
+            _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_filter_values_hierarchy ON filter_values(hierarchy_id)")
+            _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_artist_cache_name ON artist_cache(artist_name)")
 
             self.conn.commit()
             logger.info("Successfully initialized database schema")
@@ -247,7 +241,10 @@ class DatabaseManager:
         return self
 
     def __exit__(
-        self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Optional[object]
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any | None,
     ) -> None:
         """Exit context manager."""
         self.close()
@@ -255,7 +252,7 @@ class DatabaseManager:
     def begin_transaction(self) -> None:
         """Begin a transaction."""
         if self.conn:
-            self.conn.execute("BEGIN TRANSACTION")
+            _ = self.conn.execute("BEGIN TRANSACTION")
 
     def commit_transaction(self) -> None:
         """Commit the current transaction."""

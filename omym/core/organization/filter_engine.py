@@ -1,15 +1,19 @@
 """Filtering engine for organizing music files."""
 
 from sqlite3 import Connection
-from typing import List, Dict, Optional
+from typing import final
 
-from omym.utils.logger import logger
 from omym.db.daos.albums_dao import AlbumDAO
 from omym.db.daos.filter_dao import FilterDAO
 
 
+@final
 class HierarchicalFilter:
     """Filter engine for organizing music files."""
+
+    conn: Connection
+    filter_dao: FilterDAO
+    album_dao: AlbumDAO
 
     def __init__(self, conn: Connection):
         """Initialize filter engine.
@@ -21,7 +25,7 @@ class HierarchicalFilter:
         self.filter_dao = FilterDAO(conn)
         self.album_dao = AlbumDAO(conn)
 
-    def register_hierarchies(self, path_format: str) -> List[str]:
+    def register_hierarchies(self, path_format: str) -> list[str]:
         """Register filter hierarchies from path format.
 
         Args:
@@ -29,9 +33,9 @@ class HierarchicalFilter:
                 Each component in the path represents a hierarchy level.
 
         Returns:
-            List[str]: List of warning messages if any registration failed.
+            list[str]: List of warning messages if any registration failed.
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
         components = [c.strip() for c in path_format.split("/") if c.strip()]
 
         for i, name in enumerate(components):
@@ -40,7 +44,7 @@ class HierarchicalFilter:
 
         return warnings
 
-    def process_file(self, file_hash: str, metadata: Dict[str, Optional[str]]) -> List[str]:
+    def process_file(self, file_hash: str, metadata: dict[str, str | None]) -> list[str]:
         """Process a file and register its filter values.
 
         Args:
@@ -48,43 +52,18 @@ class HierarchicalFilter:
             metadata: File metadata dictionary with optional string values.
 
         Returns:
-            List[str]: List of warning messages if any processing failed.
+            list[str]: List of warning messages if any processing failed.
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
         hierarchies = self.filter_dao.get_hierarchies()
 
         for hierarchy in hierarchies:
             value = metadata.get(hierarchy.name.lower())
             if not value:
-                warnings.append(
-                    f"Missing value for hierarchy '{hierarchy.name}' in file {file_hash}"
-                )
+                warnings.append(f"Missing value for hierarchy '{hierarchy.name}' in file {file_hash}")
                 continue
 
             if not self.filter_dao.insert_value(hierarchy.id, file_hash, value):
-                warnings.append(
-                    f"Failed to register value for hierarchy '{hierarchy.name}' "
-                    f"in file {file_hash}"
-                )
+                warnings.append(f"Failed to register value for hierarchy '{hierarchy.name}' in file {file_hash}")
 
         return warnings
-
-    def _get_hierarchy_value(self, name: str, metadata: Dict[str, Optional[str]]) -> Optional[str]:
-        """Get value for a hierarchy from metadata.
-
-        Args:
-            name: Hierarchy name (e.g., "AlbumArtist", "Album", "Genre").
-            metadata: File metadata dictionary with optional string values.
-
-        Returns:
-            Optional[str]: Hierarchy value if found and valid, None otherwise.
-        """
-        if name == "AlbumArtist":
-            return metadata.get("album_artist")
-        elif name == "Album":
-            return metadata.get("album")
-        elif name == "Genre":
-            return metadata.get("genre")
-        else:
-            logger.warning("Unknown hierarchy: %s", name)
-            return None

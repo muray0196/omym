@@ -1,12 +1,13 @@
 """Progress display functionality for CLI."""
 
 from pathlib import Path
-from typing import List
+from typing import final
 from rich.progress import Progress
 
 from omym.core.metadata.music_file_processor import MusicProcessor, ProcessResult
 
 
+@final
 class ProgressDisplay:
     """Handles progress display in CLI."""
 
@@ -15,7 +16,7 @@ class ProgressDisplay:
         processor: MusicProcessor,
         music_path: Path,
         interactive: bool = False,
-    ) -> List[ProcessResult]:
+    ) -> list[ProcessResult]:
         """Process multiple files with progress bar.
 
         Args:
@@ -28,32 +29,26 @@ class ProgressDisplay:
         """
         # Get list of files to process
         files = [f for f in music_path.rglob("*") if f.is_file()]
-        results: List[ProcessResult] = []
+        results: list[ProcessResult] = []
 
         with Progress() as progress:
             # Create the main task
-            task = progress.add_task(
-                "[cyan]Processing files...",
-                total=len(files)
-            )
+            task = progress.add_task("[cyan]Processing files...", total=len(files))
 
             for file in files:
                 # Update description with current file
-                progress.update(
-                    task,
-                    description=f"[cyan]Processing {file.name}..."
-                )
+                _ = progress.update(task, description=f"[cyan]Processing {file.name}...")
 
                 # Process the file
                 result = processor.process_file(file)
                 results.append(result)
 
                 # Update progress
-                progress.update(task, advance=1)
+                _ = progress.update(task, advance=1)
 
                 # Handle interactive mode
                 if interactive and not result.success:
                     # TODO: Implement interactive handling
                     pass
 
-        return results 
+        return results

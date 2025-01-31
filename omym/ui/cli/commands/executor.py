@@ -1,7 +1,6 @@
 """Command executor base class."""
 
 from abc import ABC, abstractmethod
-from typing import List
 
 from omym.core.metadata.music_file_processor import MusicProcessor, ProcessResult
 from omym.ui.cli.args.options import Args
@@ -13,6 +12,12 @@ from omym.ui.cli.display.result import ResultDisplay
 class CommandExecutor(ABC):
     """Base class for command execution."""
 
+    args: Args
+    processor: MusicProcessor
+    preview_display: PreviewDisplay
+    progress_display: ProgressDisplay
+    result_display: ResultDisplay
+
     def __init__(self, args: Args) -> None:
         """Initialize command executor.
 
@@ -20,6 +25,8 @@ class CommandExecutor(ABC):
             args: Command line arguments.
         """
         self.args = args
+        if args.target_path is None:
+            raise ValueError("Target path is required")
         self.processor = MusicProcessor(
             base_path=args.target_path,
             dry_run=args.dry_run,
@@ -29,7 +36,7 @@ class CommandExecutor(ABC):
         self.result_display = ResultDisplay()
 
     @abstractmethod
-    def execute(self) -> List[ProcessResult]:
+    def execute(self) -> list[ProcessResult]:
         """Execute the command.
 
         Returns:
@@ -37,7 +44,7 @@ class CommandExecutor(ABC):
         """
         pass
 
-    def display_results(self, results: List[ProcessResult]) -> None:
+    def display_results(self, results: list[ProcessResult]) -> None:
         """Display command execution results.
 
         Args:

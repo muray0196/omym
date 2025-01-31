@@ -1,7 +1,7 @@
 """Path component handling functionality."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
+from typing import final, ClassVar, override
 from dataclasses import dataclass
 
 from omym.core.metadata.track_metadata import TrackMetadata
@@ -20,6 +20,8 @@ class ComponentValue:
 
 class PathComponent(ABC):
     """Base class for path components."""
+
+    order: int
 
     def __init__(self, order: int):
         """Initialize the component.
@@ -52,9 +54,13 @@ class PathComponent(ABC):
         pass
 
 
+@final
 class AlbumArtistComponent(PathComponent):
     """Album artist path component."""
 
+    order: int
+
+    @override
     def get_value(self, metadata: TrackMetadata) -> ComponentValue:
         """Get album artist value from metadata.
 
@@ -72,6 +78,7 @@ class AlbumArtistComponent(PathComponent):
         return ComponentValue(value=sanitized, order=self.order, type=self.component_type)
 
     @property
+    @override
     def component_type(self) -> str:
         """Get the component type.
 
@@ -81,9 +88,13 @@ class AlbumArtistComponent(PathComponent):
         return "AlbumArtist"
 
 
+@final
 class AlbumComponent(PathComponent):
     """Album name path component."""
 
+    order: int
+
+    @override
     def get_value(self, metadata: TrackMetadata) -> ComponentValue:
         """Get album value from metadata.
 
@@ -98,6 +109,7 @@ class AlbumComponent(PathComponent):
         return ComponentValue(value=sanitized, order=self.order, type=self.component_type)
 
     @property
+    @override
     def component_type(self) -> str:
         """Get the component type.
 
@@ -107,16 +119,17 @@ class AlbumComponent(PathComponent):
         return "Album"
 
 
+@final
 class PathComponentFactory:
     """Factory for creating path components."""
 
-    _components: Dict[str, type[PathComponent]] = {
+    _components: ClassVar[dict[str, type[PathComponent]]] = {
         "AlbumArtist": AlbumArtistComponent,
         "Album": AlbumComponent,
     }
 
     @classmethod
-    def create(cls, component_type: str, order: int) -> Optional[PathComponent]:
+    def create(cls, component_type: str, order: int) -> PathComponent | None:
         """Create a path component.
 
         Args:
@@ -124,7 +137,7 @@ class PathComponentFactory:
             order: Order in which this component appears in the path.
 
         Returns:
-            Optional[PathComponent]: Created component or None if type is unknown.
+            PathComponent | None: Created component or None if type is unknown.
         """
         component_class = cls._components.get(component_type)
         if component_class:

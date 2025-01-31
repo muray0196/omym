@@ -1,7 +1,7 @@
 """Music file grouping functionality."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, ClassVar, Set
+from typing import ClassVar
 
 from omym.core.metadata.track_metadata_extractor import MetadataExtractor
 from omym.utils.logger import logger
@@ -10,11 +10,9 @@ from omym.utils.logger import logger
 class MusicGrouper:
     """Group music files based on path format."""
 
-    SUPPORTED_COMPONENTS: ClassVar[Set[str]] = {"AlbumArtist", "Album", "Genre", "Year"}
+    SUPPORTED_COMPONENTS: ClassVar[set[str]] = {"AlbumArtist", "Album", "Genre", "Year"}
 
-    def group_by_path_format(
-        self, files: List[Path], path_format: str
-    ) -> Dict[str, Dict[str, Optional[str]]]:
+    def group_by_path_format(self, files: list[Path], path_format: str) -> dict[str, dict[str, str | None]]:
         """Group files based on the specified path format.
 
         Args:
@@ -22,10 +20,10 @@ class MusicGrouper:
             path_format: Format string (e.g., "AlbumArtist/Album").
 
         Returns:
-            Dict[str, Dict[str, Optional[str]]]: Dictionary mapping file paths to metadata.
+            dict[str, dict[str, str | None]]: Dictionary mapping file paths to metadata.
                 The metadata dictionary contains optional string values for each metadata field.
         """
-        result: Dict[str, Dict[str, Optional[str]]] = {}
+        result: dict[str, dict[str, str | None]] = {}
         components = [c.strip() for c in path_format.split("/") if c.strip()]
 
         # Validate components
@@ -47,7 +45,7 @@ class MusicGrouper:
                     continue
 
                 # Convert metadata to dictionary
-                metadata_dict: Dict[str, Optional[str]] = {
+                metadata_dict: dict[str, str | None] = {
                     "title": metadata.title,
                     "artist": metadata.artist,
                     "album": metadata.album,
@@ -61,7 +59,7 @@ class MusicGrouper:
                 }
 
                 # Check if all required components have values
-                missing_components: List[str] = []
+                missing_components: list[str] = []
                 for component in components:
                     value = self._get_component_value(component, metadata_dict)
                     if not value:
@@ -83,7 +81,7 @@ class MusicGrouper:
 
         return result
 
-    def _get_component_value(self, component: str, metadata: Dict[str, Optional[str]]) -> str:
+    def _get_component_value(self, component: str, metadata: dict[str, str | None]) -> str:
         """Get the value for a path component from metadata.
 
         Args:

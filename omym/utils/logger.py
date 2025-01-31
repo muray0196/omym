@@ -5,7 +5,7 @@ import logging.handlers
 import os
 import re
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, override
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.style import Style
@@ -45,22 +45,23 @@ class WhitePathRichHandler(RichHandler):
             parts = path.split("\\")
             for i, part in enumerate(parts):
                 if part:  # Skip empty parts
-                    text.append(part, style=Style(color="white"))
+                    _ = text.append(part, style=Style(color="white"))
                     if i < len(parts) - 1:  # Add separator if not last part
-                        text.append("\\", style=Style(color="magenta"))
+                        _ = text.append("\\", style=Style(color="magenta"))
         else:  # Unix path
             if path.startswith("/"):
-                text.append("/", style=Style(color="magenta"))
+                _ = text.append("/", style=Style(color="magenta"))
             parts = path.strip("/").split("/")
             for i, part in enumerate(parts):
                 if part:  # Skip empty parts
-                    text.append(part, style=Style(color="white"))
+                    _ = text.append(part, style=Style(color="white"))
                     if i < len(parts) - 1:  # Add separator if not last part
-                        text.append("/", style=Style(color="magenta"))
+                        _ = text.append("/", style=Style(color="magenta"))
             if path.endswith("/"):
-                text.append("/", style=Style(color="magenta"))
+                _ = text.append("/", style=Style(color="magenta"))
         return text
 
+    @override
     def render_message(self, record: logging.LogRecord, message: str) -> Text:
         """Render message with white file paths.
 
@@ -75,50 +76,50 @@ class WhitePathRichHandler(RichHandler):
 
         # Add level indicator with color
         if "Processing" in message:
-            text.append("🔍 ", style=Style(color="blue", bold=True))
-            text.append("Processing ", style=Style(color="blue"))
+            _ = text.append("🔍 ", style=Style(color="blue", bold=True))
+            _ = text.append("Processing ", style=Style(color="blue"))
             path = message.replace("Processing ", "")
-            text.append(self._format_path(path))
+            _ = text.append(self._format_path(path))
             return text
         elif "Already processed" in message:
-            text.append("✓ ", style=Style(color="green", bold=True))
-            text.append("Already processed ", style=Style(color="green"))
+            _ = text.append("✓ ", style=Style(color="green", bold=True))
+            _ = text.append("Already processed ", style=Style(color="green"))
             path = message.replace("Already processed ", "")
-            text.append(self._format_path(path))
+            _ = text.append(self._format_path(path))
             return text
         elif "Successfully committed" in message:
-            text.append("💾 ", style=Style(color="green", bold=True))
-            text.append("Successfully committed all changes to database", style=Style(color="green"))
+            _ = text.append("💾 ", style=Style(color="green", bold=True))
+            _ = text.append("Successfully committed all changes to database", style=Style(color="green"))
             return text
         elif "Configuration loaded" in message:
-            text.append("⚙️  ", style=Style(color="cyan", bold=True))
+            _ = text.append("⚙️  ", style=Style(color="cyan", bold=True))
             message = message.replace("Configuration loaded from", "")
-            text.append("Configuration loaded from", style=Style(color="cyan"))
-            text.append(" ")  # Add space after message
+            _ = text.append("Configuration loaded from", style=Style(color="cyan"))
+            _ = text.append(" ")  # Add space after message
         elif "Moving file from" in message:
-            text.append("📦 ", style=Style(color="magenta", bold=True))
+            _ = text.append("📦 ", style=Style(color="magenta", bold=True))
             # Extract source and target paths
             parts = message.replace("Moving file from ", "").split(" to ")
             if len(parts) == 2:
                 source, target = parts
-                text.append(source.strip(), style=Style(color="magenta"))
-                text.append("\n    -> ", style=Style(color="magenta", bold=True))
-                text.append(target.strip(), style=Style(color="magenta"))
+                _ = text.append(source.strip(), style=Style(color="magenta"))
+                _ = text.append("\n    -> ", style=Style(color="magenta", bold=True))
+                _ = text.append(target.strip(), style=Style(color="magenta"))
             else:
                 # Fallback if message format is unexpected
-                text.append(message, style=Style(color="magenta"))
+                _ = text.append(message, style=Style(color="magenta"))
             return text
         elif record.levelno >= logging.ERROR:
-            text.append("❌ ", style=Style(color="red", bold=True))
-            text.append(message, style=Style(color="red"))
+            _ = text.append("❌ ", style=Style(color="red", bold=True))
+            _ = text.append(message, style=Style(color="red"))
             return text
         elif record.levelno >= logging.WARNING:
-            text.append("⚠️  ", style=Style(color="yellow", bold=True))
-            text.append(message, style=Style(color="yellow"))
+            _ = text.append("⚠️  ", style=Style(color="yellow", bold=True))
+            _ = text.append(message, style=Style(color="yellow"))
             return text
         else:
-            text.append("ℹ️  ", style=Style(color="blue", bold=True))
-            text.append(message, style=Style(color="blue"))
+            _ = text.append("ℹ️  ", style=Style(color="blue", bold=True))
+            _ = text.append(message, style=Style(color="blue"))
             return text
 
         # Match full paths first
@@ -129,26 +130,26 @@ class WhitePathRichHandler(RichHandler):
                 parts = path.split("\\")
                 for i, part in enumerate(parts):
                     if part:  # Skip empty parts
-                        text.append(part, style=Style(color="bright_white"))
+                        _ = text.append(part, style=Style(color="bright_white"))
                         if i < len(parts) - 1:  # Add separator if not last part
-                            text.append("\\", style=Style(color="magenta"))
+                            _ = text.append("\\", style=Style(color="magenta"))
             else:  # Unix path
                 if path.startswith("/"):
-                    text.append("/", style=Style(color="magenta"))  # Add initial slash with color
+                    _ = text.append("/", style=Style(color="magenta"))  # Add initial slash with color
                 parts = path.strip("/").split("/")
                 for i, part in enumerate(parts):
                     if part:  # Skip empty parts
-                        text.append(part, style=Style(color="bright_white"))
+                        _ = text.append(part, style=Style(color="bright_white"))
                         if i < len(parts) - 1:  # Add separator if not last part
-                            text.append("/", style=Style(color="magenta"))
+                            _ = text.append("/", style=Style(color="magenta"))
                 if path.endswith("/"):
-                    text.append("/", style=Style(color="magenta"))  # Add final slash with color
+                    _ = text.append("/", style=Style(color="magenta"))  # Add final slash with color
 
         return text
 
 
 def setup_logger(
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     console_level: int = logging.INFO,
     file_level: int = logging.DEBUG,
 ) -> logging.Logger:

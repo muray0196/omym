@@ -5,7 +5,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Set
+from typing import Callable, ClassVar, final
 
 from omym.core.metadata.track_metadata import TrackMetadata
 from omym.core.metadata.track_metadata_extractor import MetadataExtractor
@@ -26,20 +26,31 @@ class ProcessResult:
     """Result of processing a music file."""
 
     source_path: Path
-    target_path: Optional[Path] = None
+    target_path: Path | None = None
     success: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
     dry_run: bool = False
-    file_hash: Optional[str] = None
-    metadata: Optional[TrackMetadata] = None
-    artist_id: Optional[str] = None
+    file_hash: str | None = None
+    metadata: TrackMetadata | None = None
+    artist_id: str | None = None
 
 
+@final
 class MusicProcessor:
     """Process music files for organization."""
 
     # Supported file extensions
-    SUPPORTED_EXTENSIONS: Set[str] = {".mp3", ".flac", ".m4a", ".dsf", ".aac", ".alac"}
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".mp3", ".flac", ".m4a", ".dsf", ".aac", ".alac"}
+
+    base_path: Path
+    dry_run: bool
+    db_manager: DatabaseManager
+    before_dao: ProcessingBeforeDAO
+    after_dao: ProcessingAfterDAO
+    artist_dao: ArtistCacheDAO
+    artist_id_generator: CachedArtistIdGenerator
+    directory_generator: DirectoryGenerator
+    file_name_generator: FileNameGenerator
 
     def __init__(self, base_path: Path, dry_run: bool = False) -> None:
         """Initialize music processor.
@@ -68,8 +79,8 @@ class MusicProcessor:
         self.file_name_generator = FileNameGenerator(self.artist_id_generator)
 
     def process_directory(
-        self, directory: Path, progress_callback: Optional[Callable[[int, int], None]] = None
-    ) -> List[ProcessResult]:
+        self, directory: Path, progress_callback: Callable[[int, int], None] | None = None
+    ) -> list[ProcessResult]:
         """Process all music files in a directory.
 
         Args:
@@ -82,7 +93,7 @@ class MusicProcessor:
         if not directory.is_dir():
             raise ValueError(f"Not a directory: {directory}")
 
-        results: List[ProcessResult] = []
+        results: list[ProcessResult] = []
         total_files = sum(
             1 for f in directory.rglob("*") if f.is_file() and f.suffix.lower() in self.SUPPORTED_EXTENSIONS
         )
@@ -95,25 +106,25 @@ class MusicProcessor:
         try:
             # Begin transaction for the entire directory
             if self.db_manager.conn is not None:
-                self.db_manager.conn.execute("BEGIN TRANSACTION")
+                _ = self.db_manager.conn.execute("BEGIN TRANSACTION")
 
-            for file_path in directory.rglob("*"):
-                if not file_path.is_file() or file_path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
+            for current_file in directory.rglob("*"):
+                if not current_file.is_file() or current_file.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
                     continue
 
-                logger.info("Processing %s", file_path)
+                logger.info("Processing %s", current_file)
 
                 try:
                     # Calculate file hash
-                    file_hash = self._calculate_file_hash(file_path)
+                    file_hash = self._calculate_file_hash(current_file)
 
                     # Check if file has already been processed
                     if self.before_dao.check_file_exists(file_hash):
-                        logger.info("Already processed %s", file_path.name)
+                        logger.info("Already processed %s", current_file.name)
                         continue
 
                     # Process file
-                    result = self.process_file(file_path)
+                    result = self.process_file(current_file)
                     results.append(result)
 
                     # Update progress
@@ -123,10 +134,10 @@ class MusicProcessor:
 
                 except Exception as e:
                     error_message = str(e) if str(e) else type(e).__name__
-                    logger.error("Error processing file '%s': %s", file_path, error_message)
+                    logger.error("Error processing file '%s': %s", current_file, error_message)
                     results.append(
                         ProcessResult(
-                            source_path=file_path,
+                            source_path=current_file,
                             success=False,
                             error_message=error_message,
                             dry_run=self.dry_run,
@@ -164,11 +175,10 @@ class MusicProcessor:
             except OSError:
                 continue
 
-    def _generate_target_path(self, file_path: Path, metadata: TrackMetadata) -> Optional[Path]:
+    def _generate_target_path(self, metadata: TrackMetadata) -> Path | None:
         """Generate target path for a file.
 
         Args:
-            file_path: Source file path.
             metadata: Track metadata.
 
         Returns:
@@ -198,7 +208,7 @@ class MusicProcessor:
         Returns:
             ProcessResult object containing the result of processing.
         """
-        file_hash: Optional[str] = None
+        file_hash: str | None = None
         try:
             # Calculate file hash
             file_hash = self._calculate_file_hash(file_path)
@@ -223,7 +233,7 @@ class MusicProcessor:
                 raise ValueError("Failed to extract metadata")
 
             # Generate target path
-            target_path = self._generate_target_path(file_path, metadata)
+            target_path = self._generate_target_path(metadata)
             if not target_path:
                 raise ValueError("Failed to generate target path")
 
@@ -268,10 +278,10 @@ class MusicProcessor:
         """Calculate SHA-256 hash of a file.
 
         Args:
-            file_path: Path to file.
+            file_path: Path to the file.
 
         Returns:
-            SHA-256 hash of file.
+            str: Hexadecimal hash string.
         """
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
@@ -280,66 +290,23 @@ class MusicProcessor:
         return sha256_hash.hexdigest()
 
     def _find_available_path(self, target_path: Path) -> Path:
-        """Find an available path by appending a sequence number if necessary.
+        """Find an available path by appending a number if the target path exists.
 
         Args:
-            target_path: Target path to check.
+            target_path: Initial target path.
 
         Returns:
-            Available path.
+            Path: Available path.
         """
         if not target_path.exists():
             return target_path
 
         base = target_path.parent / target_path.stem
-        ext = target_path.suffix
+        extension = target_path.suffix
         counter = 1
 
         while True:
-            new_path = Path(f"{base}_{counter}{ext}")
+            new_path = Path(f"{base} ({counter}){extension}")
             if not new_path.exists():
                 return new_path
             counter += 1
-
-    def _save_file_state(
-        self,
-        file_path: Path,
-        file_hash: str,
-        metadata: TrackMetadata,
-        target_path: Path,
-    ) -> bool:
-        """Save file state to database.
-
-        Args:
-            file_path: Source file path.
-            file_hash: File hash.
-            metadata: File metadata.
-            target_path: Target file path.
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        try:
-            # Save file state
-            if self.db_manager.conn is None:
-                return False
-
-            # Save to processing_before table
-            if not self.before_dao.insert_file(file_hash, file_path):
-                return False
-
-            # Save to processing_after table
-            if not self.after_dao.insert_file(file_hash, file_path, target_path):
-                return False
-
-            # Save artist ID to cache
-            if metadata.artist:
-                artist_id = self.artist_id_generator.generate(metadata.artist)
-                if artist_id and not self.artist_dao.insert_artist_id(metadata.artist, artist_id):
-                    return False
-
-            return True
-
-        except Exception as e:
-            logger.error("Database error: %s", e)
-            return False

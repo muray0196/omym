@@ -1,13 +1,16 @@
 """Data access object for artist_cache table."""
 
 import sqlite3
-from typing import Optional
+from typing import final
 
 from omym.utils.logger import logger
 
 
+@final
 class ArtistCacheDAO:
     """Data access object for artist_cache table."""
+
+    conn: sqlite3.Connection
 
     def __init__(self, conn: sqlite3.Connection) -> None:
         """Initialize DAO.
@@ -29,7 +32,7 @@ class ArtistCacheDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO artist_cache (artist_name, artist_id)
                 VALUES (?, ?)
@@ -46,7 +49,7 @@ class ArtistCacheDAO:
             self.conn.rollback()
             return False
 
-    def get_artist_id(self, artist_name: str) -> Optional[str]:
+    def get_artist_id(self, artist_name: str) -> str | None:
         """Get artist ID from cache.
 
         Args:
@@ -57,7 +60,7 @@ class ArtistCacheDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT artist_id 
                 FROM artist_cache 
@@ -79,7 +82,7 @@ class ArtistCacheDAO:
         """
         try:
             cursor = self.conn.cursor()
-            cursor.execute("DELETE FROM artist_cache")
+            _ = cursor.execute("DELETE FROM artist_cache")
             self.conn.commit()
             return True
         except sqlite3.Error as e:

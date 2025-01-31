@@ -1,52 +1,48 @@
 """Renaming logic functionality."""
 
 import re
-from typing import Optional, Tuple, Pattern, List, Dict, Set
+from typing import final, ClassVar
 from pathlib import Path
 from unidecode import unidecode
-import langid  # type: ignore
 import pykakasi
-
+import langid  # pyright: ignore[reportMissingTypeStubs]
 from omym.core.path.sanitizer import Sanitizer
 from omym.core.metadata.track_metadata import TrackMetadata
 from omym.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.utils.logger import logger
 
 
-# Type alias for langid.classify return type
-LangIdResult = Tuple[str, float]
-
-
+@final
 class ArtistIdGenerator:
     """Generate artist IDs."""
 
     # Characters to keep in the ID (alphanumeric and hyphens)
-    KEEP_CHARS: Pattern[str] = re.compile(r"[^A-Z0-9-]")
+    KEEP_CHARS: ClassVar[re.Pattern[str]] = re.compile(r"[^A-Z0-9-]")
 
     # Vowels to remove (except for the first character of each word)
-    VOWELS: Pattern[str] = re.compile(r"[AEIOU]")
+    VOWELS: ClassVar[re.Pattern[str]] = re.compile(r"[AEIOU]")
 
     # Padding character for short IDs
-    PADDING_CHAR: str = "X"
+    PADDING_CHAR: ClassVar[str] = "X"
 
     # ID length
-    ID_LENGTH: int = 5
+    ID_LENGTH: ClassVar[int] = 5
 
     # Default ID for when generation fails
-    DEFAULT_ID: str = "NOART"
+    DEFAULT_ID: ClassVar[str] = "NOART"
 
     # Initialize pykakasi converter
-    _kakasi = pykakasi.Kakasi()
+    _kakasi: ClassVar = pykakasi.Kakasi()
 
     @classmethod
-    def _process_word(cls, word: str) -> Tuple[str, str]:
+    def _process_word(cls, word: str) -> tuple[str, str]:
         """Process a single word by keeping its first character and removing vowels from the rest.
 
         Args:
             word: A word to process.
 
         Returns:
-            Tuple[str, str]: A tuple containing:
+            tuple[str, str]: A tuple containing:
                 - The processed word with vowels removed except for the first character
                 - The original word (for fallback if the processed word is too short)
         """
@@ -85,7 +81,7 @@ class ArtistIdGenerator:
             return text
 
     @classmethod
-    def generate(cls, artist_name: Optional[str]) -> str:
+    def generate(cls, artist_name: str | None) -> str:
         """Generate a 5-character ID from an artist name.
 
         The generation process:
@@ -120,7 +116,7 @@ class ArtistIdGenerator:
             name = artist_name
             try:
                 # Ignore type checking for langid.classify as it's a third-party library
-                lang, _ = langid.classify(name)  # type: ignore
+                lang, _ = langid.classify(name)  # pyright: ignore[reportUnknownMemberType]
                 # Treat Chinese as Japanese since langid often detects Japanese kanji as Chinese
                 if lang in ["ja", "zh"]:
                     # Use pykakasi for Japanese text
@@ -144,7 +140,7 @@ class ArtistIdGenerator:
 
             # Split into words and process each word
             words = name.split("-")
-            processed_results: List[Tuple[str, str]] = [cls._process_word(word) for word in words]
+            processed_results: list[tuple[str, str]] = [cls._process_word(word) for word in words]
 
             # Try with vowels removed
             processed_words = [result[0] for result in processed_results]
@@ -168,8 +164,11 @@ class ArtistIdGenerator:
             return cls.DEFAULT_ID
 
 
+@final
 class CachedArtistIdGenerator:
     """Generate and cache artist IDs."""
+
+    dao: ArtistCacheDAO
 
     def __init__(self, dao: ArtistCacheDAO):
         """Initialize generator with a DAO.
@@ -179,7 +178,7 @@ class CachedArtistIdGenerator:
         """
         self.dao = dao
 
-    def generate(self, artist_name: Optional[str]) -> str:
+    def generate(self, artist_name: str | None) -> str:
         """Generate or retrieve a cached artist ID.
 
         This method first checks the cache for an existing ID.
@@ -297,8 +296,11 @@ class CachedArtistIdGenerator:
         return bool(ArtistIdGenerator.KEEP_CHARS.sub("", artist_id) == artist_id)
 
 
+@final
 class FileNameGenerator:
     """Generate file names from track metadata."""
+
+    artist_id_generator: CachedArtistIdGenerator
 
     def __init__(self, artist_id_generator: CachedArtistIdGenerator):
         """Initialize generator.
@@ -348,11 +350,12 @@ class FileNameGenerator:
             return f"ERROR_{metadata.file_extension}"
 
 
+@final
 class DirectoryGenerator:
     """Generate directory structure from track metadata."""
 
-    # Cache for album years: Dict[album_key, Set[year]]
-    _album_years: Dict[str, Set[int]] = {}
+    # Cache for album years: dict[album_key, set[year]]
+    _album_years: ClassVar[dict[str, set[int]]] = {}
 
     @classmethod
     def _get_album_key(cls, album_artist: str, album: str) -> str:
@@ -416,7 +419,7 @@ class DirectoryGenerator:
         years = cls._album_years.get(key, {0})
 
         # Get the latest year (excluding 0)
-        non_zero_years: Set[int] = {y for y in years if y != 0}
+        non_zero_years: set[int] = {y for y in years if y != 0}
         if non_zero_years:
             return max(non_zero_years)
         return 0

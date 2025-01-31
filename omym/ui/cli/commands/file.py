@@ -1,6 +1,6 @@
 """File command execution."""
 
-from typing import List
+from typing import override
 
 from omym.core.metadata.music_file_processor import ProcessResult
 from omym.ui.cli.commands.executor import CommandExecutor
@@ -9,7 +9,8 @@ from omym.ui.cli.commands.executor import CommandExecutor
 class FileCommand(CommandExecutor):
     """Command for processing a single file."""
 
-    def execute(self) -> List[ProcessResult]:
+    @override
+    def execute(self) -> list[ProcessResult]:
         """Execute file processing command.
 
         Returns:

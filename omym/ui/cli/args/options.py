@@ -2,9 +2,10 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import final
 
 
+@final
 @dataclass
 class Args:
     """Command line arguments data class.
@@ -22,11 +23,11 @@ class Args:
     """
 
     music_path: Path
-    target_path: Optional[Path] = None
+    target_path: Path | None = None
     dry_run: bool = False
     verbose: bool = False
     quiet: bool = False
     force: bool = False
     interactive: bool = False
-    config_path: Optional[Path] = None
-    show_db: bool = False 
+    config_path: Path | None = None
+    show_db: bool = False

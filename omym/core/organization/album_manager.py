@@ -1,8 +1,8 @@
 """Album management system for organizing music files."""
 
 from sqlite3 import Connection
-from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
+from typing import final
 
 from omym.db.daos.albums_dao import AlbumDAO, AlbumInfo
 
@@ -12,12 +12,16 @@ class AlbumGroup:
     """Album group information."""
 
     album_info: AlbumInfo
-    file_hashes: Set[str]
-    warnings: List[str]
+    file_hashes: set[str]
+    warnings: list[str]
 
 
+@final
 class AlbumManager:
     """Album manager for organizing music files."""
+
+    conn: Connection
+    album_dao: AlbumDAO
 
     def __init__(self, conn: Connection):
         """Initialize album manager.
@@ -28,9 +32,7 @@ class AlbumManager:
         self.conn = conn
         self.album_dao = AlbumDAO(conn)
 
-    def process_files(
-        self, files: Dict[str, Dict[str, Optional[str]]]
-    ) -> Tuple[List[AlbumGroup], List[str]]:
+    def process_files(self, files: dict[str, dict[str, str | None]]) -> tuple[list[AlbumGroup], list[str]]:
         """Process files and group them into albums.
 
         Args:
@@ -38,23 +40,22 @@ class AlbumManager:
                 The metadata dictionary contains optional string values for each field.
 
         Returns:
-            Tuple[List[AlbumGroup], List[str]]: A tuple containing:
+            tuple[list[AlbumGroup], list[str]]: A tuple containing:
                 - List of album groups with their associated files and warnings
                 - List of global warnings that apply to the entire process
         """
-        warnings: List[str] = []
-        album_groups: List[AlbumGroup] = []
+        warnings: list[str] = []
+        album_groups: list[AlbumGroup] = []
 
         # Group files by album name and album artist
-        album_files: Dict[Tuple[str, str], Set[str]] = {}
+        album_files: dict[tuple[str, str], set[str]] = {}
         for file_hash, metadata in files.items():
             album_name = metadata.get("album")
             album_artist = metadata.get("album_artist")
 
             if not album_name or not album_artist:
                 warnings.append(
-                    f"Missing album information for file {file_hash}: "
-                    f"album={album_name}, album_artist={album_artist}"
+                    f"Missing album information for file {file_hash}: album={album_name}, album_artist={album_artist}"
                 )
                 continue
 
@@ -74,8 +75,8 @@ class AlbumManager:
         self,
         album_name: str,
         album_artist: str,
-        file_hashes: Set[str],
-        files: Dict[str, Dict[str, Optional[str]]],
+        file_hashes: set[str],
+        files: dict[str, dict[str, str | None]],
     ) -> AlbumGroup:
         """Process an album group.
 
@@ -92,7 +93,7 @@ class AlbumManager:
                 - Set of file hashes in the album
                 - List of warnings specific to this album
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         # Get or create album
         album_info = self.album_dao.get_album(album_name, album_artist)
@@ -101,26 +102,20 @@ class AlbumManager:
             year = self._get_latest_year(file_hashes, files)
 
             # Get total tracks and discs
-            total_tracks: Optional[int] = None
-            total_discs: Optional[int] = None
+            total_tracks: int | None = None
+            total_discs: int | None = None
             for file_hash in file_hashes:
                 metadata = files[file_hash]
                 if "total_tracks" in metadata and metadata["total_tracks"]:
                     try:
                         total_tracks = int(metadata["total_tracks"])
                     except ValueError:
-                        warnings.append(
-                            f"Invalid total_tracks value for file {file_hash}: "
-                            f"{metadata['total_tracks']}"
-                        )
+                        warnings.append(f"Invalid total_tracks value for file {file_hash}: {metadata['total_tracks']}")
                 if "total_discs" in metadata and metadata["total_discs"]:
                     try:
                         total_discs = int(metadata["total_discs"])
                     except ValueError:
-                        warnings.append(
-                            f"Invalid total_discs value for file {file_hash}: "
-                            f"{metadata['total_discs']}"
-                        )
+                        warnings.append(f"Invalid total_discs value for file {file_hash}: {metadata['total_discs']}")
 
             # Create new album
             album_id = self.album_dao.insert_album(
@@ -165,27 +160,21 @@ class AlbumManager:
         for file_hash in file_hashes:
             metadata = files[file_hash]
             if "disc_number" not in metadata or "track_number" not in metadata:
-                warnings.append(
-                    f"Missing track position for file {file_hash}: "
-                    f"disc={metadata.get('disc_number')}, "
-                    f"track={metadata.get('track_number')}"
-                )
+                disc_info = metadata.get("disc_number")
+                track_info = metadata.get("track_number")
+                warnings.append(f"Missing track position for file {file_hash}: disc={disc_info}, track={track_info}")
                 continue
 
             try:
                 disc_number = int(metadata["disc_number"] or "0")
                 track_number = int(metadata["track_number"] or "0")
 
-                if not self.album_dao.insert_track_position(
-                    album_info.id, disc_number, track_number, file_hash
-                ):
+                if not self.album_dao.insert_track_position(album_info.id, disc_number, track_number, file_hash):
                     warnings.append(f"Failed to register track position for file {file_hash}")
             except ValueError:
-                warnings.append(
-                    f"Invalid track position for file {file_hash}: "
-                    f"disc={metadata.get('disc_number')}, "
-                    f"track={metadata.get('track_number')}"
-                )
+                disc_info = metadata.get("disc_number")
+                track_info = metadata.get("track_number")
+                warnings.append(f"Invalid track position for file {file_hash}: disc={disc_info}, track={track_info}")
 
         # Check track continuity
         is_continuous, continuity_warnings = self.album_dao.check_track_continuity(album_info.id)
@@ -198,9 +187,7 @@ class AlbumManager:
             warnings=warnings,
         )
 
-    def _get_latest_year(
-        self, file_hashes: Set[str], files: Dict[str, Dict[str, Optional[str]]]
-    ) -> Optional[int]:
+    def _get_latest_year(self, file_hashes: set[str], files: dict[str, dict[str, str | None]]) -> int | None:
         """Get the latest year from a set of files.
 
         Args:
@@ -209,9 +196,9 @@ class AlbumManager:
                 The metadata dictionary contains optional string values for each field.
 
         Returns:
-            Optional[int]: Latest year if found and valid, None otherwise.
+            int | None: Latest year if found and valid, None otherwise.
         """
-        latest_year: Optional[int] = None
+        latest_year: int | None = None
         for file_hash in file_hashes:
             metadata = files[file_hash]
             year_str = metadata.get("year")

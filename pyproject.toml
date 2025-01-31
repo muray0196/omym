@@ -37,3 +37,13 @@ line-length = 120
 
 [tool.ruff.lint]
 ignore = ["F401"]
+
+[tool.pyright]
+include = ["omym", "tests"]
+exclude = ["**/__pycache__"]
+stubPath = "omym/types"
+pythonVersion = "3.13"
+typeCheckingMode = "all"
+reportAny = false
+reportExplicitAny = false
+reportMissingImports = false

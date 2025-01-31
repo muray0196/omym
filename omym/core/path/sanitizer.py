@@ -1,29 +1,30 @@
 """File and path name sanitization functionality."""
 
 import re
-import unicodedata
 from pathlib import Path
-from typing import Optional, Pattern, Union, List
+from typing import final, ClassVar
+import unicodedata
 
 from omym.utils.logger import logger
 
 
+@final
 class Sanitizer:
     """Sanitize file and path names."""
 
     # Characters to be replaced with hyphens (all non-word characters except hyphens)
-    REPLACE_WITH_HYPHEN: Pattern[str] = re.compile(r"[^\w-]")
+    REPLACE_WITH_HYPHEN: ClassVar[re.Pattern[str]] = re.compile(r"[^\w-]")
 
     # Apostrophes to remove
-    REMOVE_APOSTROPHE: Pattern[str] = re.compile(r"'")
+    REMOVE_APOSTROPHE: ClassVar[re.Pattern[str]] = re.compile(r"'")
 
     # Multiple consecutive hyphens
-    MULTIPLE_HYPHENS: Pattern[str] = re.compile(r"-+")
+    MULTIPLE_HYPHENS: ClassVar[re.Pattern[str]] = re.compile(r"-+")
 
     # Maximum lengths (in bytes)
-    MAX_ARTIST_LENGTH: int = 50
-    MAX_ALBUM_LENGTH: int = 90
-    MAX_TRACK_LENGTH: int = 90
+    MAX_ARTIST_LENGTH: ClassVar[int] = 50
+    MAX_ALBUM_LENGTH: ClassVar[int] = 90
+    MAX_TRACK_LENGTH: ClassVar[int] = 90
 
     @classmethod
     def _clean_string(cls, text: str) -> str:
@@ -60,8 +61,8 @@ class Sanitizer:
     @classmethod
     def sanitize_string(
         cls,
-        text: Optional[Union[str, int, float]],
-        max_length: Optional[int] = None,
+        text: str | int | float | None,
+        max_length: int | None = None,
         preserve_extension: bool = False,
     ) -> str:
         """Sanitize a string by applying the following rules:
@@ -125,7 +126,7 @@ class Sanitizer:
             raise
 
     @classmethod
-    def sanitize_artist_name(cls, artist_name: Optional[str]) -> str:
+    def sanitize_artist_name(cls, artist_name: str | None) -> str:
         """Sanitize an artist name.
 
         Args:
@@ -140,7 +141,7 @@ class Sanitizer:
         return cls.sanitize_string(artist_name, cls.MAX_ARTIST_LENGTH)
 
     @classmethod
-    def sanitize_album_name(cls, album_name: Optional[str]) -> str:
+    def sanitize_album_name(cls, album_name: str | None) -> str:
         """Sanitize an album name.
 
         Args:
@@ -155,7 +156,7 @@ class Sanitizer:
         return cls.sanitize_string(album_name, cls.MAX_ALBUM_LENGTH)
 
     @classmethod
-    def sanitize_track_name(cls, track_name: Optional[str]) -> str:
+    def sanitize_track_name(cls, track_name: str | None) -> str:
         """Sanitize a track name.
 
         Args:
@@ -189,7 +190,7 @@ class Sanitizer:
         """
         try:
             parts = list(path.parts)
-            sanitized_parts: List[str] = []
+            sanitized_parts: list[str] = []
 
             # Handle absolute paths
             if path.is_absolute():
@@ -205,9 +206,7 @@ class Sanitizer:
             for i, part in enumerate(parts):
                 # Preserve extension only for the last component (if it's a file)
                 preserve_extension = i == len(parts) - 1
-                sanitized = cls.sanitize_string(
-                    part, preserve_extension=preserve_extension
-                )
+                sanitized = cls.sanitize_string(part, preserve_extension=preserve_extension)
                 if sanitized:  # Only add non-empty parts
                     sanitized_parts.append(sanitized)
 
@@ -223,7 +222,7 @@ class Sanitizer:
             raise
 
     @classmethod
-    def sanitize_title(cls, title: Optional[str]) -> str:
+    def sanitize_title(cls, title: str | None) -> str:
         """Sanitize a track title.
 
         Args:

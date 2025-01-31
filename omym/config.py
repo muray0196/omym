@@ -4,12 +4,12 @@ import json
 import tomllib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional, ClassVar, Dict, Any
+from typing import Any, ClassVar
 
 from omym.utils.logger import logger
 
 
-def _path_field(default: Optional[Path] = None) -> Any:
+def _path_field(default: Path | None = None) -> Any:
     """Create a field for Path objects with proper conversion.
 
     Args:
@@ -26,19 +26,17 @@ class Config:
     """Application configuration."""
 
     # Base path for music library
-    base_path: Optional[Path] = _path_field()
+    base_path: Path | None = _path_field()
 
     # Log file path
-    log_file: Optional[Path] = _path_field()
+    log_file: Path | None = _path_field()
 
     # Default configuration file path (relative to project root)
-    config_file: Path = field(
-        default_factory=lambda: Path(__file__).parent.parent / "config" / "config.toml"
-    )
+    config_file: Path = field(default_factory=lambda: Path(__file__).parent.parent / "config" / "config.toml")
 
     # Singleton instance
-    _instance: ClassVar[Optional["Config"]] = None
-    _loaded_from: ClassVar[Optional[Path]] = None
+    _instance: ClassVar["Config | None"] = None
+    _loaded_from: ClassVar[Path | None] = None
 
     def __post_init__(self) -> None:
         """Convert string paths to Path objects after initialization."""
@@ -61,9 +59,9 @@ class Config:
 
         try:
             # If the file exists and is JSON, convert it to TOML
-            if self.config_file.suffix == '.json':
+            if self.config_file.suffix == ".json":
                 # Create new TOML path
-                toml_path = self.config_file.with_suffix('.toml')
+                toml_path = self.config_file.with_suffix(".toml")
                 # Write as TOML
                 self._save_toml(toml_path, config_dict)
                 # Remove old JSON file if it exists
@@ -80,7 +78,7 @@ class Config:
             logger.error("Failed to save configuration: %s", e)
             raise
 
-    def _save_toml(self, path: Path, config: Dict[str, Any]) -> None:
+    def _save_toml(self, path: Path, config: dict[str, Any]) -> None:
         """Save configuration as TOML with comments.
 
         Args:
@@ -88,30 +86,30 @@ class Config:
             config: Configuration dictionary to save
         """
         toml_str = "# OMYM Configuration File\n\n"
-        
+
         # Base path section
         toml_str += "# Base path for your music library (optional)\n"
         toml_str += "# This is the root directory where your music files are stored\n"
-        toml_str += "# Example: base_path = \"/path/to/your/music\"\n"
+        toml_str += '# Example: base_path = "/path/to/your/music"\n'
         if config["base_path"] is not None:
-            toml_str += f'base_path = {self._format_toml_value(config["base_path"])}\n'
+            toml_str += f"base_path = {self._format_toml_value(config['base_path'])}\n"
         toml_str += "\n"
-        
+
         # Log file section
         toml_str += "# Log file path (optional)\n"
         toml_str += "# Where to store the application logs\n"
-        toml_str += "# Example: log_file = \"/path/to/logs/omym.log\"\n"
+        toml_str += '# Example: log_file = "/path/to/logs/omym.log"\n'
         if config["log_file"] is not None:
-            toml_str += f'log_file = {self._format_toml_value(config["log_file"])}\n'
+            toml_str += f"log_file = {self._format_toml_value(config['log_file'])}\n"
         toml_str += "\n"
-        
+
         # Config file section (always present)
         toml_str += "# Configuration file path (relative to project root)\n"
         toml_str += "# Location of this configuration file\n"
         toml_str += f'config_file = "{config["config_file"]}"\n'
 
         with open(path, "w", encoding="utf-8") as f:
-            f.write(toml_str)
+            _ = f.write(toml_str)  # Assign to _ to acknowledge unused result
 
     def _format_toml_value(self, value: Any) -> str:
         """Format a value for TOML serialization.
@@ -127,7 +125,7 @@ class Config:
         return str(value)
 
     @classmethod
-    def load(cls, config_file: Optional[Path] = None) -> "Config":
+    def load(cls, config_file: Path | None = None) -> "Config":
         """Load configuration from file.
 
         Args:
@@ -155,7 +153,7 @@ class Config:
                         config_dict = tomllib.load(f)
                 except Exception:
                     # If TOML loading fails, try JSON as fallback
-                    if config_file.suffix == '.json':
+                    if config_file.suffix == ".json":
                         with open(config_file, "r", encoding="utf-8") as f:
                             config_dict = json.load(f)
                         logger.info("Loaded legacy JSON configuration from %s", config_file)
@@ -172,11 +170,11 @@ class Config:
 
                 logger.info("Configuration loaded from %s", config_file)
                 instance = cls(**config_dict)
-                
+
                 # Save immediately if it's a JSON file to trigger conversion
-                if config_file.suffix == '.json':
+                if config_file.suffix == ".json":
                     instance.save()
-                
+
                 cls._instance = instance
                 cls._loaded_from = instance.config_file  # Use the potentially updated config_file path
                 return instance
