@@ -39,7 +39,7 @@ class ProcessResult:
 class MusicProcessor:
     """Process music files for organization."""
 
-    # Supported file extensions
+    # Supported file extensions.
     SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".mp3", ".flac", ".m4a", ".dsf", ".aac", ".alac"}
 
     base_path: Path
@@ -62,24 +62,26 @@ class MusicProcessor:
         self.base_path = base_path
         self.dry_run = dry_run
 
-        # Initialize database connection
+        # Initialize database connection.
         self.db_manager = DatabaseManager()
         self.db_manager.connect()
         if self.db_manager.conn is None:
             raise RuntimeError("Failed to connect to database")
 
-        # Initialize DAOs
+        # Initialize DAOs.
         self.before_dao = ProcessingBeforeDAO(self.db_manager.conn)
         self.after_dao = ProcessingAfterDAO(self.db_manager.conn)
         self.artist_dao = ArtistCacheDAO(self.db_manager.conn)
 
-        # Initialize generators
+        # Initialize generators.
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)
         self.directory_generator = DirectoryGenerator()
         self.file_name_generator = FileNameGenerator(self.artist_id_generator)
 
     def process_directory(
-        self, directory: Path, progress_callback: Callable[[int, int], None] | None = None
+        self,
+        directory: Path,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> list[ProcessResult]:
         """Process all music files in a directory.
 
@@ -94,43 +96,35 @@ class MusicProcessor:
             raise ValueError(f"Not a directory: {directory}")
 
         results: list[ProcessResult] = []
-        total_files = sum(
-            1 for f in directory.rglob("*") if f.is_file() and f.suffix.lower() in self.SUPPORTED_EXTENSIONS
-        )
-        processed_files = 0
-
+        # Build a list of supported files.
+        supported_files = [f for f in directory.rglob("*") if self._is_supported(f)]
+        total_files = len(supported_files)
         if total_files == 0:
             logger.warning("No supported music files found in directory: %s", directory)
-            return []
+            return results
 
+        processed_count = 0
         try:
-            # Begin transaction for the entire directory
-            if self.db_manager.conn is not None:
-                _ = self.db_manager.conn.execute("BEGIN TRANSACTION")
+            # Begin transaction for the entire directory.
+            conn = self.db_manager.conn
+            if conn is None:
+                raise RuntimeError("Database connection is not initialized")
+            _ = conn.execute("BEGIN TRANSACTION")
 
-            for current_file in directory.rglob("*"):
-                if not current_file.is_file() or current_file.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-                    continue
-
+            for current_file in supported_files:
                 logger.info("Processing %s", current_file)
-
                 try:
-                    # Calculate file hash
                     file_hash = self._calculate_file_hash(current_file)
-
-                    # Check if file has already been processed
+                    # Skip files that have already been processed.
                     if self.before_dao.check_file_exists(file_hash):
                         logger.info("Already processed %s", current_file.name)
                         continue
 
-                    # Process file
                     result = self.process_file(current_file)
                     results.append(result)
-
-                    # Update progress
-                    processed_files += 1
+                    processed_count += 1
                     if progress_callback:
-                        progress_callback(processed_files, total_files)
+                        progress_callback(processed_count, total_files)
 
                 except Exception as e:
                     error_message = str(e) if str(e) else type(e).__name__
@@ -144,60 +138,23 @@ class MusicProcessor:
                         )
                     )
 
-            # Clean up empty directories if not in dry run mode
             if not self.dry_run:
                 self._cleanup_empty_directories(directory)
 
-            # Commit all changes to database
-            if self.db_manager.conn is not None:
-                self.db_manager.conn.commit()
-                logger.info("Successfully committed all changes to database")
+            conn = self.db_manager.conn
+            if conn is None:
+                raise RuntimeError("Database connection is not initialized")
+            conn.commit()
+            logger.info("Successfully committed all changes to database")
 
         except Exception as e:
             error_message = str(e) if str(e) else type(e).__name__
             logger.error("Error processing directory '%s': %s", directory, error_message)
-            if self.db_manager.conn is not None:
-                self.db_manager.conn.rollback()
+            conn = self.db_manager.conn
+            if conn is not None:
+                conn.rollback()
 
         return results
-
-    def _cleanup_empty_directories(self, directory: Path) -> None:
-        """Clean up empty directories.
-
-        Args:
-            directory: Directory to clean up.
-        """
-        for root, _, _ in os.walk(str(directory), topdown=False):
-            try:
-                root_path = Path(root)
-                if root_path.exists() and not any(root_path.iterdir()):
-                    root_path.rmdir()
-            except OSError:
-                continue
-
-    def _generate_target_path(self, metadata: TrackMetadata) -> Path | None:
-        """Generate target path for a file.
-
-        Args:
-            metadata: Track metadata.
-
-        Returns:
-            Target path if successful, None otherwise.
-        """
-        try:
-            # Generate target path components
-            dir_path = self.directory_generator.generate(metadata)
-            file_name = self.file_name_generator.generate(metadata)
-            if not dir_path or not file_name:
-                return None
-
-            # Find available path
-            target_path = self._find_available_path(self.base_path / dir_path / file_name)
-            return target_path
-
-        except Exception as e:
-            logger.error("Error generating target path: %s", e)
-            return None
 
     def process_file(self, file_path: Path) -> ProcessResult:
         """Process a single music file.
@@ -210,12 +167,11 @@ class MusicProcessor:
         """
         file_hash: str | None = None
         try:
-            # Calculate file hash
+            # Calculate file hash.
             file_hash = self._calculate_file_hash(file_path)
 
-            # Check if file has already been processed
             if self.before_dao.check_file_exists(file_hash):
-                # Get existing target path
+                # Get existing target path.
                 target_path = self.before_dao.get_target_path(file_hash)
                 if target_path and target_path.exists():
                     logger.info("File already processed: %s -> %s", file_path, target_path)
@@ -227,30 +183,23 @@ class MusicProcessor:
                         file_hash=file_hash,
                     )
 
-            # Extract metadata
+            # Extract metadata.
             metadata = MetadataExtractor.extract(file_path)
             if not metadata:
                 raise ValueError("Failed to extract metadata")
 
-            # Generate target path
+            # Generate target path.
             target_path = self._generate_target_path(metadata)
             if not target_path:
                 raise ValueError("Failed to generate target path")
 
-            # Save file state to database
+            # Save file state.
             if not self.before_dao.insert_file(file_hash, file_path):
                 raise ValueError("Failed to save file state to database")
 
-            # Move file if not in dry run mode
+            # If not in dry run mode, move the file and record updated state.
             if not self.dry_run:
-                # Create target directory
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # Move file
-                logger.info("Moving file from %s to %s", file_path, target_path)
-                shutil.move(str(file_path), str(target_path))
-
-                # Save after state to database
+                self._move_file(file_path, target_path)
                 if not self.after_dao.insert_file(file_hash, file_path, target_path):
                     raise ValueError("Failed to save file state to database")
 
@@ -274,6 +223,65 @@ class MusicProcessor:
                 file_hash=file_hash,
             )
 
+    def _is_supported(self, file: Path) -> bool:
+        """Check if the given file has a supported extension.
+
+        Args:
+            file: File path to check.
+
+        Returns:
+            True if file is supported; otherwise, False.
+        """
+        return file.is_file() and file.suffix.lower() in self.SUPPORTED_EXTENSIONS
+
+    def _move_file(self, src_path: Path, dest_path: Path) -> None:
+        """Move a file from the source path to the target path.
+
+        Args:
+            src_path: Source file path.
+            dest_path: Target file path.
+        """
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info("Moving file from %s to %s", src_path, dest_path)
+        shutil.move(str(src_path), str(dest_path))
+
+    def _cleanup_empty_directories(self, directory: Path) -> None:
+        """Clean up empty directories.
+
+        Args:
+            directory: Directory to clean up.
+        """
+        for root, _, _ in os.walk(str(directory), topdown=False):
+            try:
+                root_path = Path(root)
+                if root_path.exists() and not any(root_path.iterdir()):
+                    root_path.rmdir()
+            except OSError:
+                continue
+
+    def _generate_target_path(self, metadata: TrackMetadata) -> Path | None:
+        """Generate target path for a file based on its metadata.
+
+        Args:
+            metadata: Track metadata.
+
+        Returns:
+            Target path if successful, None otherwise.
+        """
+        try:
+            # Generate components for target directory and file name.
+            dir_path = self.directory_generator.generate(metadata)
+            file_name = self.file_name_generator.generate(metadata)
+            if not dir_path or not file_name:
+                return None
+
+            target_path = self._find_available_path(self.base_path / dir_path / file_name)
+            return target_path
+
+        except Exception as e:
+            logger.error("Error generating target path: %s", e)
+            return None
+
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of a file.
 
@@ -281,7 +289,7 @@ class MusicProcessor:
             file_path: Path to the file.
 
         Returns:
-            str: Hexadecimal hash string.
+            Hexadecimal hash string.
         """
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
@@ -290,13 +298,13 @@ class MusicProcessor:
         return sha256_hash.hexdigest()
 
     def _find_available_path(self, target_path: Path) -> Path:
-        """Find an available path by appending a number if the target path exists.
+        """Find an available file path by appending a number if needed.
 
         Args:
             target_path: Initial target path.
 
         Returns:
-            Path: Available path.
+            Available file path.
         """
         if not target_path.exists():
             return target_path

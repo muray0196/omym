@@ -74,34 +74,30 @@ class PathGenerator:
 
         for file_path, metadata in grouped_files.items():
             warnings: list[str] = []
-            relative_path = Path()
-
-            # Build relative path components
             components: list[str] = []
 
-            # Add album artist
+            # Add album artist.
             album_artist = metadata.get("album_artist") or metadata.get("artist")
             if not album_artist:
                 warnings.append("Missing album artist")
                 album_artist = "Unknown-Artist"
             components.append(album_artist)
 
-            # Add year and album
+            # Add year and album.
             year = metadata.get("year", "0000")
             album = metadata.get("album", "Unknown-Album")
             components.append(f"{year}_{album}")
 
-            # Build relative path
-            for component in components:
-                relative_path = relative_path / component
+            # Build relative path using the helper method.
+            relative_path = self._assemble_relative_path(components)
 
-            # Create path info
-            path_info = PathInfo(
-                file_hash=file_path,  # Using file path as hash for now
-                relative_path=relative_path,
-                warnings=warnings,
+            paths.append(
+                PathInfo(
+                    file_hash=file_path,  # Using file path as hash for now.
+                    relative_path=relative_path,
+                    warnings=warnings,
+                )
             )
-            paths.append(path_info)
 
         return paths
 
@@ -117,16 +113,16 @@ class PathGenerator:
             logger.error("No hierarchies found")
             return paths
 
-        # Get all values for each hierarchy
+        # Get all values for each hierarchy.
         hierarchy_values: dict[int, list[FilterValue]] = {}
         for hierarchy in hierarchies:
             values = self.filter_dao.get_values(hierarchy.id)
             hierarchy_values[hierarchy.id] = values
 
-        # Group files by hierarchy values
+        # Group files by hierarchy values.
         file_groups = self._group_files_by_hierarchies(hierarchies, hierarchy_values)
 
-        # Generate paths for each group
+        # Generate paths for each group.
         for group_values, file_hashes in file_groups.items():
             group_paths = self._generate_group_paths(hierarchies, group_values, file_hashes)
             paths.extend(group_paths)
@@ -146,35 +142,28 @@ class PathGenerator:
 
         Returns:
             dict[tuple[str, ...], set[str]]: Dictionary mapping hierarchy value tuples
-                to sets of file hashes. Each tuple contains the values for each hierarchy
-                in order.
+                to sets of file hashes.
         """
         groups: dict[tuple[str, ...], set[str]] = {}
 
-        # Get all file hashes
+        # Get all file hashes.
         file_hashes: set[str] = set()
         for values in hierarchy_values.values():
             for value in values:
                 file_hashes.add(value.file_hash)
 
-        # Group files by hierarchy values
+        # Group files by hierarchy values.
         for file_hash in file_hashes:
             group_key: list[str] = []
             for hierarchy in hierarchies:
                 value = self._find_value_for_file(hierarchy.id, file_hash, hierarchy_values[hierarchy.id])
                 if not value:
-                    logger.warning(
-                        "Missing value for hierarchy %s, file %s",
-                        hierarchy.name,
-                        file_hash,
-                    )
+                    logger.warning("Missing value for hierarchy %s, file %s", hierarchy.name, file_hash)
                     break
                 group_key.append(value)
             else:
                 key = tuple(group_key)
-                if key not in groups:
-                    groups[key] = set()
-                groups[key].add(file_hash)
+                groups.setdefault(key, set()).add(file_hash)
 
         return groups
 
@@ -210,25 +199,38 @@ class PathGenerator:
 
         Returns:
             list[PathInfo]: List of path information for each file in the group.
-                Each PathInfo contains the file hash, relative path, and any warnings.
         """
+        # Build the relative path from group values, with logging for each hierarchy.
+        relative_path = self._assemble_relative_path(list(group_values), hierarchies)
         paths: list[PathInfo] = []
-        relative_path = Path()
 
-        # Build relative path using hierarchy values
-        for i, value in enumerate(group_values):
-            if i < len(hierarchies):
-                logger.debug("Using hierarchy %s with value %s", hierarchies[i].name, value)
-            relative_path = relative_path / value
-
-        # Generate paths for each file
+        # Generate a PathInfo for each file in the group.
         for file_hash in file_hashes:
-            warnings: list[str] = []
-            path_info = PathInfo(
-                file_hash=file_hash,
-                relative_path=relative_path,
-                warnings=warnings,
+            paths.append(
+                PathInfo(
+                    file_hash=file_hash,
+                    relative_path=relative_path,
+                    warnings=[],
+                )
             )
-            paths.append(path_info)
 
         return paths
+
+    def _assemble_relative_path(self, components: list[str], hierarchies: list[FilterHierarchy] | None = None) -> Path:
+        """Assemble a relative path from a list of components.
+
+        If hierarchies are provided, logs each component with the corresponding hierarchy name.
+
+        Args:
+            components: List of path components.
+            hierarchies: Optional list of FilterHierarchy for logging.
+
+        Returns:
+            Path: Assembled relative path.
+        """
+        if hierarchies:
+            for i, component in enumerate(components):
+                if i < len(hierarchies):
+                    logger.debug("Using hierarchy %s with value %s", hierarchies[i].name, component)
+        # Use the Path constructor to join components.
+        return Path(*components)

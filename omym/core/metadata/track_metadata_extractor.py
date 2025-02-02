@@ -1,7 +1,8 @@
 """Audio file metadata extraction functionality."""
 
+import abc
 from pathlib import Path
-from typing import Any, Callable, ClassVar, cast
+from typing import ClassVar, cast, override, TypeVar, Protocol
 
 from mutagen._file import File as MutagenFile  # pyright: ignore[reportUnknownVariableType]
 from mutagen.easyid3 import EasyID3
@@ -12,331 +13,299 @@ from mutagen._util import MutagenError
 
 from omym.utils.logger import logger
 from omym.core.metadata.track_metadata import TrackMetadata
-from omym.types.mutagen_types import MutagenTags, MutagenFile as MutagenFileProtocol
 
 
-class MetadataExtractor:
-    """Extract metadata from audio files."""
+# Type definitions for mutagen tags
+T = TypeVar("T")
+TagValue = str | list[str] | list[tuple[int, int]] | None
+TagsDict = dict[str, TagValue]
 
-    SUPPORTED_FORMATS: ClassVar[set[str]] = {".flac", ".mp3", ".m4a", ".dsf"}
 
-    @staticmethod
-    def _safe_get_first(data: list[str] | None, default: str = "") -> str:
-        """Safely get first item from list or return default.
+class MutagenTags(Protocol):
+    """Protocol for mutagen tags."""
 
-        Args:
-            data: List of strings or None
-            default: Default value if list is None or empty
+    def get(self, key: str, default: T | None = None) -> TagValue | T: ...
+    def items(self) -> list[tuple[str, TagValue]]: ...
 
-        Returns:
-            str: First item or default value
-        """
-        if not data:
-            return default
-        return data[0]
 
-    @staticmethod
-    def _safe_get_tuple(data: list[tuple[int, int]] | None, default: tuple[int, int] = (0, 0)) -> tuple[int, int]:
-        """Safely get first tuple from list or return default.
+class MutagenTagsBytes(Protocol):
+    """Protocol for mutagen tags that use bytes."""
 
-        Args:
-            data: List of tuples or None
-            default: Default value if list is None or empty
+    def get(self, key: bytes, default: T | None = None) -> bytes | T: ...
+    def items(self) -> list[tuple[bytes, bytes]]: ...
 
-        Returns:
-            tuple[int, int]: First tuple or default value
-        """
-        if not data:
-            return default
-        return data[0]
 
-    @staticmethod
-    def _safe_get_tag_value(tags: MutagenTags, key: str, default: str | None = None) -> str | None:
-        """Safely get tag value from audio tags.
+def convert_bytes_tags(tags: MutagenTagsBytes) -> TagsDict:
+    """Convert byte tags to string tags.
 
-        Args:
-            tags: Audio file tags
-            key: Tag key
-            default: Default value if tag is not found
+    Args:
+        tags: Tags with byte keys and values.
 
-        Returns:
-            str | None: Tag value or default
-        """
+    Returns:
+        Dictionary with string keys and values.
+    """
+    result: TagsDict = {}
+    for key, value in tags.items():
         try:
-            value = str(tags.get(key, default))
-            return value if value != str(default) else default
-        except (AttributeError, TypeError, ValueError):
-            return default
+            str_key = key.decode("utf-8")
+            str_value = value.decode("utf-8")
+            result[str_key] = str_value
+        except (UnicodeDecodeError, AttributeError):
+            continue
+    return result
 
-    @staticmethod
-    def _get_audio_tag_value(audio: MutagenTags, key: str) -> list[str] | None:
-        """Get audio tag value with proper type casting.
 
-        Args:
-            audio: Audio file object
-            key: Tag key
+def safe_get_first(data: list[str] | None, default: str = "") -> str:
+    """Safely get the first element from a list or return the default."""
+    return data[0] if data else default
 
-        Returns:
-            list[str] | None: Tag value or None
-        """
-        try:
-            value = audio.get(key)
-            return cast(list[str] | None, value)
-        except (AttributeError, TypeError, ValueError):
-            return None
 
-    @staticmethod
-    def _get_audio_tuple_value(audio: MutagenTags, key: str) -> list[tuple[int, int]] | None:
-        """Get audio tuple value with proper type casting.
+def parse_slash_separated(value: str) -> tuple[int | None, int | None]:
+    """Parse a string in 'number/total' format.
 
-        Args:
-            audio: Audio file object
-            key: Tag key
+    Returns a tuple (number, total) or (None, None) if conversion fails.
+    """
+    parts = value.split("/") if value else []
+    num = int(parts[0]) if parts and parts[0].isdigit() else None
+    total = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+    return num, total
 
-        Returns:
-            list[tuple[int, int]] | None: Tag value or None
-        """
-        try:
-            value = audio.get(key)
-            return cast(list[tuple[int, int]] | None, value)
-        except (AttributeError, TypeError, ValueError):
-            return None
 
-    @staticmethod
-    def _get_dsf_tag_value(tags: dict[str, Any], key: str, default: str = "") -> str:
-        """Get DSF tag value with proper type casting.
+def parse_tuple_numbers(data: list[tuple[int, int]] | None) -> tuple[int | None, int | None]:
+    """Parse a list of numeric tuples and return the first tuple with zeros converted to None."""
+    if data:
+        first = data[0]
+        num = first[0] if first[0] != 0 else None
+        total = first[1] if first[1] != 0 else None
+        return num, total
+    return None, None
 
-        Args:
-            tags: DSF file tags
-            key: Tag key
-            default: Default value if tag is not found
 
-        Returns:
-            str: Tag value or default
-        """
-        try:
-            value = tags.get(key)
-            if value is None:
-                return default
-            return str(value)
-        except (AttributeError, TypeError, ValueError):
-            return default
+def parse_year(date_str: str) -> int | None:
+    """Parse a year from a string (expects the first 4 characters to be digits)."""
+    return int(date_str[:4]) if date_str and len(date_str) >= 4 and date_str[:4].isdigit() else None
 
-    @staticmethod
-    def _extract_mp3(file_path: Path) -> TrackMetadata:
-        """Extract metadata from MP3 file.
+
+def safe_get_dsf(tags: TagsDict, key: str, default: str = "") -> str:
+    """Safely get a DSF tag value from a dictionary."""
+    try:
+        value = tags.get(key, default)
+        return str(value) if value is not None else default
+    except Exception:
+        return default
+
+
+class AudioFormatExtractor(abc.ABC):
+    """Abstract base class for audio metadata extractors."""
+
+    @abc.abstractmethod
+    def extract_metadata(self, file_path: Path) -> TrackMetadata:
+        """Extract metadata from an audio file.
 
         Args:
-            file_path: Path to the MP3 file.
+            file_path: Path to the audio file.
 
         Returns:
             TrackMetadata: Extracted metadata.
 
         Raises:
-            FileNotFoundError: If the file does not exist.
-            Exception: If metadata extraction fails.
+            Exception: When extraction fails.
         """
+        pass
+
+
+class BaseTagExtractor:
+    """Provides common helper methods for tag extraction."""
+
+    @staticmethod
+    def get_str_tag(tags: MutagenTags, key: str, default: str | None = None) -> str | None:
+        """Extract the first string value for a key from tag collection."""
+        value = tags.get(key)
+        if isinstance(value, list):
+            return safe_get_first(cast(list[str], value), default or "")
+        elif isinstance(value, str):
+            return value
+        return default
+
+
+class Mp3Extractor(AudioFormatExtractor):
+    """Extractor for MP3 files using EasyID3 tags."""
+
+    @override
+    def extract_metadata(self, file_path: Path) -> TrackMetadata:
         try:
             audio = cast(MutagenTags, MP3(file_path, ID3=EasyID3))
-
-            # Extract track and disc numbers
-            track_str = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "tracknumber"))
-            track = track_str.split("/") if track_str else [""]
-            track_number = int(track[0]) if track and track[0].isdigit() else None
-            track_total = int(track[1]) if len(track) > 1 and track[1].isdigit() else None
-
-            disc_str = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "discnumber"))
-            disc = disc_str.split("/") if disc_str else [""]
-            disc_number = int(disc[0]) if disc and disc[0].isdigit() else None
-            disc_total = int(disc[1]) if len(disc) > 1 and disc[1].isdigit() else None
-
-            # Extract year
-            date = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "date"))
-            year = int(date[:4]) if date and date[:4].isdigit() else None
-
-            return TrackMetadata(
-                title=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "title")) or None,
-                artist=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "artist"))
-                or None,
-                album_artist=MetadataExtractor._safe_get_first(
-                    MetadataExtractor._get_audio_tag_value(audio, "albumartist")
-                )
-                or None,
-                album=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "album")) or None,
-                track_number=track_number,
-                track_total=track_total,
-                disc_number=disc_number,
-                disc_total=disc_total,
-                year=year,
-                file_extension=file_path.suffix.lower(),
-            )
         except MutagenError as e:
             logger.error("Failed to extract MP3 metadata from %s: %s", file_path, e)
             if "No such file" in str(e):
                 raise FileNotFoundError(str(e)) from e
             raise
-        except Exception as e:
-            logger.error("Failed to extract MP3 metadata from %s: %s", file_path, e)
-            raise
 
-    @staticmethod
-    def _extract_flac(file_path: Path) -> TrackMetadata:
-        """Extract metadata from FLAC file.
+        title = BaseTagExtractor.get_str_tag(audio, "title")
+        artist = BaseTagExtractor.get_str_tag(audio, "artist")
+        album_artist = BaseTagExtractor.get_str_tag(audio, "albumartist")
+        album = BaseTagExtractor.get_str_tag(audio, "album")
 
-        Args:
-            file_path: Path to the FLAC file.
+        track_str = safe_get_first(cast(list[str], audio.get("tracknumber")), "")
+        track_number, track_total = parse_slash_separated(track_str)
 
-        Returns:
-            TrackMetadata: Extracted metadata.
+        disc_str = safe_get_first(cast(list[str], audio.get("discnumber")), "")
+        disc_number, disc_total = parse_slash_separated(disc_str)
 
-        Raises:
-            Exception: If metadata extraction fails.
-        """
+        date_str = safe_get_first(cast(list[str], audio.get("date")), "")
+        year = parse_year(date_str)
+
+        return TrackMetadata(
+            title=title,
+            artist=artist,
+            album_artist=album_artist,
+            album=album,
+            track_number=track_number,
+            track_total=track_total,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            year=year,
+            file_extension=file_path.suffix.lower(),
+        )
+
+
+class FlacExtractor(AudioFormatExtractor):
+    """Extractor for FLAC files."""
+
+    @override
+    def extract_metadata(self, file_path: Path) -> TrackMetadata:
         try:
             audio = cast(MutagenTags, FLAC(file_path))
-
-            # Extract track and disc numbers
-            track_str = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "tracknumber"))
-            track = track_str.split("/") if track_str else [""]
-            track_number = int(track[0]) if track and track[0].isdigit() else None
-            track_total = int(track[1]) if len(track) > 1 and track[1].isdigit() else None
-
-            disc_str = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "discnumber"))
-            disc = disc_str.split("/") if disc_str else [""]
-            disc_number = int(disc[0]) if disc and disc[0].isdigit() else None
-            disc_total = int(disc[1]) if len(disc) > 1 and disc[1].isdigit() else None
-
-            # Extract year
-            date = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "date"))
-            year = int(date[:4]) if date and date[:4].isdigit() else None
-
-            return TrackMetadata(
-                title=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "title")) or None,
-                artist=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "artist"))
-                or None,
-                album_artist=MetadataExtractor._safe_get_first(
-                    MetadataExtractor._get_audio_tag_value(audio, "albumartist")
-                )
-                or None,
-                album=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "album")) or None,
-                track_number=track_number,
-                track_total=track_total,
-                disc_number=disc_number,
-                disc_total=disc_total,
-                year=year,
-                file_extension=file_path.suffix.lower(),
-            )
         except Exception as e:
             logger.error("Failed to extract FLAC metadata from %s: %s", file_path, e)
             raise
 
-    @staticmethod
-    def _extract_m4a(file_path: Path) -> TrackMetadata:
-        """Extract metadata from M4A/AAC file.
+        title = BaseTagExtractor.get_str_tag(audio, "title")
+        artist = BaseTagExtractor.get_str_tag(audio, "artist")
+        album_artist = BaseTagExtractor.get_str_tag(audio, "albumartist")
+        album = BaseTagExtractor.get_str_tag(audio, "album")
 
-        Args:
-            file_path: Path to the M4A file.
+        track_str = safe_get_first(cast(list[str], audio.get("tracknumber")), "")
+        track_number, track_total = parse_slash_separated(track_str)
 
-        Returns:
-            TrackMetadata: Extracted metadata.
+        disc_str = safe_get_first(cast(list[str], audio.get("discnumber")), "")
+        disc_number, disc_total = parse_slash_separated(disc_str)
 
-        Raises:
-            Exception: If metadata extraction fails.
-        """
+        date_str = safe_get_first(cast(list[str], audio.get("date")), "")
+        year = parse_year(date_str)
+
+        return TrackMetadata(
+            title=title,
+            artist=artist,
+            album_artist=album_artist,
+            album=album,
+            track_number=track_number,
+            track_total=track_total,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            year=year,
+            file_extension=file_path.suffix.lower(),
+        )
+
+
+class M4aExtractor(AudioFormatExtractor):
+    """Extractor for M4A/AAC files using MP4 tags."""
+
+    @override
+    def extract_metadata(self, file_path: Path) -> TrackMetadata:
         try:
             audio = cast(MutagenTags, MP4(file_path))
-
-            # Extract track and disc numbers
-            track = MetadataExtractor._safe_get_tuple(MetadataExtractor._get_audio_tuple_value(audio, "trkn"))
-            track_number = track[0] if track[0] != 0 else None
-            track_total = track[1] if track[1] != 0 else None
-
-            disc = MetadataExtractor._safe_get_tuple(MetadataExtractor._get_audio_tuple_value(audio, "disk"))
-            disc_number = disc[0] if disc[0] != 0 else None
-            disc_total = disc[1] if disc[1] != 0 else None
-
-            # Extract year
-            year_str = MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "\xa9day"))
-            year = int(year_str) if year_str and year_str.isdigit() else None
-
-            return TrackMetadata(
-                title=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "\xa9nam"))
-                or None,
-                artist=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "\xa9ART"))
-                or None,
-                album_artist=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "aART"))
-                or None,
-                album=MetadataExtractor._safe_get_first(MetadataExtractor._get_audio_tag_value(audio, "\xa9alb"))
-                or None,
-                track_number=track_number,
-                track_total=track_total,
-                disc_number=disc_number,
-                disc_total=disc_total,
-                year=year,
-                file_extension=file_path.suffix.lower(),
-            )
         except Exception as e:
             logger.error("Failed to extract M4A metadata from %s: %s", file_path, e)
             raise
 
-    @staticmethod
-    def _extract_dsf(file_path: Path) -> TrackMetadata:
-        """Extract metadata from DSF file.
+        # In MP4, standard tag keys are slightly different.
+        title = BaseTagExtractor.get_str_tag(audio, "\xa9nam")
+        artist = BaseTagExtractor.get_str_tag(audio, "\xa9ART")
+        album_artist = BaseTagExtractor.get_str_tag(audio, "aART")
+        album = BaseTagExtractor.get_str_tag(audio, "\xa9alb")
 
-        Args:
-            file_path: Path to the DSF file.
+        # For track and disk, MP4 stores a list of tuples.
+        track_tuple = cast(list[tuple[int, int]], audio.get("trkn"))
+        track_number, track_total = parse_tuple_numbers(track_tuple)
 
-        Returns:
-            TrackMetadata: Extracted metadata.
+        disc_tuple = cast(list[tuple[int, int]], audio.get("disk"))
+        disc_number, disc_total = parse_tuple_numbers(disc_tuple)
 
-        Raises:
-            Exception: If metadata extraction fails.
-        """
+        date_str = BaseTagExtractor.get_str_tag(audio, "\xa9day", "")
+        year = int(date_str) if date_str and date_str.isdigit() else None
+
+        return TrackMetadata(
+            title=title,
+            artist=artist,
+            album_artist=album_artist,
+            album=album,
+            track_number=track_number,
+            track_total=track_total,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            year=year,
+            file_extension=file_path.suffix.lower(),
+        )
+
+
+class DsfExtractor(AudioFormatExtractor):
+    """Extractor for DSF files which use ID3-like tags."""
+
+    @override
+    def extract_metadata(self, file_path: Path) -> TrackMetadata:
         try:
-            # DSF files use ID3 tags like MP3
-            audio = cast(MutagenFileProtocol, MutagenFile(file_path))
-            if not audio or not audio.tags:
+            audio = MutagenFile(file_path)
+            if not audio or not hasattr(audio, "tags") or audio.tags is None:  # pyright: ignore[reportUnknownMemberType]
                 return TrackMetadata(file_extension=file_path.suffix.lower())
-
-            # We know audio.tags exists at this point and it's a dict-like object
-            # Use MutagenTags protocol to handle the dynamic nature of mutagen tags
-            tags = audio.tags
-
-            # Create a dictionary to handle the tags in a type-safe way
-            tag_dict: dict[str, Any] = {}
-            for key, value in tags.items():
-                tag_dict[key] = value
-
-            # Extract track and disc numbers
-            track_str = MetadataExtractor._get_dsf_tag_value(tag_dict, "TRCK", "")
-            track = track_str.split("/") if track_str else [""]
-            track_number = int(track[0]) if track and track[0].isdigit() else None
-            track_total = int(track[1]) if len(track) > 1 and track[1].isdigit() else None
-
-            disc_str = MetadataExtractor._get_dsf_tag_value(tag_dict, "TPOS", "")
-            disc = disc_str.split("/") if disc_str else [""]
-            disc_number = int(disc[0]) if disc and disc[0].isdigit() else None
-            disc_total = int(disc[1]) if len(disc) > 1 and disc[1].isdigit() else None
-
-            # Extract year
-            date = MetadataExtractor._get_dsf_tag_value(tag_dict, "TDRC", "")
-            year = int(date[:4]) if date and date[:4].isdigit() else None
-
-            return TrackMetadata(
-                title=MetadataExtractor._get_dsf_tag_value(tag_dict, "TIT2") or None,
-                artist=MetadataExtractor._get_dsf_tag_value(tag_dict, "TPE1") or None,
-                album_artist=MetadataExtractor._get_dsf_tag_value(tag_dict, "TPE2") or None,
-                album=MetadataExtractor._get_dsf_tag_value(tag_dict, "TALB") or None,
-                track_number=track_number,
-                track_total=track_total,
-                disc_number=disc_number,
-                disc_total=disc_total,
-                year=year,
-                file_extension=file_path.suffix.lower(),
-            )
+            tags = convert_bytes_tags(cast(MutagenTagsBytes, audio.tags))
         except Exception as e:
-            logger.error("Failed to extract DSF metadata from %s: %s", file_path, e)
+            logger.error("Failed to open DSF file %s: %s", file_path, e)
             raise
+
+        title = safe_get_dsf(tags, "TIT2") or None
+        artist = safe_get_dsf(tags, "TPE1") or None
+        album_artist = safe_get_dsf(tags, "TPE2") or None
+        album = safe_get_dsf(tags, "TALB") or None
+
+        track_str = safe_get_dsf(tags, "TRCK", "")
+        track_number, track_total = parse_slash_separated(track_str)
+
+        disc_str = safe_get_dsf(tags, "TPOS", "")
+        disc_number, disc_total = parse_slash_separated(disc_str)
+
+        date_str = safe_get_dsf(tags, "TDRC", "")
+        year = parse_year(date_str)
+
+        return TrackMetadata(
+            title=title,
+            artist=artist,
+            album_artist=album_artist,
+            album=album,
+            track_number=track_number,
+            track_total=track_total,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            year=year,
+            file_extension=file_path.suffix.lower(),
+        )
+
+
+class MetadataExtractor:
+    """Facade class for extracting metadata from audio files.
+
+    This class selects the appropriate extractor based on file extension.
+    """
+
+    SUPPORTED_FORMATS: ClassVar[set[str]] = {".flac", ".mp3", ".m4a", ".dsf"}
+
+    # Mapping from file extension to corresponding extractor instance.
+    _format_map: ClassVar[dict[str, AudioFormatExtractor]] = {
+        ".mp3": Mp3Extractor(),
+        ".flac": FlacExtractor(),
+        ".m4a": M4aExtractor(),
+        ".dsf": DsfExtractor(),
+    }
 
     @classmethod
     def extract(cls, file_path: Path) -> TrackMetadata:
@@ -349,18 +318,12 @@ class MetadataExtractor:
             TrackMetadata: Extracted metadata.
 
         Raises:
-            ValueError: If file format is not supported.
-            Exception: If metadata extraction fails.
+            ValueError: If the file format is unsupported.
+            Exception: If extraction fails.
         """
-        if file_path.suffix.lower() not in cls.SUPPORTED_FORMATS:
-            raise ValueError(f"Unsupported file format: {file_path.suffix}")
+        ext = file_path.suffix.lower()
+        if ext not in cls.SUPPORTED_FORMATS:
+            raise ValueError(f"Unsupported file format: {ext}")
 
-        format_map: dict[str, Callable[[Path], TrackMetadata]] = {
-            ".mp3": cls._extract_mp3,
-            ".flac": cls._extract_flac,
-            ".m4a": cls._extract_m4a,
-            ".dsf": cls._extract_dsf,
-        }
-
-        extractor = format_map[file_path.suffix.lower()]
-        return extractor(file_path)
+        extractor = cls._format_map[ext]
+        return extractor.extract_metadata(file_path)
