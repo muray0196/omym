@@ -21,6 +21,7 @@ packages = ["omym"]
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.393",
     "pytest>=8.3.4",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.14.0",
@@ -34,15 +35,17 @@ omym = ["db/*.sql"]
 
 [tool.ruff]
 line-length = 120
-
-[tool.ruff.lint]
 ignore = ["F401"]
 
 [tool.pyright]
 include = ["omym", "tests"]
 exclude = ["**/__pycache__"]
+stubPath = "typings"
 pythonVersion = "3.13"
-typeCheckingMode = "recommended"  # Do not change this.
+typeCheckingMode = "recommended"
+# Configure reporting options
+reportDeprecated = true
 reportMissingImports = false
 reportAny = false
 reportExplicitAny = false
+reportImplicitOverride = false
