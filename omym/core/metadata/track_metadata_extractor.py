@@ -9,6 +9,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
+from mutagen.id3 import ID3
 from mutagen._util import MutagenError
 
 from omym.utils.logger import logger
@@ -252,43 +253,102 @@ class M4aExtractor(AudioFormatExtractor):
 class DsfExtractor(AudioFormatExtractor):
     """Extractor for DSF files which use ID3-like tags."""
 
+    # DSF files use ID3v2 tags with specific frame IDs
+    TAG_MAPPING: ClassVar[dict[str, str]] = {
+        "title": "TIT2",  # Title
+        "artist": "TPE1",  # Lead Artist
+        "album_artist": "TPE2",  # Band/Orchestra/Accompaniment
+        "album": "TALB",  # Album
+        "track": "TRCK",  # Track number/Position in set
+        "disc": "TPOS",  # Part of a set
+        "date": "TDRC",  # Recording time
+    }
+
     @override
     def extract_metadata(self, file_path: Path) -> TrackMetadata:
         try:
-            audio = MutagenFile(file_path)
-            if not audio or not hasattr(audio, "tags") or audio.tags is None:  # pyright: ignore[reportUnknownMemberType]
-                return TrackMetadata(file_extension=file_path.suffix.lower())
-            tags = convert_bytes_tags(cast(MutagenTagsBytes, audio.tags))
+            # Try to read ID3 tags directly
+            try:
+                id3_tags = ID3(file_path)
+                logger.debug("Opened DSF file with ID3: %s", file_path)
+            except Exception as e:
+                logger.debug("Failed to open DSF with ID3, trying generic file: %s", e)
+                # Fallback to generic file
+                audio = MutagenFile(file_path)
+                if not audio or not hasattr(audio, "tags") or audio.tags is None:  # pyright: ignore[reportUnknownMemberType]
+                    logger.warning("No tags found in DSF file: %s", file_path)
+                    return TrackMetadata(file_extension=file_path.suffix.lower())
+                id3_tags = cast(ID3, audio.tags)  # pyright: ignore[reportUnknownMemberType]
+
+            logger.debug("Audio type: %s", type(id3_tags))
+            if hasattr(id3_tags, "keys"):
+                logger.debug("Available tags: %s", list(id3_tags.keys()))
+
+            # Extract metadata using string keys for ID3
+            title = self._get_id3_value(id3_tags, self.TAG_MAPPING["title"])
+            logger.debug("Title tag: %s", title)
+            artist = self._get_id3_value(id3_tags, self.TAG_MAPPING["artist"])
+            logger.debug("Artist tag: %s", artist)
+            album_artist = self._get_id3_value(id3_tags, self.TAG_MAPPING["album_artist"])
+            logger.debug("Album artist tag: %s", album_artist)
+            album = self._get_id3_value(id3_tags, self.TAG_MAPPING["album"])
+            logger.debug("Album tag: %s", album)
+
+            track_str = self._get_id3_value(id3_tags, self.TAG_MAPPING["track"]) or ""
+            logger.debug("Track tag: %s", track_str)
+            track_number, track_total = parse_slash_separated(track_str)
+
+            disc_str = self._get_id3_value(id3_tags, self.TAG_MAPPING["disc"]) or ""
+            logger.debug("Disc tag: %s", disc_str)
+            disc_number, disc_total = parse_slash_separated(disc_str)
+
+            date_str = self._get_id3_value(id3_tags, self.TAG_MAPPING["date"]) or ""
+            logger.debug("Date tag: %s", date_str)
+            year = parse_year(date_str)
+
+            metadata = TrackMetadata(
+                title=title,
+                artist=artist,
+                album_artist=album_artist,
+                album=album,
+                track_number=track_number,
+                track_total=track_total,
+                disc_number=disc_number,
+                disc_total=disc_total,
+                year=year,
+                file_extension=file_path.suffix.lower(),
+            )
+            logger.debug("Extracted DSF metadata: %s", metadata)
+            return metadata
+
         except Exception as e:
-            logger.error("Failed to open DSF file %s: %s", file_path, e)
+            logger.error("Failed to extract DSF metadata from %s: %s", file_path, e)
             raise
 
-        title = safe_get_dsf(tags, "TIT2") or None
-        artist = safe_get_dsf(tags, "TPE1") or None
-        album_artist = safe_get_dsf(tags, "TPE2") or None
-        album = safe_get_dsf(tags, "TALB") or None
+    def _get_id3_value(self, tags: ID3, key: str) -> str | None:
+        """Extract a value from ID3 tags.
 
-        track_str = safe_get_dsf(tags, "TRCK", "")
-        track_number, track_total = parse_slash_separated(track_str)
+        Args:
+            tags: ID3 tags
+            key: Tag key
 
-        disc_str = safe_get_dsf(tags, "TPOS", "")
-        disc_number, disc_total = parse_slash_separated(disc_str)
-
-        date_str = safe_get_dsf(tags, "TDRC", "")
-        year = parse_year(date_str)
-
-        return TrackMetadata(
-            title=title,
-            artist=artist,
-            album_artist=album_artist,
-            album=album,
-            track_number=track_number,
-            track_total=track_total,
-            disc_number=disc_number,
-            disc_total=disc_total,
-            year=year,
-            file_extension=file_path.suffix.lower(),
-        )
+        Returns:
+            Tag value as string, or None if not found
+        """
+        try:
+            frame = tags.get(key)
+            if frame is None:
+                return None
+            # ID3 frames typically store text in their 'text' attribute
+            if hasattr(frame, "text"):
+                text = frame.text
+                if isinstance(text, (list, tuple)) and text:
+                    return str(text[0])
+                return str(text)
+            return None
+        except Exception as e:
+            logger.warning("Failed to get ID3 tag %r: %s", key, e)
+            return None
 
 
 class MetadataExtractor:
