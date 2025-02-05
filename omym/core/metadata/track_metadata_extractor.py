@@ -2,38 +2,24 @@
 
 import abc
 from pathlib import Path
-from typing import Any, ClassVar, TypeAlias, cast, override, TypeVar, Protocol
-
-from mutagen._file import File as MutagenFile  # pyright: ignore[reportUnknownVariableType]
+from typing import Any, ClassVar, cast, override, TYPE_CHECKING
 from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
 from mutagen.id3 import ID3
+from mutagen.dsf import DSF
 from mutagen._util import MutagenError
-
 from omym.utils.logger import logger
 from omym.core.metadata.track_metadata import TrackMetadata
 
-
-# Type definitions for mutagen tags
-T = TypeVar(name="T")
-TagValue: TypeAlias = str | list[str] | list[tuple[int, int]] | None
-TagsDict: TypeAlias = dict[str, TagValue]
-
-
-class MutagenTags(Protocol):
-    """Protocol for mutagen tags."""
-
-    def get(self, key: str, default: T | None = None) -> TagValue | T: ...
-    def items(self) -> list[tuple[str, TagValue]]: ...
-
-
-class MutagenTagsBytes(Protocol):
-    """Protocol for mutagen tags that use bytes."""
-
-    def get(self, key: bytes, default: T | None = None) -> bytes | T: ...
-    def items(self) -> list[tuple[bytes, bytes]]: ...
+if TYPE_CHECKING:
+    from mutagen import MutagenTags, MutagenTagsBytes, TagValue, TagsDict
+else:
+    MutagenTags: type[object] = object
+    MutagenTagsBytes: type[object] = object
+    TagValue: type[object] = object
+    TagsDict: type[dict[str, Any]] = dict
 
 
 def convert_bytes_tags(tags: MutagenTagsBytes) -> TagsDict:
@@ -121,16 +107,20 @@ class BaseTagExtractor:
     @staticmethod
     def get_str_tag(tags: MutagenTags, key: str, default: str | None = None) -> str | None:
         """Extract the first string value for a key from tag collection."""
-        value = tags.get(key)
+        value: str | list[str] | list[tuple[int, int]] | None = tags.get(key)
         if isinstance(value, list):
-            return safe_get_first(cast(list[str], value), default or "")
+            return safe_get_first(data=cast(list[str], value), default=default or "")
         elif isinstance(value, str):
             return value
         return default
 
 
-class BaseAudioExtractor(AudioFormatExtractor):
+class BaseAudioExtractor(AudioFormatExtractor, abc.ABC):
     """Base class for audio metadata extractors."""
+
+    # Format specific file class and initialization parameters
+    FILE_CLASS: ClassVar[type | None] = None
+    FILE_INIT_PARAMS: ClassVar[dict[str, Any]] = {}
 
     TAG_MAPPING: ClassVar[dict[str, str]] = {
         "title": "",
@@ -142,20 +132,45 @@ class BaseAudioExtractor(AudioFormatExtractor):
         "date": "",
     }
 
-    @abc.abstractmethod
-    def _open_file(self, file_path: Path) -> Any:
+    def _open_file(self, file_path: Path) -> MutagenTags:
         """Open the audio file and get its tags.
 
         Args:
             file_path: Path to the audio file.
 
         Returns:
-            Any: The audio file tags object.
+            MutagenTags: The audio file tags object.
 
         Raises:
+            FileNotFoundError: If the file doesn't exist.
+            NotImplementedError: If FILE_CLASS is not defined in subclass.
             Exception: If file cannot be opened or tags cannot be read.
         """
-        pass
+        try:
+            if self.FILE_CLASS is None:
+                raise NotImplementedError("FILE_CLASS must be defined in subclass")
+
+            file_instance = self.FILE_CLASS(file_path, **self.FILE_INIT_PARAMS)
+            return cast(MutagenTags, file_instance)
+
+        except MutagenError as e:
+            logger.error(
+                "Failed to extract %s metadata from %s: %s",
+                self.__class__.__name__.replace("Extractor", ""),
+                file_path,
+                e,
+            )
+            if "No such file" in str(e):
+                raise FileNotFoundError(str(e)) from e
+            raise
+        except Exception as e:
+            logger.error(
+                "Failed to extract %s metadata from %s: %s",
+                self.__class__.__name__.replace("Extractor", ""),
+                file_path,
+                e,
+            )
+            raise
 
     @abc.abstractmethod
     def _get_tag_value(self, tags: Any, key: str) -> str | None:
@@ -184,7 +199,7 @@ class BaseAudioExtractor(AudioFormatExtractor):
             Exception: If metadata extraction fails.
         """
         try:
-            tags = self._open_file(file_path)
+            tags: MutagenTags = self._open_file(file_path)
             logger.debug("Opened file %s with tags type: %s", file_path, type(tags))
 
             # Extract basic metadata
@@ -198,21 +213,21 @@ class BaseAudioExtractor(AudioFormatExtractor):
             logger.debug("Album tag: %s", album)
 
             # Track information
-            track_str = self._get_tag_value(tags, self.TAG_MAPPING["track"]) or ""
+            track_str: str = self._get_tag_value(tags, key=self.TAG_MAPPING["track"]) or ""
             logger.debug("Track tag: %s", track_str)
-            track_number, track_total = parse_slash_separated(track_str)
+            track_number, track_total = parse_slash_separated(value=track_str)
 
             # Disc information
-            disc_str = self._get_tag_value(tags, self.TAG_MAPPING["disc"]) or ""
+            disc_str: str = self._get_tag_value(tags, key=self.TAG_MAPPING["disc"]) or ""
             logger.debug("Disc tag: %s", disc_str)
-            disc_number, disc_total = parse_slash_separated(disc_str)
+            disc_number, disc_total = parse_slash_separated(value=disc_str)
 
             # Date information
-            date_str = self._get_tag_value(tags, self.TAG_MAPPING["date"]) or ""
+            date_str: str = self._get_tag_value(tags, key=self.TAG_MAPPING["date"]) or ""
             logger.debug("Date tag: %s", date_str)
-            year = parse_year(date_str)
+            year: int | None = parse_year(date_str)
 
-            metadata = TrackMetadata(
+            metadata: TrackMetadata = TrackMetadata(
                 title=title,
                 artist=artist,
                 album_artist=album_artist,
@@ -235,6 +250,9 @@ class BaseAudioExtractor(AudioFormatExtractor):
 class Mp3Extractor(BaseAudioExtractor):
     """Extractor for MP3 files using EasyID3 tags."""
 
+    FILE_CLASS: ClassVar[type | None] = MP3
+    FILE_INIT_PARAMS: ClassVar[dict[str, Any]] = {"ID3": EasyID3}
+
     TAG_MAPPING: ClassVar[dict[str, str]] = {
         "title": "title",
         "artist": "artist",
@@ -244,15 +262,6 @@ class Mp3Extractor(BaseAudioExtractor):
         "disc": "discnumber",
         "date": "date",
     }
-
-    def _open_file(self, file_path: Path) -> MutagenTags:
-        try:
-            return cast(MutagenTags, MP3(file_path, ID3=EasyID3))
-        except MutagenError as e:
-            logger.error("Failed to extract MP3 metadata from %s: %s", file_path, e)
-            if "No such file" in str(e):
-                raise FileNotFoundError(str(e)) from e
-            raise
 
     def _get_tag_value(self, tags: MutagenTags, key: str) -> str | None:
         return BaseTagExtractor.get_str_tag(tags, key)
@@ -261,6 +270,9 @@ class Mp3Extractor(BaseAudioExtractor):
 class FlacExtractor(BaseAudioExtractor):
     """Extractor for FLAC files."""
 
+    FILE_CLASS: ClassVar[type | None] = FLAC
+    FILE_INIT_PARAMS: ClassVar[dict[str, Any]] = {}
+
     TAG_MAPPING: ClassVar[dict[str, str]] = {
         "title": "title",
         "artist": "artist",
@@ -271,19 +283,15 @@ class FlacExtractor(BaseAudioExtractor):
         "date": "date",
     }
 
-    def _open_file(self, file_path: Path) -> MutagenTags:
-        try:
-            return cast(MutagenTags, FLAC(file_path))
-        except Exception as e:
-            logger.error("Failed to extract FLAC metadata from %s: %s", file_path, e)
-            raise
-
     def _get_tag_value(self, tags: MutagenTags, key: str) -> str | None:
         return BaseTagExtractor.get_str_tag(tags, key)
 
 
 class M4aExtractor(BaseAudioExtractor):
     """Extractor for M4A/AAC files using MP4 tags."""
+
+    FILE_CLASS: ClassVar[type | None] = MP4
+    FILE_INIT_PARAMS: ClassVar[dict[str, Any]] = {}
 
     TAG_MAPPING: ClassVar[dict[str, str]] = {
         "title": "\xa9nam",
@@ -295,26 +303,22 @@ class M4aExtractor(BaseAudioExtractor):
         "date": "\xa9day",
     }
 
-    def _open_file(self, file_path: Path) -> MutagenTags:
-        try:
-            return cast(MutagenTags, MP4(file_path))
-        except Exception as e:
-            logger.error("Failed to extract M4A metadata from %s: %s", file_path, e)
-            raise
-
     def _get_tag_value(self, tags: MutagenTags, key: str) -> str | None:
         if key in ["trkn", "disk"]:
             # Handle tuple values for track and disc numbers
-            value = cast(list[tuple[int, int]] | None, tags.get(key))
+            value: list[tuple[int, int]] | None = cast(list[tuple[int, int]] | None, tags.get(key))
             if not value:
                 return None
-            num, total = parse_tuple_numbers(value)
+            num, total = parse_tuple_numbers(data=value)
             return f"{num or ''}/{total or ''}"
         return BaseTagExtractor.get_str_tag(tags, key)
 
 
 class DsfExtractor(BaseAudioExtractor):
-    """Extractor for DSF files which use ID3-like tags."""
+    """Extractor for DSF files."""
+
+    FILE_CLASS: ClassVar[type | None] = DSF
+    FILE_INIT_PARAMS: ClassVar[dict[str, Any]] = {}
 
     TAG_MAPPING: ClassVar[dict[str, str]] = {
         "title": "TIT2",
@@ -326,31 +330,14 @@ class DsfExtractor(BaseAudioExtractor):
         "date": "TDRC",
     }
 
-    def _open_file(self, file_path: Path) -> ID3:
-        try:
-            # Try to read ID3 tags directly
-            try:
-                return ID3(file_path)
-            except Exception as e:
-                logger.debug("Failed to open DSF with ID3, trying generic file: %s", e)
-                # Fallback to generic file
-                audio = MutagenFile(file_path)
-                if not audio or not hasattr(audio, "tags") or audio.tags is None:  # pyright: ignore[reportUnknownMemberType]
-                    logger.warning("No tags found in DSF file: %s", file_path)
-                    raise ValueError("No tags found")
-                return cast(ID3, audio.tags)  # pyright: ignore[reportUnknownMemberType]
-        except Exception as e:
-            logger.error("Failed to open DSF file %s: %s", file_path, e)
-            raise
-
     def _get_tag_value(self, tags: ID3, key: str) -> str | None:
         try:
-            frame = tags.get(key)
+            frame: TagValue = cast(MutagenTags, tags).get(key)
             if frame is None:
                 return None
-            # ID3 frames typically store text in their 'text' attribute
-            if hasattr(frame, "text"):
-                text = frame.text
+            frame_obj: object = cast(object, frame)
+            if hasattr(frame_obj, "text"):
+                text: str | list[str] = cast(str | list[str], getattr(frame_obj, "text"))
                 if isinstance(text, (list, tuple)) and text:
                     return str(text[0])
                 return str(text)
@@ -390,9 +377,9 @@ class MetadataExtractor:
             ValueError: If the file format is unsupported.
             Exception: If extraction fails.
         """
-        ext = file_path.suffix.lower()
+        ext: str = file_path.suffix.lower()
         if ext not in cls.SUPPORTED_FORMATS:
             raise ValueError(f"Unsupported file format: {ext}")
 
-        extractor = cls._format_map[ext]
+        extractor: AudioFormatExtractor = cls._format_map[ext]
         return extractor.extract_metadata(file_path)

@@ -38,7 +38,7 @@ line-length = 120
 ignore = ["F401"]
 
 [tool.pyright]
-include = ["omym", "tests"]
+include = ["omym", "tests", "typings"]
 exclude = ["**/__pycache__"]
 stubPath = "typings"
 pythonVersion = "3.13"

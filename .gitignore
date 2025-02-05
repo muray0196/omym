@@ -10,5 +10,6 @@ data/
 # Python
 __pycache__/
 *.egg-info/
+.ruff_cache/
 .coverage
 uv.lock
