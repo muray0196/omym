@@ -20,6 +20,8 @@ class Args:
         interactive: Enable interactive mode.
         config_path: Path to custom configuration file.
         show_db: Enable database operations preview.
+        clear_artist_cache: Clear cached artist IDs before processing.
+        clear_cache: Clear all caches and processing state.
     """
 
     music_path: Path
@@ -31,3 +33,5 @@ class Args:
     interactive: bool = False
     config_path: Path | None = None
     show_db: bool = False
+    clear_artist_cache: bool = False
+    clear_cache: bool = False

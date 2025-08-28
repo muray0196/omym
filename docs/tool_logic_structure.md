@@ -35,7 +35,7 @@ This document describes the internal structure of OMYM's logic, detailing how di
 ### 3. Text Processing
 - **Artist ID Generation** (`core/renaming_logic.py`)
   - Artist name processing
-  - 5-character ID generation
+  - Up to 5-character ID generation (no padding)
   - Caching mechanism
   - Language-specific handling
 
@@ -181,7 +181,7 @@ db/db_manager.py
 ## Performance Optimization
 
 ### 1. Caching
-- Artist ID caching (5-char IDs)
+- Artist ID caching (IDs up to 5 chars)
 - Path component caching
 - File hash caching
 - Filter result caching

@@ -31,8 +31,8 @@ class TestArtistIdGenerator:
         # Test name with numbers
         assert ArtistIdGenerator.generate("123 John Smith") == "123JH"
 
-        # Test short name
-        assert ArtistIdGenerator.generate("Jo") == "JOXXX"
+        # Test short name (no padding)
+        assert ArtistIdGenerator.generate("Jo") == "JO"
 
         # Test long name
         assert ArtistIdGenerator.generate("John Jacob Smith") == "JHNJC"

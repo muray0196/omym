@@ -82,6 +82,19 @@ class ArgumentParser:
             help="Enable database operations preview",
         )
 
+        # Maintenance options
+        _ = parser.add_argument(
+            "--clear-artist-cache",
+            action="store_true",
+            help="Clear cached artist IDs before processing",
+        )
+
+        _ = parser.add_argument(
+            "--clear-cache",
+            action="store_true",
+            help="Clear all caches and processing state before processing",
+        )
+
         return parser
 
     @staticmethod
@@ -141,4 +154,6 @@ class ArgumentParser:
             interactive=parsed_args.interactive,
             config_path=config_path,
             show_db=parsed_args.db,
+            clear_artist_cache=parsed_args.clear_artist_cache,
+            clear_cache=parsed_args.clear_cache,
         )

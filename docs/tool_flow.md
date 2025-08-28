@@ -16,6 +16,8 @@ This document outlines the operational flow of the OMYM (Organize My Music) tool
     - `--force`: Override safety checks
     - `--config FILE`: Path to custom configuration file
     - `--db`: Enable database operations preview
+    - `--clear-artist-cache`: Clear cached artist IDs before processing
+    - `--clear-cache`: Clear all caches and processing state before processing
 
 ### 2. Processing Phases
 
@@ -45,7 +47,7 @@ This document outlines the operational flow of the OMYM (Organize My Music) tool
 2. **Music Organization**
    - Group tracks by album
    - Process album metadata
-   - Generate artist IDs (5 characters)
+   - Generate artist IDs (up to 5 characters)
    - Cache artist information
 
 3. **Path Generation**
@@ -138,7 +140,7 @@ This document outlines the operational flow of the OMYM (Organize My Music) tool
 
 ### 2. Artist Cache (ArtistCacheDAO)
 - Artist names
-- Generated artist IDs (5 chars)
+- Generated artist IDs (up to 5 chars)
 - Cache hits/misses
 
 ### 3. Post-Processing State (ProcessingAfterDAO)

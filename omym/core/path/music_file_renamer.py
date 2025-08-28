@@ -22,9 +22,6 @@ class ArtistIdGenerator:
     # Vowels to remove (except for the first character of each word)
     VOWELS: ClassVar[re.Pattern[str]] = re.compile(r"[AEIOU]")
 
-    # Padding character for short IDs
-    PADDING_CHAR: ClassVar[str] = "X"
-
     # ID length
     ID_LENGTH: ClassVar[int] = 5
 
@@ -82,7 +79,7 @@ class ArtistIdGenerator:
 
     @classmethod
     def generate(cls, artist_name: str | None) -> str:
-        """Generate a 5-character ID from an artist name.
+        """Generate an artist ID (up to 5 characters) from an artist name.
 
         The generation process:
         1. If the artist name is empty or None, return "NOART"
@@ -96,13 +93,13 @@ class ArtistIdGenerator:
            - Keep the first character of each word
            - Remove vowels from the rest of each word
         6. If the result is less than 5 chars, use original words
-        7. Take first 5 chars or pad with 'X' if still shorter
+        7. Take first 5 chars; do not pad if shorter
 
         Args:
             artist_name: The artist name to generate an ID for.
 
         Returns:
-            str: A 5-character artist ID, either:
+            str: An artist ID up to 5 characters, either:
                 - A generated ID based on the artist name
                 - "NOART" if the input is empty/None
                 - "XXXXX" if no valid characters remain after processing
@@ -153,11 +150,11 @@ class ArtistIdGenerator:
             else:
                 name = processed_id
 
-            # Take first 5 characters or pad with 'X'
+            # Take first 5 characters; do not pad if shorter
             if len(name) > cls.ID_LENGTH:
                 return name[: cls.ID_LENGTH]
             else:
-                return name.ljust(cls.ID_LENGTH, cls.PADDING_CHAR)
+                return name
 
         except Exception as e:
             logger.error("Failed to generate artist ID for '%s': %s", artist_name, e)
@@ -189,7 +186,7 @@ class CachedArtistIdGenerator:
             artist_name: The artist name to generate an ID for.
 
         Returns:
-            str: A 5-character artist ID, either:
+            str: An artist ID up to 5 characters, either:
                 - A cached ID if found in the database
                 - A newly generated ID if not found in cache
                 - "NOART" if the input is empty/None or an error occurs
@@ -286,7 +283,8 @@ class CachedArtistIdGenerator:
         if not artist_id:
             return False
 
-        if len(artist_id) != ArtistIdGenerator.ID_LENGTH:
+        # Allow IDs of length 1..ID_LENGTH
+        if len(artist_id) > ArtistIdGenerator.ID_LENGTH:
             return False
 
         if artist_id in [ArtistIdGenerator.DEFAULT_ID, "XXXXX"]:

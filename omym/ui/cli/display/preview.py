@@ -113,7 +113,7 @@ class PreviewDisplay:
                     file_name = result.target_path.name
                     # Artist ID is the last part before the extension
                     artist_id = file_name.rsplit("_", 1)[-1].split(".")[0]
-                    if len(artist_id) == 5:  # Valid artist ID length
+                    if 1 <= len(artist_id) <= 5:  # Valid artist ID length (up to 5)
                         artists_seen[artist] = artist_id
 
         # Add rows to artist table

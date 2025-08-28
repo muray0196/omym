@@ -13,6 +13,8 @@ omym MUSIC_PATH [options]
 omym path/to/music --dry-run    # Preview changes
 omym path/to/music --target /output/path  # Process with custom target
 omym path/to/music --db         # Show database operations
+omym path/to/music --clear-artist-cache  # Clear cached artist IDs
+omym path/to/music --clear-cache  # Clear all caches and processing state
 ```
 
 ### 2. Command Options
@@ -31,6 +33,8 @@ omym path/to/music --db         # Show database operations
 - **Additional Options**
   - `--config FILE`: Path to custom configuration file
   - `--db`: Enable database operations preview
+  - `--clear-artist-cache`: Clear cached artist IDs before processing
+  - `--clear-cache`: Clear all caches and processing state before processing
 
 ### 3. Output Formatting
 
