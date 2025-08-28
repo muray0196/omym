@@ -16,7 +16,7 @@ This document describes the internal structure of OMYM's logic, detailing how di
 - **Metadata Management** (`core/metadata_extractor.py`, `core/metadata.py`)
   - Audio file parsing
   - Tag extraction and validation
-  - Format-specific handling (MP3, FLAC, M4A, DSF, AAC, ALAC)
+  - Format-specific handling (MP3, FLAC, M4A, DSF, AAC, ALAC, Opus)
   - Metadata model definitions
 
 ### 2. Music Organization
@@ -47,7 +47,7 @@ This document describes the internal structure of OMYM's logic, detailing how di
 
 ### 4. File Filtering
 - **Music File Filtering** (`core/filtering.py`)
-  - File type detection (.mp3, .flac, .m4a, .dsf, .aac, .alac)
+  - File type detection (.mp3, .flac, .m4a, .dsf, .aac, .alac, .opus)
   - Filter rule application
   - Hierarchy management
   - Filter persistence

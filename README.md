@@ -4,7 +4,7 @@ A Python tool to organize your music library by automatically processing metadat
 
 ## Features
 
-- Supports MP3, FLAC, M4A/AAC, DSF formats
+- Supports MP3, FLAC, M4A/AAC, DSF, Opus (.opus) formats
 - Extracts and processes music metadata
 - Creates organized folder structure
 - Handles multi-disc albums and compilations

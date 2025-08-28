@@ -17,7 +17,7 @@ This document provides a comprehensive list of technologies, tools, and framewor
 #### 2.1 Audio Processing
 - **mutagen (>=1.47.0)**
   - Audio metadata extraction
-  - Multiple format support (MP3, FLAC, M4A/AAC, DSF)
+  - Multiple format support (MP3, FLAC, M4A/AAC, DSF, Opus)
   - Tag manipulation
 
 #### 2.2 Text Processing

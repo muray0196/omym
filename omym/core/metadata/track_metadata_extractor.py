@@ -8,6 +8,7 @@ from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
 from mutagen.id3 import ID3
+from mutagen.oggopus import OggOpus
 from mutagen.dsf import DSF
 from mutagen._util import MutagenError
 from omym.utils.logger import logger
@@ -287,6 +288,27 @@ class FlacExtractor(BaseAudioExtractor):
         return BaseTagExtractor.get_str_tag(tags, key)
 
 
+class OpusExtractor(BaseAudioExtractor):
+    """Extractor for Opus (.opus) files using Vorbis comments."""
+
+    FILE_CLASS: ClassVar[type | None] = OggOpus
+    FILE_INIT_PARAMS: ClassVar[dict[str, Any]] = {}
+
+    # Opus (Ogg) uses Vorbis-style comment keys, matching FLAC
+    TAG_MAPPING: ClassVar[dict[str, str]] = {
+        "title": "title",
+        "artist": "artist",
+        "album_artist": "albumartist",
+        "album": "album",
+        "track": "tracknumber",
+        "disc": "discnumber",
+        "date": "date",
+    }
+
+    def _get_tag_value(self, tags: MutagenTags, key: str) -> str | None:
+        return BaseTagExtractor.get_str_tag(tags, key)
+
+
 class M4aExtractor(BaseAudioExtractor):
     """Extractor for M4A/AAC files using MP4 tags."""
 
@@ -353,7 +375,7 @@ class MetadataExtractor:
     This class selects the appropriate extractor based on file extension.
     """
 
-    SUPPORTED_FORMATS: ClassVar[set[str]] = {".flac", ".mp3", ".m4a", ".dsf"}
+    SUPPORTED_FORMATS: ClassVar[set[str]] = {".flac", ".mp3", ".m4a", ".dsf", ".opus"}
 
     # Mapping from file extension to corresponding extractor instance.
     _format_map: ClassVar[dict[str, AudioFormatExtractor]] = {
@@ -361,6 +383,7 @@ class MetadataExtractor:
         ".flac": FlacExtractor(),
         ".m4a": M4aExtractor(),
         ".dsf": DsfExtractor(),
+        ".opus": OpusExtractor(),
     }
 
     # Compatibility wrappers for tests and external patching
@@ -379,6 +402,10 @@ class MetadataExtractor:
     @classmethod
     def _extract_dsf(cls, file_path: Path) -> TrackMetadata:
         return cls._format_map[".dsf"].extract_metadata(file_path)
+
+    @classmethod
+    def _extract_opus(cls, file_path: Path) -> TrackMetadata:
+        return cls._format_map[".opus"].extract_metadata(file_path)
 
     @classmethod
     def extract(cls, file_path: Path) -> TrackMetadata:
@@ -404,6 +431,7 @@ class MetadataExtractor:
             ".flac": cls._extract_flac,
             ".m4a": cls._extract_m4a,
             ".dsf": cls._extract_dsf,
+            ".opus": cls._extract_opus,
         }
 
         return method_map[ext](file_path)

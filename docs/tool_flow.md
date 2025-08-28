@@ -34,7 +34,7 @@ This document outlines the operational flow of the OMYM (Organize My Music) tool
 
 3. **File Discovery**
    - Scan input directories
-   - Filter audio files (.mp3, .flac, .m4a, .dsf, .aac, .alac)
+   - Filter audio files (.mp3, .flac, .m4a, .dsf, .aac, .alac, .opus)
    - Calculate file hashes
    - Validate file accessibility
 

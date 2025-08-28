@@ -40,7 +40,7 @@ class MusicProcessor:
     """Process music files for organization."""
 
     # Supported file extensions.
-    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".mp3", ".flac", ".m4a", ".dsf", ".aac", ".alac"}
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".mp3", ".flac", ".m4a", ".dsf", ".aac", ".alac", ".opus"}
 
     base_path: Path
     dry_run: bool
