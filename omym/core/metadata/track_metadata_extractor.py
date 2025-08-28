@@ -363,6 +363,23 @@ class MetadataExtractor:
         ".dsf": DsfExtractor(),
     }
 
+    # Compatibility wrappers for tests and external patching
+    @classmethod
+    def _extract_mp3(cls, file_path: Path) -> TrackMetadata:
+        return cls._format_map[".mp3"].extract_metadata(file_path)
+
+    @classmethod
+    def _extract_flac(cls, file_path: Path) -> TrackMetadata:
+        return cls._format_map[".flac"].extract_metadata(file_path)
+
+    @classmethod
+    def _extract_m4a(cls, file_path: Path) -> TrackMetadata:
+        return cls._format_map[".m4a"].extract_metadata(file_path)
+
+    @classmethod
+    def _extract_dsf(cls, file_path: Path) -> TrackMetadata:
+        return cls._format_map[".dsf"].extract_metadata(file_path)
+
     @classmethod
     def extract(cls, file_path: Path) -> TrackMetadata:
         """Extract metadata from an audio file.
@@ -381,5 +398,12 @@ class MetadataExtractor:
         if ext not in cls.SUPPORTED_FORMATS:
             raise ValueError(f"Unsupported file format: {ext}")
 
-        extractor: AudioFormatExtractor = cls._format_map[ext]
-        return extractor.extract_metadata(file_path)
+        # Route through per-format methods to allow easy mocking in tests
+        method_map: dict[str, callable[[Path], TrackMetadata]] = {
+            ".mp3": cls._extract_mp3,
+            ".flac": cls._extract_flac,
+            ".m4a": cls._extract_m4a,
+            ".dsf": cls._extract_dsf,
+        }
+
+        return method_map[ext](file_path)
