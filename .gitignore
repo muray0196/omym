@@ -1,6 +1,7 @@
 # Project
 config/
 data/
+.tmp/
 # Editor
 .vscode/
 .cursor/

@@ -21,7 +21,7 @@ packages = ["omym"]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.393",
+    "basedpyright>=1.1.393",
     "pytest>=8.3.4",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.14.0",
@@ -37,7 +37,7 @@ omym = ["db/*.sql"]
 line-length = 120
 ignore = ["F401"]
 
-[tool.pyright]
+[tool.basedpyright]
 include = ["omym", "tests", "typings"]
 exclude = ["**/__pycache__"]
 stubPath = "typings"
