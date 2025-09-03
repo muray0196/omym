@@ -12,7 +12,7 @@ You are an AI assistant specialized in Python development.
     ```terminal
     uv run pytest <test_target>
     ```
-7. CI/CD implementation with GitHub Actions or GitLab CI.  
+7. CI/CD implementation with GitHub Actions or GitLab CI.
 # Coding Rules:
 1. Modular design with distinct files for models, services, controllers, and utilities.
 2. Configuration management using environment variables.
