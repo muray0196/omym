@@ -6,8 +6,8 @@ from collections.abc import Generator
 
 import pytest
 
-from omym.core.path.path_generator import PathGenerator
-from omym.db.daos.filter_dao import FilterDAO
+from omym.domain.path.path_generator import PathGenerator
+from omym.infra.db.daos.filter_dao import FilterDAO
 
 
 @pytest.fixture

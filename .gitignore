@@ -1,13 +1,9 @@
 # Project
-config/
-data/
+.config/
+.data/
 .tmp/
 # Editor
 .vscode/
-.cursor/
-.cursorrules
-.cursorignore
-.windsurfrules
 # Python
 __pycache__/
 *.egg-info/

@@ -4,8 +4,8 @@ import sqlite3
 
 import pytest
 
-from omym.core.organization.filter_engine import HierarchicalFilter
-from omym.db.daos.filter_dao import FilterDAO
+from omym.domain.organization.filter_engine import HierarchicalFilter
+from omym.infra.db.daos.filter_dao import FilterDAO
 
 
 @pytest.fixture

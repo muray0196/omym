@@ -6,8 +6,8 @@ import tempfile
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.music_file_processor import ProcessResult, MusicProcessor
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.music_file_processor import ProcessResult, MusicProcessor
 from omym.ui.cli.display.progress import ProgressDisplay
 
 

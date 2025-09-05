@@ -4,8 +4,8 @@ import sqlite3
 
 import pytest
 
-from omym.core.organization.album_manager import AlbumManager, AlbumGroup
-from omym.db.daos.albums_dao import AlbumInfo
+from omym.domain.organization.album_manager import AlbumManager, AlbumGroup
+from omym.infra.db.daos.albums_dao import AlbumInfo
 
 
 @pytest.fixture

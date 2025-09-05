@@ -17,7 +17,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["omym"]
+[tool.setuptools.package-dir]
+"" = "src"
 
 [dependency-groups]
 dev = [
@@ -38,7 +39,7 @@ line-length = 120
 ignore = ["F401"]
 
 [tool.basedpyright]
-include = ["omym", "tests", "typings"]
+include = ["src", "tests", "typings"]
 exclude = ["**/__pycache__"]
 stubPath = "typings"
 pythonVersion = "3.13"

@@ -6,8 +6,8 @@ from typing import TypeAlias
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.track_metadata_extractor import MetadataExtractor
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.track_metadata_extractor import MetadataExtractor
 
 # Type aliases for metadata dictionaries
 MP3Metadata: TypeAlias = dict[str, list[str]]

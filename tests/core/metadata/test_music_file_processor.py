@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.music_file_processor import MusicProcessor
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.music_file_processor import MusicProcessor
 
 
 @pytest.fixture
@@ -52,13 +52,13 @@ def processor(mocker: MockerFixture, tmp_path: Path) -> MusicProcessor:
         MusicProcessor: A test processor.
     """
     # Mock database manager
-    mock_db = mocker.patch("omym.core.metadata.music_file_processor.DatabaseManager").return_value
+    mock_db = mocker.patch("omym.domain.metadata.music_file_processor.DatabaseManager").return_value
     mock_db.conn = mocker.MagicMock()
 
     # Mock DAOs
-    mock_before_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingBeforeDAO").return_value
-    mock_after_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingAfterDAO").return_value
-    mock_artist_dao = mocker.patch("omym.core.metadata.music_file_processor.ArtistCacheDAO").return_value
+    mock_before_dao = mocker.patch("omym.domain.metadata.music_file_processor.ProcessingBeforeDAO").return_value
+    mock_after_dao = mocker.patch("omym.domain.metadata.music_file_processor.ProcessingAfterDAO").return_value
+    mock_artist_dao = mocker.patch("omym.domain.metadata.music_file_processor.ArtistCacheDAO").return_value
 
     # Configure DAO behavior
     _ = mock_before_dao.check_file_exists.return_value = False
@@ -99,7 +99,7 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         result = processor.process_file(source_file)
@@ -125,7 +125,7 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction to fail
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=None)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=None)
 
         # Act
         result = processor.process_file(source_file)
@@ -156,7 +156,7 @@ class TestMusicProcessor:
         processor.dry_run = True
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         result = processor.process_file(source_file)
@@ -194,7 +194,7 @@ class TestMusicProcessor:
             (source_dir / name).touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Mock file hash calculation to return different hashes
         def mock_hash(file_path: Path) -> str:
@@ -262,7 +262,7 @@ class TestMusicProcessor:
             (source_dir / name).touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         results = processor.process_directory(source_dir)
@@ -303,13 +303,13 @@ class TestMusicProcessor:
         existing_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Mock file hash calculation
         _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
 
         # Mock database check to indicate file exists
-        mock_before_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingBeforeDAO").return_value
+        mock_before_dao = mocker.patch("omym.domain.metadata.music_file_processor.ProcessingBeforeDAO").return_value
         mock_before_dao.check_file_exists.return_value = True
         mock_before_dao.get_target_path.return_value = str(existing_file)
 
@@ -349,10 +349,10 @@ class TestMusicProcessor:
         existing_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Mock database check to indicate file exists
-        mock_before_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingBeforeDAO").return_value
+        mock_before_dao = mocker.patch("omym.domain.metadata.music_file_processor.ProcessingBeforeDAO").return_value
         mock_before_dao.check_file_exists.return_value = True
         mock_before_dao.get_target_path.return_value = str(existing_file)
 
@@ -386,10 +386,10 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
 
         # Mock shutil.move to raise an error
-        mock_move = mocker.patch("omym.core.metadata.music_file_processor.shutil.move")
+        mock_move = mocker.patch("omym.domain.metadata.music_file_processor.shutil.move")
         mock_move.side_effect = OSError("Failed to move file: Test error")
 
         # Act

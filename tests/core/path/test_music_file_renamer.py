@@ -2,14 +2,14 @@
 
 from pathlib import Path
 
-from omym.core.path.music_file_renamer import (
+from omym.domain.path.music_file_renamer import (
     ArtistIdGenerator,
     CachedArtistIdGenerator,
     DirectoryGenerator,
 )
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.db.cache.artist_cache_dao import ArtistCacheDAO
-from omym.db.db_manager import DatabaseManager
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.infra.db.cache.artist_cache_dao import ArtistCacheDAO
+from omym.infra.db.db_manager import DatabaseManager
 
 
 class TestArtistIdGenerator:

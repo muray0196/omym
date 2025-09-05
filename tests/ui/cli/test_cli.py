@@ -7,8 +7,8 @@ import shutil
 from pytest_mock import MockerFixture
 from unittest.mock import MagicMock
 
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.music_file_processor import ProcessResult
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.music_file_processor import ProcessResult
 from omym.ui.cli import CommandProcessor
 
 

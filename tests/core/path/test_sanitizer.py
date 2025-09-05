@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from omym.core.path.sanitizer import Sanitizer
+from omym.domain.path.sanitizer import Sanitizer
 
 
 class TestSanitizer:

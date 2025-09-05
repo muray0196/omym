@@ -6,7 +6,7 @@ from collections.abc import Generator
 
 import pytest
 
-from omym.db.db_manager import DatabaseManager
+from omym.infra.db.db_manager import DatabaseManager
 
 
 @pytest.fixture

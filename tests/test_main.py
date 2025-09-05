@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.music_file_processor import ProcessResult
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.music_file_processor import ProcessResult
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def mock_metadata(mocker: MockerFixture) -> TrackMetadata:
         disc_total=1,
         file_extension=".mp3",
     )
-    _ = mocker.patch("omym.core.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+    _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
     return metadata
 
 
@@ -60,17 +60,17 @@ def mock_database(mocker: MockerFixture) -> None:
         mocker: Pytest mocker fixture.
     """
     # Mock database manager
-    mock_db = mocker.patch("omym.core.metadata.music_file_processor.DatabaseManager")
+    mock_db = mocker.patch("omym.domain.metadata.music_file_processor.DatabaseManager")
     mock_instance = mock_db.return_value
     _ = mock_instance.connect.return_value
 
     # Mock DAOs
-    mock_before_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingBeforeDAO")
+    mock_before_dao = mocker.patch("omym.domain.metadata.music_file_processor.ProcessingBeforeDAO")
     mock_before_instance = mock_before_dao.return_value
     _ = mock_before_instance.insert_file.return_value
     _ = mock_before_instance.check_file_exists.return_value
 
-    mock_after_dao = mocker.patch("omym.core.metadata.music_file_processor.ProcessingAfterDAO")
+    mock_after_dao = mocker.patch("omym.domain.metadata.music_file_processor.ProcessingAfterDAO")
     mock_after_instance = mock_after_dao.return_value
     _ = mock_after_instance.insert_file.return_value
 

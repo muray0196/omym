@@ -7,8 +7,8 @@ import shutil
 from pytest_mock import MockerFixture
 from unittest.mock import MagicMock
 
-from omym.core.metadata.track_metadata import TrackMetadata
-from omym.core.metadata.music_file_processor import ProcessResult
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.music_file_processor import ProcessResult
 from omym.ui.cli.args.options import Args
 from omym.ui.cli.commands import FileCommand, DirectoryCommand
 
@@ -48,7 +48,6 @@ def test_args(test_dir: Path) -> Args:
         quiet=False,
         force=False,
         interactive=False,
-        config_path=None,
         show_db=False,
     )
 

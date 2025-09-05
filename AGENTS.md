@@ -13,6 +13,7 @@ You are an AI assistant specialized in Python development.
     uv run pytest <test_target>
     ```
 7. CI/CD implementation with GitHub Actions or GitLab CI.
+8. This project is portable by design. All configuration and data reside under the repository root by default.
 # Coding Rules:
 1. Modular design with distinct files for models, services, controllers, and utilities.
 2. Configuration management using environment variables.

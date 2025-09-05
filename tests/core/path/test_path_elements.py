@@ -3,14 +3,14 @@
 import pytest
 from typing import override
 
-from omym.core.path.path_elements import (
+from omym.domain.path.path_elements import (
     ComponentValue,
     PathComponent,
     AlbumArtistComponent,
     AlbumComponent,
     PathComponentFactory,
 )
-from omym.core.metadata.track_metadata import TrackMetadata
+from omym.domain.metadata.track_metadata import TrackMetadata
 
 
 @pytest.fixture
