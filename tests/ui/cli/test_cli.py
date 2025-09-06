@@ -39,7 +39,7 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
     Returns:
         MagicMock: Mock processor instance.
     """
-    mock = mocker.patch("omym.ui.cli.commands.executor.MusicProcessor")
+    mock = mocker.patch("omym.application.services.organize_service.MusicProcessor")
     mock_instance = mock.return_value
 
     # Setup mock process_file method

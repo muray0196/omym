@@ -29,7 +29,7 @@ dev = [
 ]
 
 [project.scripts]
-omym = "omym.main:main"
+omym = "omym.ui.cli:main"
 
 [tool.setuptools.package-data]
 omym = ["db/*.sql"]
