@@ -30,8 +30,8 @@ class PreviewDisplay:
 
         # Create a tree structure for visualization
         tree = Tree(f"📁 {base_path}")
-        current_artist = None
-        current_album = None
+        current_artist: str | None = None
+        current_album: str | None = None
         artist_node = None
         album_node = None
 
@@ -46,7 +46,7 @@ class PreviewDisplay:
             rel_path = result.target_path.relative_to(base_path)
             parts = rel_path.parts
 
-            if len(parts) >= 1 and parts[0] != current_artist:
+            if len(parts) >= 1 and (current_artist is None or parts[0] != current_artist):
                 current_artist = parts[0]
                 artist_node = tree.add(f"📁 {current_artist}")
                 current_album = None

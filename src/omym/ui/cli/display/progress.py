@@ -1,11 +1,24 @@
 """Progress display functionality for CLI."""
 
 from pathlib import Path
-from typing import final
-from rich.progress import Progress
+from typing import final, Protocol, Callable, runtime_checkable
+from rich.progress import Progress, TaskID
 
-from omym.application.services.organize_service import OrganizeMusicService, OrganizeRequest
+from omym.application.services.organize_service import OrganizeRequest
 from omym.domain.metadata.music_file_processor import ProcessResult
+
+
+@runtime_checkable
+class OrganizeServiceLike(Protocol):
+    """Protocol for application services that can process a directory with progress."""
+
+    def process_directory_with_progress(
+        self,
+        request: OrganizeRequest,
+        directory: Path,
+        progress_callback: Callable[[int, int, Path], None],
+    ) -> list[ProcessResult]:
+        ...
 
 
 @final
@@ -14,7 +27,7 @@ class ProgressDisplay:
 
     def run_with_service(
         self,
-        app: OrganizeMusicService,
+        app: OrganizeServiceLike,
         request: OrganizeRequest,
         directory: Path,
         interactive: bool = False,
@@ -33,7 +46,7 @@ class ProgressDisplay:
         results: list[ProcessResult] = []
 
         with Progress() as progress:
-            task_id: int | None = None
+            task_id: TaskID | None = None
             last_count = 0
 
             def _cb(processed: int, total: int, current_file: Path) -> None:

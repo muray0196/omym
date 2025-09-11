@@ -2,7 +2,7 @@
 
 import abc
 from pathlib import Path
-from typing import Any, ClassVar, cast, override, TYPE_CHECKING
+from typing import Any, ClassVar, cast, override, TYPE_CHECKING, Callable
 from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
@@ -426,7 +426,7 @@ class MetadataExtractor:
             raise ValueError(f"Unsupported file format: {ext}")
 
         # Route through per-format methods to allow easy mocking in tests
-        method_map: dict[str, type[TrackMetadata] | callable[[Path], TrackMetadata]] = {
+        method_map: dict[str, Callable[[Path], TrackMetadata]] = {
             ".mp3": cls._extract_mp3,
             ".flac": cls._extract_flac,
             ".m4a": cls._extract_m4a,

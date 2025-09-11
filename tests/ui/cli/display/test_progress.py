@@ -6,9 +6,11 @@ import tempfile
 import pytest
 from pytest_mock import MockerFixture
 
+from typing import Callable
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.domain.metadata.music_file_processor import ProcessResult
 from omym.ui.cli.display.progress import ProgressDisplay
+from omym.application.services.organize_service import OrganizeRequest
 
 
 @pytest.fixture
@@ -56,9 +58,16 @@ def test_run_with_service_progress(mocker: MockerFixture) -> None:
 
     # Mock app service that invokes the callback twice and returns two results
     class _App:
-        def process_directory_with_progress(self, request, directory, cb):
-            cb(1, 2, Path("a.mp3"))
-            cb(2, 2, Path("b.mp3"))
+        def process_directory_with_progress(
+            self,
+            request: OrganizeRequest,
+            directory: Path,
+            progress_callback: Callable[[int, int, Path], None],
+        ):
+            # Mark parameters as used for type checker
+            del request, directory
+            progress_callback(1, 2, Path("a.mp3"))
+            progress_callback(2, 2, Path("b.mp3"))
             return [ok, ok]
 
     app = _App()
@@ -94,9 +103,15 @@ def test_run_with_service_interactive(mocker: MockerFixture) -> None:
     )
 
     class _App:
-        def process_directory_with_progress(self, request, directory, cb):
-            cb(1, 2, Path("a.mp3"))
-            cb(2, 2, Path("b.mp3"))
+        def process_directory_with_progress(
+            self,
+            request: OrganizeRequest,
+            directory: Path,
+            progress_callback: Callable[[int, int, Path], None],
+        ):
+            del request, directory
+            progress_callback(1, 2, Path("a.mp3"))
+            progress_callback(2, 2, Path("b.mp3"))
             return [err, err]
 
     app = _App()
