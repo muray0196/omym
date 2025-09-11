@@ -5,7 +5,7 @@ from typing import final, ClassVar
 from pathlib import Path
 from unidecode import unidecode
 import pykakasi
-import langid  # pyright: ignore[reportMissingTypeStubs]
+import langid
 from omym.domain.path.sanitizer import Sanitizer
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.infra.db.cache.artist_cache_dao import ArtistCacheDAO
@@ -112,8 +112,8 @@ class ArtistIdGenerator:
             # First, try to detect language and transliterate if needed
             name = artist_name
             try:
-                # Ignore type checking for langid.classify as it's a third-party library
-                lang, _ = langid.classify(name)  # pyright: ignore[reportUnknownMemberType]
+                # Detect language using langid
+                lang, _ = langid.classify(name)
                 # Treat Chinese as Japanese since langid often detects Japanese kanji as Chinese
                 if lang in ["ja", "zh"]:
                     # Use pykakasi for Japanese text
