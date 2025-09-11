@@ -81,13 +81,14 @@ class MusicProcessor:
     def process_directory(
         self,
         directory: Path,
-        progress_callback: Callable[[int, int], None] | None = None,
+        progress_callback: Callable[[int, int, Path], None] | None = None,
     ) -> list[ProcessResult]:
         """Process all music files in a directory.
 
         Args:
             directory: Directory to process.
-            progress_callback: Optional callback for progress updates.
+            progress_callback: Optional callback for progress updates. Signature:
+                (processed_count, total_count, current_file_path)
 
         Returns:
             List of ProcessResult objects.
@@ -124,7 +125,7 @@ class MusicProcessor:
                     results.append(result)
                     processed_count += 1
                     if progress_callback:
-                        progress_callback(processed_count, total_files)
+                        progress_callback(processed_count, total_files, current_file)
 
                 except Exception as e:
                     error_message = str(e) if str(e) else type(e).__name__

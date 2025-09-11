@@ -7,7 +7,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from omym.domain.metadata.track_metadata import TrackMetadata
-from omym.domain.metadata.music_file_processor import ProcessResult, MusicProcessor
+from omym.domain.metadata.music_file_processor import ProcessResult
 from omym.ui.cli.display.progress import ProgressDisplay
 
 
@@ -26,21 +26,14 @@ def test_dir() -> Generator[Path, None, None]:
         yield temp_path
 
 
-def test_process_files_with_progress(mocker: MockerFixture) -> None:
-    """Test processing files with progress display."""
+def test_run_with_service_progress(mocker: MockerFixture) -> None:
+    """Test processing via app service with progress display."""
     # Mock Progress
     mock_progress = mocker.patch("omym.ui.cli.display.progress.Progress")
     mock_progress_instance = mock_progress.return_value.__enter__.return_value
 
-    # Create test files
+    # Create test data
     test_dir = Path("test_music")
-    test_files = [
-        test_dir / "test1.mp3",
-        test_dir / "test2.mp3",
-    ]
-
-    # Mock processor
-    mock_processor = mocker.Mock(spec=MusicProcessor)
     metadata = TrackMetadata(
         title="Test Track",
         artist="Test Artist",
@@ -53,7 +46,7 @@ def test_process_files_with_progress(mocker: MockerFixture) -> None:
         disc_total=1,
         file_extension=".mp3",
     )
-    mock_processor.process_file.return_value = ProcessResult(
+    ok = ProcessResult(
         source_path=Path("test.mp3"),
         target_path=Path("Artist/Album/01 - Test Track.mp3"),
         success=True,
@@ -61,37 +54,37 @@ def test_process_files_with_progress(mocker: MockerFixture) -> None:
         artist_id=None,
     )
 
-    # Mock Path.rglob
-    _ = mocker.patch.object(Path, "rglob", return_value=test_files)
-    _ = mocker.patch.object(Path, "is_file", return_value=True)
+    # Mock app service that invokes the callback twice and returns two results
+    class _App:
+        def process_directory_with_progress(self, request, directory, cb):
+            cb(1, 2, Path("a.mp3"))
+            cb(2, 2, Path("b.mp3"))
+            return [ok, ok]
 
-    # Process files
+    app = _App()
+
+    # Minimal request object substitute; its fields aren't used in the test
+    request = mocker.Mock()
+
+    # Run
     display = ProgressDisplay()
-    results = display.process_files_with_progress(mock_processor, test_dir)
+    results = display.run_with_service(app, request, test_dir)
 
-    # Verify progress display
+    # Verify progress interactions and results
     mock_progress_instance.add_task.assert_called_once_with("[cyan]Processing files...", total=2)
     assert mock_progress_instance.update.call_count >= 2
     assert len(results) == 2
-    assert all(result.success for result in results)
+    assert all(r.success for r in results)
 
 
-def test_process_files_with_progress_interactive(mocker: MockerFixture) -> None:
-    """Test processing files with progress display in interactive mode."""
-    # Mock Progress
+def test_run_with_service_interactive(mocker: MockerFixture) -> None:
+    """Test processing via app service in interactive mode."""
     mock_progress = mocker.patch("omym.ui.cli.display.progress.Progress")
     mock_progress_instance = mock_progress.return_value.__enter__.return_value
 
-    # Create test files
     test_dir = Path("test_music")
-    test_files = [
-        test_dir / "test1.mp3",
-        test_dir / "test2.mp3",
-    ]
 
-    # Mock processor with error
-    mock_processor = mocker.Mock(spec=MusicProcessor)
-    mock_processor.process_file.return_value = ProcessResult(
+    err = ProcessResult(
         source_path=Path("test.mp3"),
         target_path=None,
         success=False,
@@ -100,16 +93,19 @@ def test_process_files_with_progress_interactive(mocker: MockerFixture) -> None:
         artist_id=None,
     )
 
-    # Mock Path.rglob
-    _ = mocker.patch.object(Path, "rglob", return_value=test_files)
-    _ = mocker.patch.object(Path, "is_file", return_value=True)
+    class _App:
+        def process_directory_with_progress(self, request, directory, cb):
+            cb(1, 2, Path("a.mp3"))
+            cb(2, 2, Path("b.mp3"))
+            return [err, err]
 
-    # Process files in interactive mode
+    app = _App()
+    request = mocker.Mock()
+
     display = ProgressDisplay()
-    results = display.process_files_with_progress(mock_processor, test_dir, interactive=True)
+    results = display.run_with_service(app, request, test_dir, interactive=True)
 
-    # Verify progress display
     mock_progress_instance.add_task.assert_called_once_with("[cyan]Processing files...", total=2)
     assert mock_progress_instance.update.call_count >= 2
     assert len(results) == 2
-    assert all(not result.success for result in results)
+    assert all(not r.success for r in results)

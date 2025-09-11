@@ -118,15 +118,17 @@ def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: Mo
 
     # Setup mock progress display
     mock_progress_instance = mock_progress.return_value
-    mock_progress_instance.process_files_with_progress.return_value = [mock_processor.process_file.return_value]
+    mock_progress_instance.run_with_service.return_value = [mock_processor.process_file.return_value]
 
     # Process directory
     CommandProcessor.process_command([str(test_dir)])
 
     # Verify
-    mock_progress_instance.process_files_with_progress.assert_called_once_with(
-        mock_processor, test_dir, interactive=False
-    )
+    assert mock_progress_instance.run_with_service.call_count == 1
+    args, kwargs = mock_progress_instance.run_with_service.call_args
+    # Third positional arg is directory
+    assert args[2] == test_dir
+    assert kwargs.get("interactive") is False
     mock_result.return_value.show_results.assert_called_once()
     mock_preview.return_value.show_preview.assert_not_called()
 

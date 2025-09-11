@@ -129,7 +129,7 @@ def test_directory_command(test_args: Args, mock_processor: MagicMock, mocker: M
 
     # Setup mock progress display
     mock_progress_instance = mock_progress.return_value
-    mock_progress_instance.process_files_with_progress.return_value = [mock_processor.process_file.return_value]
+    mock_progress_instance.run_with_service.return_value = [mock_processor.process_file.return_value]
 
     # Create and execute command
     command = DirectoryCommand(test_args)
@@ -137,9 +137,12 @@ def test_directory_command(test_args: Args, mock_processor: MagicMock, mocker: M
 
     # Verify
     assert len(results) == 1
-    mock_progress_instance.process_files_with_progress.assert_called_once_with(
-        mock_processor, test_args.music_path, interactive=test_args.interactive
-    )
+    # Verify delegation to ProgressDisplay with application service
+    assert mock_progress_instance.run_with_service.call_count == 1
+    # Third positional arg is the directory path
+    args, kwargs = mock_progress_instance.run_with_service.call_args
+    assert args[2] == test_args.music_path
+    assert kwargs.get("interactive") == test_args.interactive
     mock_result.return_value.show_results.assert_called_once()
     mock_preview.return_value.show_preview.assert_not_called()
 
@@ -216,7 +219,7 @@ def test_directory_command_interactive(test_args: Args, mock_processor: MagicMoc
 
     # Setup mock progress display
     mock_progress_instance = mock_progress.return_value
-    mock_progress_instance.process_files_with_progress.return_value = [mock_processor.process_file.return_value]
+    mock_progress_instance.run_with_service.return_value = [mock_processor.process_file.return_value]
 
     # Create and execute command
     command = DirectoryCommand(test_args)
@@ -224,9 +227,10 @@ def test_directory_command_interactive(test_args: Args, mock_processor: MagicMoc
 
     # Verify
     assert len(results) == 1
-    mock_progress_instance.process_files_with_progress.assert_called_once_with(
-        mock_processor, test_args.music_path, interactive=True
-    )
+    assert mock_progress_instance.run_with_service.call_count == 1
+    args, kwargs = mock_progress_instance.run_with_service.call_args
+    assert args[2] == test_args.music_path
+    assert kwargs.get("interactive") is True
     mock_result.return_value.show_results.assert_called_once()
     mock_preview.return_value.show_preview.assert_not_called()
 

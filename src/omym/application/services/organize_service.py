@@ -6,7 +6,7 @@ so that multiple UIs (CLI, GUI) can reuse the same use cases.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import final
+from typing import final, Callable
 
 from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
 
@@ -101,3 +101,22 @@ class OrganizeMusicService:
         """
         processor = self.build_processor(request)
         return processor.process_directory(directory)
+
+    def process_directory_with_progress(
+        self,
+        request: OrganizeRequest,
+        directory: Path,
+        progress_callback: Callable[[int, int, Path], None],
+    ) -> list[ProcessResult]:
+        """Process a directory and report progress through a callback.
+
+        Args:
+            request: Organize operation parameters.
+            directory: Directory containing files to process.
+            progress_callback: Callback that receives (processed_count, total_count, current_file_path).
+
+        Returns:
+            List of processing results.
+        """
+        processor = self.build_processor(request)
+        return processor.process_directory(directory, progress_callback=progress_callback)

@@ -16,8 +16,9 @@ class DirectoryCommand(CommandExecutor):
         Returns:
             List of processing results.
         """
-        results = self.progress_display.process_files_with_progress(
-            self.processor,
+        results = self.progress_display.run_with_service(
+            self.app,
+            self.request,
             self.args.music_path,
             interactive=self.args.interactive,
         )

@@ -4,51 +4,54 @@ from pathlib import Path
 from typing import final
 from rich.progress import Progress
 
-from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
+from omym.application.services.organize_service import OrganizeMusicService, OrganizeRequest
+from omym.domain.metadata.music_file_processor import ProcessResult
 
 
 @final
 class ProgressDisplay:
     """Handles progress display in CLI."""
 
-    def process_files_with_progress(
+    def run_with_service(
         self,
-        processor: MusicProcessor,
-        music_path: Path,
+        app: OrganizeMusicService,
+        request: OrganizeRequest,
+        directory: Path,
         interactive: bool = False,
     ) -> list[ProcessResult]:
-        """Process multiple files with progress bar.
+        """Run directory processing via application service with progress bar.
 
         Args:
-            processor: Music file processor instance.
-            music_path: Path to process.
+            app: Application service instance used to orchestrate processing.
+            request: Organize operation parameters.
+            directory: Directory to process.
             interactive: Whether to run in interactive mode.
 
         Returns:
             List of processing results.
         """
-        # Get list of files to process
-        files = [f for f in music_path.rglob("*") if f.is_file()]
         results: list[ProcessResult] = []
 
         with Progress() as progress:
-            # Create the main task
-            task = progress.add_task("[cyan]Processing files...", total=len(files))
+            task_id: int | None = None
+            last_count = 0
 
-            for file in files:
-                # Update description with current file
-                _ = progress.update(task, description=f"[cyan]Processing {file.name}...")
+            def _cb(processed: int, total: int, current_file: Path) -> None:
+                nonlocal task_id, last_count
+                if task_id is None:
+                    task_id = progress.add_task("[cyan]Processing files...", total=total)
+                advance = processed - last_count
+                if advance < 0:
+                    advance = 0
+                # Update description with current file name for better UX
+                _ = progress.update(task_id, advance=advance, description=f"[cyan]Processing {current_file.name}...")
+                last_count = processed
 
-                # Process the file
-                result = processor.process_file(file)
-                results.append(result)
+            results = app.process_directory_with_progress(request, directory, _cb)
 
-                # Update progress
-                _ = progress.update(task, advance=1)
-
-                # Handle interactive mode
-                if interactive and not result.success:
-                    # TODO: Implement interactive handling
-                    pass
+        # Placeholder for future interactive handling
+        if interactive:
+            # TODO: Implement interactive handling for failed items
+            pass
 
         return results
