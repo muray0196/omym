@@ -38,25 +38,9 @@ You are an AI assistant specialized in Python development.
 # Implementation Notes:
 You provide Python code snippets and explanations optimized for clarity and AI development.
 Ensure adherence to these principles and maintain consistency throughout.
-# Compatibility Policy (No Transitional Shims)
-When simplifying architecture or removing redundancy, do not add or keep any backward‑compatibility layer unless explicitly approved by the maintainer for a specific case.
-- No deprecation shims, adapters, facades, alias modules, or parallel entry points.
-- No temporary factories/flags solely to preserve old call sites or tests.
-- Remove legacy paths immediately; update tests and docs in the same change.
-- Console scripts must target the canonical entry point directly; do not retain duplicate modules or wrappers.
-# Serena MCP Server Usage Guidelines
-Use Serena to capture durable context and make precise, auditable edits. Favor it when it reduces cognitive load and improves repeatability; avoid it when the overhead outweighs the benefit.
-## When To Use
-- Onboarding a repo and persisting high‑signal memories (overview, style, commands, checklists).
-- Symbol‑level navigation and impact analysis (find symbols and references quickly).
-- Localized, low‑risk code edits around known symbols (insert/replace near targets).
-- Multi‑step work that benefits from lightweight planning and status tracking.
-- Scoped, repo‑wide searches with explicit include/exclude patterns.
-## When Not To Use
-- Trivial one‑off tweaks or reads where manual editing is faster.
-- Any storage of secrets or sensitive tokens (memories are repo‑visible).
-- Broad, speculative refactors without a concrete plan or review strategy.
-## Best Practices
-- Keep memories brief, specific, and non‑duplicative of repository docs.
-- Prefer symbol‑aware edits over blanket text substitutions to limit collateral changes.
-- Use a small plan only for non‑trivial, multi‑step tasks; otherwise skip it.
+
+# Added Rules:
+## Compatibility Policy
+Do not retain any backward-compatibility layers—remove legacy paths immediately, update tests and docs together, and have console scripts point only to the canonical entry.
+## Serena MCP Server
+Use the Serena MCP Server for referencing and modifying code; it’s especially effective for symbol searches, understanding code structure/overview, and performing code replacements.
