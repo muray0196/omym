@@ -152,8 +152,8 @@ class TestDirectoryGenerator:
             file_extension=".mp3",
         )
 
-    def test_latest_year_is_used(self) -> None:
-        """Test that the latest year is used for album directory."""
+    def test_earliest_year_is_used(self) -> None:
+        """Test that the earliest year is used for album directory."""
         # Create test metadata with unique album name
         metadata1 = self.create_test_metadata(2020, "Latest Year Album")
         metadata2 = self.create_test_metadata(2022, "Latest Year Album")
@@ -165,7 +165,7 @@ class TestDirectoryGenerator:
         DirectoryGenerator.register_album_year(metadata3)
 
         path = DirectoryGenerator.generate(metadata1)
-        assert "2022_Latest-Year-Album" in str(path)
+        assert "2020_Latest-Year-Album" in str(path)
 
     def test_zero_years_are_ignored(self) -> None:
         """Test that zero years are ignored when determining album year."""
@@ -180,7 +180,7 @@ class TestDirectoryGenerator:
         DirectoryGenerator.register_album_year(metadata3)
 
         path = DirectoryGenerator.generate(metadata1)
-        assert "2020_Zero-Year-Album" in str(path)
+        assert "2019_Zero-Year-Album" in str(path)
 
     def test_all_tracks_have_no_year(self) -> None:
         """Test handling of albums where all tracks have no year."""

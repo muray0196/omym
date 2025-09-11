@@ -104,6 +104,19 @@ class MusicProcessor:
             logger.warning("No supported music files found in directory: %s", directory)
             return results
 
+        # Pre-scan metadata to register album years across the whole directory.
+        # This ensures the album-level earliest year is known before generating any paths,
+        # avoiding transient splits like 2020_/2024_ for the same album based on processing order.
+        for pre_file in supported_files:
+            try:
+                meta = MetadataExtractor.extract(pre_file)
+                self.directory_generator.register_album_year(meta)
+                # Register album-level track width for consistent padding
+                FileNameGenerator.register_album_track_width(meta)
+            except Exception:
+                # Best-effort: failure to read one file's metadata must not block processing
+                continue
+
         processed_count = 0
         try:
             # Begin transaction for the entire directory.

@@ -70,9 +70,8 @@ class AlbumArtistComponent(PathComponent):
         Returns:
             ComponentValue: Album artist value with metadata.
         """
-        album_artist = metadata.album_artist if metadata.album_artist else metadata.artist
-        if not album_artist:
-            album_artist = "Unknown-Artist"
+        # Do not fallback to track artist when album_artist is missing
+        album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
 
         sanitized = Sanitizer.sanitize_artist_name(album_artist)
         return ComponentValue(value=sanitized, order=self.order, type=self.component_type)

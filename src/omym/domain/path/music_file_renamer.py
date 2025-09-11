@@ -299,6 +299,52 @@ class FileNameGenerator:
     """Generate file names from track metadata."""
 
     artist_id_generator: CachedArtistIdGenerator
+    # Cache for per-album track number width (minimum 2)
+    _album_track_widths: ClassVar[dict[str, int]] = {}
+
+    @classmethod
+    def _get_album_key(cls, album_artist: str, album: str) -> str:
+        """Generate a unique key for an album for width lookup.
+
+        Uses sanitized names to align with directory generation.
+
+        Args:
+            album_artist: Album artist name.
+            album: Album name.
+
+        Returns:
+            str: Unique key for the album.
+        """
+        aa = Sanitizer.sanitize_artist_name(album_artist)
+        al = Sanitizer.sanitize_album_name(album)
+        return f"{aa}|{al}"
+
+    @classmethod
+    def register_album_track_width(cls, metadata: TrackMetadata) -> None:
+        """Register track-number width for an album based on a track.
+
+        The effective album width is max(2, max digits across all tracks in the album)).
+        Tracks without a valid number are ignored.
+
+        Args:
+            metadata: Track metadata containing album and track information.
+        """
+        # Determine album artist strictly (no fallback to track artist)
+        album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
+        album = metadata.album if metadata.album else "Unknown-Album"
+        key = cls._get_album_key(album_artist, album)
+
+        # Determine width candidate from track number
+        width = 0
+        if isinstance(metadata.track_number, int) and metadata.track_number > 0:
+            width = len(str(metadata.track_number))
+        if width <= 0:
+            return
+        width = max(2, width)
+
+        current = cls._album_track_widths.get(key)
+        if current is None or width > current:
+            cls._album_track_widths[key] = width
 
     def __init__(self, artist_id_generator: CachedArtistIdGenerator):
         """Initialize generator.
@@ -330,8 +376,16 @@ class FileNameGenerator:
             # Get sanitized title
             title = Sanitizer.sanitize_title(metadata.title)
 
-            # Format track number (XX if missing)
-            track_num = str(metadata.track_number).zfill(2) if metadata.track_number else "XX"
+            # Format track number using album-scoped width (min 2)
+            album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
+            album = metadata.album if metadata.album else "Unknown-Album"
+            key = self._get_album_key(album_artist, album)
+            width = max(2, self._album_track_widths.get(key, 2))
+            track_num = (
+                str(metadata.track_number).zfill(width)
+                if isinstance(metadata.track_number, int) and metadata.track_number > 0
+                else "XX"
+            )
 
             # Format disc number if present
             prefix = f"D{metadata.disc_number}" if metadata.disc_number else ""
@@ -375,10 +429,8 @@ class DirectoryGenerator:
         Args:
             metadata: Track metadata containing album information.
         """
-        # Get album artist (fallback to artist if missing)
-        album_artist = metadata.album_artist if metadata.album_artist else metadata.artist
-        if not album_artist:
-            album_artist = "Unknown-Artist"
+        # Get album artist strictly from album_artist (no fallback to artist)
+        album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
 
         # Get album name
         album = metadata.album if metadata.album else "Unknown-Album"
@@ -403,7 +455,7 @@ class DirectoryGenerator:
     def get_album_year(cls, album_artist: str, album: str) -> int:
         """Get the year for an album.
 
-        Use the latest year from all tracks in the album.
+        Use the earliest year from all tracks in the album.
         If no valid year is found, use 0000.
 
         Args:
@@ -416,10 +468,10 @@ class DirectoryGenerator:
         key = cls._get_album_key(album_artist, album)
         years = cls._album_years.get(key, {0})
 
-        # Get the latest year (excluding 0)
+        # Use the earliest year (excluding 0) per new spec
         non_zero_years: set[int] = {y for y in years if y != 0}
         if non_zero_years:
-            return max(non_zero_years)
+            return min(non_zero_years)
         return 0
 
     @classmethod
@@ -436,10 +488,8 @@ class DirectoryGenerator:
             Path: Generated directory path.
         """
         try:
-            # Get album artist (fallback to artist if missing)
-            album_artist = metadata.album_artist if metadata.album_artist else metadata.artist
-            if not album_artist:
-                album_artist = "Unknown-Artist"
+            # Get album artist strictly from album_artist (no fallback to artist)
+            album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
 
             # Sanitize album artist name
             album_artist = Sanitizer.sanitize_artist_name(album_artist)

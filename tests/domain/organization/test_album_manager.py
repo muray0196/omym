@@ -226,8 +226,8 @@ def test_process_files_track_continuity(album_manager: AlbumManager) -> None:
     assert "Missing tracks in disc 1: [2]" == group.warnings[0]
 
 
-def test_get_latest_year(album_manager: AlbumManager) -> None:
-    """Test getting the latest year from files.
+def test_get_earliest_year(album_manager: AlbumManager) -> None:
+    """Test getting the earliest year from files.
 
     Note:
         This test accesses a protected method for testing purposes.
@@ -241,5 +241,5 @@ def test_get_latest_year(album_manager: AlbumManager) -> None:
     }
     file_hashes: set[str] = {"hash1", "hash2", "hash3", "hash4"}
 
-    year = album_manager._get_latest_year(file_hashes, files)  # pyright: ignore[reportPrivateUsage]
-    assert year == 2021
+    year = album_manager._get_earliest_year(file_hashes, files)  # pyright: ignore[reportPrivateUsage]
+    assert year == 2020

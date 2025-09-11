@@ -150,7 +150,8 @@ class AlbumManager:
             return album_info
 
         # Determine album properties.
-        year = self._get_latest_year(file_hashes, files)
+        # Album year is defined as the earliest (smallest) valid year among tracks in the album.
+        year = self._get_earliest_year(file_hashes, files)
         total_tracks, total_discs = self._calculate_album_totals(file_hashes, files, warnings)
 
         # Attempt to create new album.
@@ -220,29 +221,34 @@ class AlbumManager:
 
         return total_tracks, total_discs
 
-    def _get_latest_year(
+    def _get_earliest_year(
         self,
         file_hashes: set[str],
         files: dict[str, dict[str, str | None]],
     ) -> int | None:
-        """Retrieve the latest year from the provided files.
+        """Retrieve the earliest year from the provided files.
 
         Args:
             file_hashes: Set of file hashes to check.
             files: Dictionary mapping file hashes to metadata.
 
         Returns:
-            int | None: The latest year if found and valid; otherwise, None.
+            int | None: The earliest year if found and valid; otherwise, None.
         """
-        latest_year: int | None = None
+        earliest_year: int | None = None
         for file_hash in file_hashes:
             metadata = files[file_hash]
             year_str = metadata.get("year")
-            if year_str:
-                try:
-                    year = int(year_str)
-                    if latest_year is None or year > latest_year:
-                        latest_year = year
-                except ValueError:
+            if not year_str:
+                continue
+            try:
+                year = int(year_str)
+                # Ignore non-positive/clearly invalid years
+                if year <= 0:
                     continue
-        return latest_year
+                if earliest_year is None or year < earliest_year:
+                    earliest_year = year
+            except ValueError:
+                # Ignore unparsable values
+                continue
+        return earliest_year

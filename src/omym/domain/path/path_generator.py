@@ -72,21 +72,41 @@ class PathGenerator:
         """
         paths: list[PathInfo] = []
 
+        # First pass: compute album-level earliest year (ignore 0/invalid)
+        album_earliest_year: dict[tuple[str, str], int] = {}
+        for _file_path, metadata in grouped_files.items():
+            album_artist = metadata.get("album_artist") or "Unknown-Artist"
+            album = metadata.get("album") or "Unknown-Album"
+            key = (album_artist, album)
+            year_str = metadata.get("year")
+            try:
+                year_val = int(year_str) if year_str is not None else 0
+            except ValueError:
+                year_val = 0
+            if year_val <= 0:
+                continue
+            current = album_earliest_year.get(key)
+            if current is None or year_val < current:
+                album_earliest_year[key] = year_val
+
+        # Second pass: build paths using album-level earliest year
         for file_path, metadata in grouped_files.items():
             warnings: list[str] = []
             components: list[str] = []
 
-            # Add album artist.
-            album_artist = metadata.get("album_artist") or metadata.get("artist")
+            # Add album artist (no fallback to artist)
+            album_artist = metadata.get("album_artist")
             if not album_artist:
                 warnings.append("Missing album artist")
                 album_artist = "Unknown-Artist"
             components.append(album_artist)
 
-            # Add year and album.
-            year = metadata.get("year", "0000")
-            album = metadata.get("album", "Unknown-Album")
-            components.append(f"{year}_{album}")
+            # Add year and album using album-level earliest year
+            album = metadata.get("album") or "Unknown-Album"
+            key = (album_artist, album)
+            year_val: int = album_earliest_year.get(key, 0)
+            year_str = str(year_val).zfill(4)
+            components.append(f"{year_str}_{album}")
 
             # Build relative path using the helper method.
             relative_path = self._assemble_relative_path(components)

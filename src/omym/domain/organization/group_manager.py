@@ -92,7 +92,8 @@ class MusicGrouper:
             str: Component value, empty string if not found.
         """
         if component == "AlbumArtist":
-            return metadata.get("album_artist") or metadata.get("artist") or ""
+            # No fallback to track artist; require album_artist explicitly
+            return metadata.get("album_artist") or ""
         elif component == "Album":
             return metadata.get("album") or ""
         elif component == "Genre":

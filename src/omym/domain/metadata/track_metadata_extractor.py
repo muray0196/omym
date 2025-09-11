@@ -223,10 +223,12 @@ class BaseAudioExtractor(AudioFormatExtractor, abc.ABC):
             logger.debug("Disc tag: %s", disc_str)
             disc_number, disc_total = parse_slash_separated(value=disc_str)
 
-            # Date information
+            # Year/Date information (prefer 'year' over 'date')
+            # Some tag formats store a dedicated 'year' field; if present, prefer it.
+            year_str_preferred: str = self._get_tag_value(tags, key="year") or ""
             date_str: str = self._get_tag_value(tags, key=self.TAG_MAPPING["date"]) or ""
-            logger.debug("Date tag: %s", date_str)
-            year: int | None = parse_year(date_str)
+            logger.debug("Year tag: %s; Date tag: %s", year_str_preferred, date_str)
+            year: int | None = parse_year(year_str_preferred) or parse_year(date_str)
 
             metadata: TrackMetadata = TrackMetadata(
                 title=title,

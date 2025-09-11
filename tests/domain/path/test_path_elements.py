@@ -56,8 +56,8 @@ def test_album_artist_component_with_album_artist(metadata: TrackMetadata) -> No
     assert result.type == "AlbumArtist"
 
 
-def test_album_artist_component_fallback_to_artist(metadata: TrackMetadata) -> None:
-    """Test AlbumArtistComponent falling back to artist.
+def test_album_artist_component_no_fallback_to_artist(metadata: TrackMetadata) -> None:
+    """Test AlbumArtistComponent does not fallback to track artist.
 
     Args:
         metadata: Test metadata fixture.
@@ -65,7 +65,7 @@ def test_album_artist_component_fallback_to_artist(metadata: TrackMetadata) -> N
     metadata.album_artist = None
     component = AlbumArtistComponent(order=1)
     result = component.get_value(metadata)
-    assert result.value == "Test-Artist"
+    assert result.value == "Unknown-Artist"
     assert result.order == 1
     assert result.type == "AlbumArtist"
 
