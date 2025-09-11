@@ -38,11 +38,20 @@ class Config:
     _loaded_from: ClassVar[Path | None] = None
 
     def __post_init__(self) -> None:
-        """Convert string paths to Path objects after initialization."""
-        for field_name, field_type in self.__annotations__.items():
-            value = getattr(self, field_name)
-            if isinstance(value, str) and "Path" in str(field_type):
-                setattr(self, field_name, Path(value) if value else None)
+        """Convert string paths to ``Path`` objects using field metadata.
+
+        This avoids brittle type-name introspection and leverages the
+        ``metadata={"path": True}`` flag set by ``_path_field`` so only
+        intended fields are converted.
+        """
+        from dataclasses import fields
+
+        for f in fields(self):
+            if not f.metadata.get("path", False):
+                continue
+            value = getattr(self, f.name)
+            if isinstance(value, str):
+                setattr(self, f.name, Path(value) if value else None)
 
     def save(self) -> None:
         """Save configuration to file."""
@@ -71,25 +80,29 @@ class Config:
             path: Path to save the configuration to
             config: Configuration dictionary to save
         """
-        toml_str = "# OMYM Configuration File\n\n"
+        lines: list[str] = []
+
+        # Header
+        lines.append("# OMYM Configuration File")
+        lines.append("")
 
         # Base path section
-        toml_str += "# Base path for your music library (optional)\n"
-        toml_str += "# This is the root directory where your music files are stored\n"
-        toml_str += '# Example: base_path = "/path/to/your/music"\n'
+        lines.append("# Base path for your music library (optional)")
+        lines.append("# This is the root directory where your music files are stored")
+        lines.append('# Example: base_path = "/path/to/your/music"')
         if config["base_path"] is not None:
-            toml_str += f"base_path = {self._format_toml_value(config['base_path'])}\n"
-        toml_str += "\n"
+            lines.append(f"base_path = {self._format_toml_value(config['base_path'])}")
+        lines.append("")
 
         # Log file section
-        toml_str += "# Log file path (optional)\n"
-        toml_str += "# Where to store the application logs\n"
-        toml_str += '# Example: log_file = "/path/to/logs/omym.log"\n'
+        lines.append("# Log file path (optional)")
+        lines.append("# Where to store the application logs")
+        lines.append('# Example: log_file = "/path/to/logs/omym.log"')
         if config["log_file"] is not None:
-            toml_str += f"log_file = {self._format_toml_value(config['log_file'])}\n"
-        toml_str += "\n"
+            lines.append(f"log_file = {self._format_toml_value(config['log_file'])}")
+        lines.append("")
 
-        # No explicit config_file is stored; path is fixed by policy.
+        toml_str = "\n".join(lines)
 
         with open(path, "w", encoding="utf-8") as f:
             _ = f.write(toml_str)  # Assign to _ to acknowledge unused result

@@ -35,12 +35,12 @@ You are an AI assistant specialized in Python development.
 2. Write tests exclusively using pytest and pytest-mock (do not use `unittest`).
 3. Ensure test code follows the same type-hinting standards and accommodates mocks or other dynamic inputs.
 4. Complex tests must have a simple docstring describing their purpose.
+# Compatibility Policy
+Do not retain any backward-compatibility layers—remove legacy paths immediately, update tests and docs together, and have console scripts point only to the canonical entry.
+# Use MCP Server
+- Perform Serena MCP Server initialization at project start.
+- Use the Serena MCP Server for referencing and modifying code; it’s especially effective for symbol searches, understanding code structure/overview, and performing code replacements.
+
 # Implementation Notes:
 You provide Python code snippets and explanations optimized for clarity and AI development.
 Ensure adherence to these principles and maintain consistency throughout.
-
-# Added Rules:
-## Compatibility Policy
-Do not retain any backward-compatibility layers—remove legacy paths immediately, update tests and docs together, and have console scripts point only to the canonical entry.
-## Serena MCP Server
-Use the Serena MCP Server for referencing and modifying code; it’s especially effective for symbol searches, understanding code structure/overview, and performing code replacements.

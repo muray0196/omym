@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import final, Callable
 
 from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
+from omym.infra.db.daos.maintenance_dao import MaintenanceDAO
 
 
 @dataclass(frozen=True)
@@ -61,15 +62,7 @@ class OrganizeMusicService:
                 db_manager = getattr(processor, "db_manager", None)
                 conn = db_manager.conn if db_manager is not None else None
                 if conn is not None:
-                    cur = conn.cursor()
-                    # Delete in FK-safe order
-                    cur.execute("DELETE FROM processing_after")
-                    cur.execute("DELETE FROM track_positions")
-                    cur.execute("DELETE FROM filter_values")
-                    cur.execute("DELETE FROM processing_before")
-                    cur.execute("DELETE FROM albums")
-                    cur.execute("DELETE FROM artist_cache")
-                    conn.commit()
+                    _ = MaintenanceDAO(conn).clear_all()
             except Exception:
                 # Best-effort clean; non-fatal if unsupported
                 pass

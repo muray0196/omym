@@ -146,38 +146,37 @@ class PathGenerator:
         """
         groups: dict[tuple[str, ...], set[str]] = {}
 
-        # Get all file hashes.
+        # Build an O(1) lookup index for (hierarchy_id, file_hash) -> value
+        # This avoids repeated linear scans per file per hierarchy.
+        value_index: dict[tuple[int, str], str] = {}
         file_hashes: set[str] = set()
-        for values in hierarchy_values.values():
-            for value in values:
-                file_hashes.add(value.file_hash)
+        for h_id, values in hierarchy_values.items():
+            for v in values:
+                file_hashes.add(v.file_hash)
+                value_index[(h_id, v.file_hash)] = v.value
 
         # Group files by hierarchy values.
         for file_hash in file_hashes:
             group_key: list[str] = []
+            missing = False
             for hierarchy in hierarchies:
-                value = self._find_value_for_file(hierarchy.id, file_hash, hierarchy_values[hierarchy.id])
-                if not value:
+                value = value_index.get((hierarchy.id, file_hash))
+                if value is None:
                     logger.warning("Missing value for hierarchy %s, file %s", hierarchy.name, file_hash)
+                    missing = True
                     break
                 group_key.append(value)
-            else:
+            if not missing:
                 key = tuple(group_key)
                 groups.setdefault(key, set()).add(file_hash)
 
         return groups
 
-    def _find_value_for_file(self, hierarchy_id: int, file_hash: str, values: list[FilterValue]) -> str | None:
-        """Find value for a file in a hierarchy.
+    def _find_value_for_file(self, hierarchy_id: int, file_hash: str, values: list[FilterValue]) -> str | None:  # pyright: ignore[reportUnusedFunction] - kept for external callers if any
+        """(Deprecated) Linear search for a file's hierarchy value.
 
-        Args:
-            hierarchy_id: ID of the hierarchy to search in.
-            file_hash: Hash of the file to find value for.
-            values: List of filter values to search through.
-
-        Returns:
-            str | None: The value for the file in the hierarchy if found,
-                None if not found.
+        Kept for compatibility with any external callers; internal code now
+        uses an indexed lookup in ``_group_files_by_hierarchies`` for O(1) access.
         """
         for value in values:
             if value.hierarchy_id == hierarchy_id and value.file_hash == file_hash:

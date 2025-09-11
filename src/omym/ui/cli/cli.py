@@ -43,10 +43,14 @@ class CommandProcessor:
             sys.exit(1)
 
 
-def main() -> None:
-    """Main entry point."""
+def main() -> int:
+    """Main entry point.
+
+    Returns:
+        int: Process exit code (0 on success). Note that underlying
+        command processing may call ``sys.exit(...)`` on errors, so this
+        return is only reached when processing completes successfully.
+    """
     CommandProcessor.process_command()
+    return 0
 
-
-if __name__ == "__main__":
-    main()
