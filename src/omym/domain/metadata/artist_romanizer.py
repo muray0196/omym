@@ -99,6 +99,7 @@ class ArtistRomanizer:
     def _romanize_single(self, text: str) -> str:
         cached = self._cache.get(text)
         if cached is not None:
+            logger.debug("Using cached romanized name for '%s': %s", text, cached)
             return cached
 
         detected_lang = self.language_detector(text)
@@ -107,6 +108,7 @@ class ArtistRomanizer:
             return text
 
         try:
+            logger.info("Querying MusicBrainz for romanized name: '%s'", text)
             romanized = self.fetcher(text)
         except Exception as exc:  # pragma: no cover - defensive logging only
             logger.warning("Failed to romanize artist '%s': %s", text, exc)
@@ -114,11 +116,17 @@ class ArtistRomanizer:
 
         normalized = romanized.strip() if romanized else None
         if normalized:
+            logger.info("MusicBrainz romanized '%s' -> '%s'", text, normalized)
             self._cache[text] = normalized
             return normalized
 
         fallback = self.transliterator(text).strip()
         if fallback:
+            logger.info(
+                "MusicBrainz fallback transliteration for '%s' -> '%s'",
+                text,
+                fallback,
+            )
             self._cache[text] = fallback
             return fallback
 

@@ -3,10 +3,12 @@
 import hashlib
 import os
 import shutil
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, ClassVar, final
 
+from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.domain.metadata.track_metadata_extractor import MetadataExtractor
 from omym.domain.path.music_file_renamer import (
@@ -19,7 +21,6 @@ from omym.infra.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.infra.db.daos.processing_before_dao import ProcessingBeforeDAO
 from omym.infra.db.db_manager import DatabaseManager
 from omym.infra.logger.logger import logger
-from omym.infra.musicbrainz.client import configure_romanization_cache
 
 
 @dataclass
@@ -52,6 +53,9 @@ class MusicProcessor:
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
     file_name_generator: FileNameGenerator
+    _romanizer: ArtistRomanizer
+    _romanizer_executor: ThreadPoolExecutor
+    _romanize_futures: dict[str, Future[str]]
 
     def __init__(self, base_path: Path, dry_run: bool = False) -> None:
         """Initialize music processor.
@@ -73,12 +77,14 @@ class MusicProcessor:
         self.before_dao = ProcessingBeforeDAO(self.db_manager.conn)
         self.after_dao = ProcessingAfterDAO(self.db_manager.conn)
         self.artist_dao = ArtistCacheDAO(self.db_manager.conn)
-        configure_romanization_cache(self.artist_dao)
 
         # Initialize generators.
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)
         self.directory_generator = DirectoryGenerator()
         self.file_name_generator = FileNameGenerator(self.artist_id_generator)
+        self._romanizer = ArtistRomanizer()
+        self._romanizer_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mb-romanizer")
+        self._romanize_futures = {}
 
     def process_directory(
         self,
@@ -112,6 +118,10 @@ class MusicProcessor:
         for pre_file in supported_files:
             try:
                 meta = MetadataExtractor.extract(pre_file)
+                if meta.artist:
+                    self._schedule_romanization(meta.artist)
+                if meta.album_artist:
+                    self._schedule_romanization(meta.album_artist)
                 self.directory_generator.register_album_year(meta)
                 # Register album-level track width for consistent padding
                 FileNameGenerator.register_album_track_width(meta)
@@ -203,6 +213,11 @@ class MusicProcessor:
             metadata = MetadataExtractor.extract(file_path)
             if not metadata:
                 raise ValueError("Failed to extract metadata")
+
+            if metadata.artist:
+                metadata.artist = self._await_romanization(metadata.artist)
+            if metadata.album_artist:
+                metadata.album_artist = self._await_romanization(metadata.album_artist)
 
             # Generate target path.
             target_path = self._generate_target_path(metadata)
@@ -297,6 +312,36 @@ class MusicProcessor:
         except Exception as e:
             logger.error("Error generating target path: %s", e)
             return None
+
+    def _schedule_romanization(self, name: str) -> None:
+        trimmed = name.strip()
+        if not trimmed or trimmed in self._romanize_futures:
+            return
+
+        def _romanize() -> str:
+            return self._romanizer.romanize_name(trimmed) or trimmed
+
+        logger.debug("Scheduling romanization task for '%s'", trimmed)
+        self._romanize_futures[trimmed] = self._romanizer_executor.submit(_romanize)
+
+    def _await_romanization(self, name: str) -> str:
+        trimmed = name.strip()
+        if not trimmed:
+            return name
+        future = self._romanize_futures.get(trimmed)
+        if future is None:
+            self._schedule_romanization(trimmed)
+            future = self._romanize_futures.get(trimmed)
+        if future is None:
+            return name
+        try:
+            romanized = future.result()
+            if romanized != trimmed:
+                _ = self.artist_dao.upsert_romanized_name(trimmed, romanized)
+            return romanized
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Romanization future failed for '%s': %s", trimmed, exc)
+            return name
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of a file.

@@ -1,5 +1,5 @@
 # Project
-.config/
+config/
 .data/
 .tmp/
 # Editor

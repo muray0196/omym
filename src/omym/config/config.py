@@ -30,8 +30,11 @@ class Config:
     # Log file path
     log_file: Path | None = _path_field()
 
-    # MusicBrainz romanization toggle
+    # MusicBrainz settings
     use_mb_romanization: bool = True
+    mb_app_name: str | None = None
+    mb_app_version: str | None = None
+    mb_contact: str | None = None
 
     # Note: Configuration file path is fixed by policy (XDG). Users cannot
     # override it via config values. See default_config_path().
@@ -113,6 +116,17 @@ class Config:
         )
         lines.append("")
 
+        # MusicBrainz identity
+        lines.append("# MusicBrainz application identity (optional)")
+        lines.append("# These fields override environment variables if provided")
+        if config.get("mb_app_name"):
+            lines.append(f"mb_app_name = {self._format_toml_value(config['mb_app_name'])}")
+        if config.get("mb_app_version"):
+            lines.append(f"mb_app_version = {self._format_toml_value(config['mb_app_version'])}")
+        if config.get("mb_contact"):
+            lines.append(f"mb_contact = {self._format_toml_value(config['mb_contact'])}")
+        lines.append("")
+
         toml_str = "\n".join(lines)
 
         with open(path, "w", encoding="utf-8") as f:
@@ -159,7 +173,10 @@ class Config:
                     raise
 
                 # Ensure new fields have defaults if absent (backward compatibility)
-                config_dict.setdefault("use_mb_romanization", True)
+                _ = config_dict.setdefault("use_mb_romanization", True)
+                _ = config_dict.setdefault("mb_app_name", None)
+                _ = config_dict.setdefault("mb_app_version", None)
+                _ = config_dict.setdefault("mb_contact", None)
 
                 # Convert string paths back to Path objects and handle empty strings
                 for key, value in config_dict.items():

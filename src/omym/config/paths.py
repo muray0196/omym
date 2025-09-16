@@ -4,7 +4,7 @@ This module centralizes how the application discovers locations for
 config and data files.
 
 Policy (portable by default):
-- Config: repository-root ``<repo_root>/.config/omym/config.toml``
+- Config: repository-root ``<repo_root>/config/omym/config.toml``
 - Data: repository-root ``<repo_root>/.data`` unless overridden by
   ``OMYM_DATA_DIR``.
 """
@@ -42,10 +42,10 @@ def _detect_repo_root(start: Path | None = None) -> Path:
 def default_config_path() -> Path:
     """Get the default path to the main TOML config file.
 
-    Portable layout: ``<repo_root>/.config/omym/config.toml``.
+    Portable layout: ``<repo_root>/config/omym/config.toml``.
     """
     repo_root = _detect_repo_root()
-    return (repo_root / ".config" / "omym" / "config.toml").resolve()
+    return (repo_root / "config" / "omym" / "config.toml").resolve()
 
 
 def default_data_dir() -> Path:

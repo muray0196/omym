@@ -27,6 +27,7 @@ def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Ite
 
     config_module.Config._instance = None  # pyright: ignore[reportPrivateUsage]
     config_module.Config._loaded_from = None  # pyright: ignore[reportPrivateUsage]
+    config_module.config = config_module.Config.load()
 
     yield
 
@@ -36,11 +37,10 @@ def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Ite
 
 
 def test_use_mb_romanization_defaults_true(
-    isolated_environment: None, monkeypatch: pytest.MonkeyPatch
+    isolated_environment: None,
 ) -> None:
     """Default configuration enables MusicBrainz romanization."""
     _ = isolated_environment
-    monkeypatch.delenv("OMYM_USE_MB_ROMANIZATION", raising=False)
 
     import omym.config.settings as settings
 
@@ -49,15 +49,25 @@ def test_use_mb_romanization_defaults_true(
     assert reloaded.USE_MB_ROMANIZATION is True
 
 
-def test_use_mb_romanization_env_override(
-    isolated_environment: None, monkeypatch: pytest.MonkeyPatch
+def test_musicbrainz_identity_uses_config_defaults(
+    isolated_environment: None,
 ) -> None:
-    """Environment variable overrides configuration flag."""
+    """MusicBrainz identity derives from config values."""
+
     _ = isolated_environment
-    monkeypatch.setenv("OMYM_USE_MB_ROMANIZATION", "0")
+
+    from omym.config.config import config as app_config
+
+    app_config.use_mb_romanization = False
+    app_config.mb_app_name = "custom-app"
+    app_config.mb_app_version = "9.9.9"
+    app_config.mb_contact = "mailto:config@example.com"
 
     import omym.config.settings as settings
 
     reloaded = importlib.reload(settings)
 
     assert reloaded.USE_MB_ROMANIZATION is False
+    assert reloaded.MB_APP_NAME == "custom-app"
+    assert reloaded.MB_APP_VERSION == "9.9.9"
+    assert reloaded.MB_CONTACT == "mailto:config@example.com"

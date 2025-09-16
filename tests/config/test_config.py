@@ -30,6 +30,9 @@ def test_default_config(repo_root: Path) -> None:
     assert config.base_path is None
     assert config.log_file is None
     assert config.use_mb_romanization is True
+    assert config.mb_app_name is None
+    assert config.mb_app_version is None
+    assert config.mb_contact is None
     # Ensure save creates file in XDG default path
     config.save()
     assert default_config_path().exists()
@@ -43,6 +46,9 @@ def test_save_load_toml(repo_root: Path) -> None:
         base_path=Path("/test/music"),
         log_file=Path("/test/logs/omym.log"),
         use_mb_romanization=False,
+        mb_app_name="myapp",
+        mb_app_version="1.2.3",
+        mb_contact="mailto:test@example.com",
     )
     original_config.save()
 
@@ -54,6 +60,9 @@ def test_save_load_toml(repo_root: Path) -> None:
     assert loaded_config.base_path == Path("/test/music")
     assert loaded_config.log_file == Path("/test/logs/omym.log")
     assert loaded_config.use_mb_romanization is False
+    assert loaded_config.mb_app_name == "myapp"
+    assert loaded_config.mb_app_version == "1.2.3"
+    assert loaded_config.mb_contact == "mailto:test@example.com"
     assert default_config_path().exists()
 
 
@@ -65,6 +74,9 @@ def test_save_load_none_values(repo_root: Path) -> None:
         base_path=None,
         log_file=None,
         use_mb_romanization=True,
+        mb_app_name=None,
+        mb_app_version=None,
+        mb_contact=None,
     )
     original_config.save()
 
@@ -76,6 +88,9 @@ def test_save_load_none_values(repo_root: Path) -> None:
     assert loaded_config.base_path is None
     assert loaded_config.log_file is None
     assert loaded_config.use_mb_romanization is True
+    assert loaded_config.mb_app_name is None
+    assert loaded_config.mb_app_version is None
+    assert loaded_config.mb_contact is None
 
 
 def test_singleton_behavior(repo_root: Path) -> None:
@@ -85,6 +100,9 @@ def test_singleton_behavior(repo_root: Path) -> None:
     config1 = Config.load()
     config1.base_path = Path("/test/music1")
     config1.use_mb_romanization = False
+    config1.mb_app_name = "myapp"
+    config1.mb_app_version = "2.0.0"
+    config1.mb_contact = "https://example.com"
     config1.save()
 
     # Load second instance (should be same object)
@@ -92,6 +110,9 @@ def test_singleton_behavior(repo_root: Path) -> None:
     assert config2 is config1
     assert config2.base_path == Path("/test/music1")
     assert config2.use_mb_romanization is False
+    assert config2.mb_app_name == "myapp"
+    assert config2.mb_app_version == "2.0.0"
+    assert config2.mb_contact == "https://example.com"
 
 
 def test_toml_comments(repo_root: Path) -> None:
@@ -100,6 +121,9 @@ def test_toml_comments(repo_root: Path) -> None:
     config = Config(
         base_path=Path("/test/music"),
         use_mb_romanization=False,
+        mb_app_name="myapp",
+        mb_app_version="1.0.0",
+        mb_contact="mailto:test@example.com",
     )
     config.save()
 
@@ -113,3 +137,4 @@ def test_toml_comments(repo_root: Path) -> None:
     assert "# Log file path" in content
     assert "# MusicBrainz romanization" in content
     assert "use_mb_romanization = false" in content
+    assert "mb_app_name" in content
