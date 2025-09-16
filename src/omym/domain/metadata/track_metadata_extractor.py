@@ -12,6 +12,7 @@ from mutagen.oggopus import OggOpus
 from mutagen.dsf import DSF
 from mutagen._util import MutagenError
 from omym.infra.logger.logger import logger
+from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
 
 if TYPE_CHECKING:
@@ -379,6 +380,8 @@ class MetadataExtractor:
 
     SUPPORTED_FORMATS: ClassVar[set[str]] = {".flac", ".mp3", ".m4a", ".dsf", ".opus"}
 
+    _artist_romanizer: ClassVar[ArtistRomanizer] = ArtistRomanizer()
+
     # Mapping from file extension to corresponding extractor instance.
     _format_map: ClassVar[dict[str, AudioFormatExtractor]] = {
         ".mp3": Mp3Extractor(),
@@ -410,6 +413,16 @@ class MetadataExtractor:
         return cls._format_map[".opus"].extract_metadata(file_path)
 
     @classmethod
+    def configure_romanizer(cls, romanizer: ArtistRomanizer) -> None:
+        """Override the romanizer used after extraction.
+
+        Args:
+            romanizer: Romanizer instance configured for the runtime.
+        """
+
+        cls._artist_romanizer = romanizer
+
+    @classmethod
     def extract(cls, file_path: Path) -> TrackMetadata:
         """Extract metadata from an audio file.
 
@@ -436,4 +449,6 @@ class MetadataExtractor:
             ".opus": cls._extract_opus,
         }
 
-        return method_map[ext](file_path)
+        metadata = method_map[ext](file_path)
+        processed = cls._artist_romanizer.romanize_metadata(metadata)
+        return processed if processed is not None else metadata

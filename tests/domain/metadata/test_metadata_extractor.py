@@ -6,6 +6,7 @@ from typing import TypeAlias
 import pytest
 from pytest_mock import MockerFixture
 
+from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.domain.metadata.track_metadata_extractor import MetadataExtractor
 
@@ -226,6 +227,33 @@ class TestMetadataExtractor:
             assert metadata.year == year
         finally:
             # Clean up
+            test_file.unlink()
+
+    def test_metadata_extractor_applies_romanization(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """Verify that romanization is applied when configured to do so."""
+
+        test_file = tmp_path / "test.mp3"
+        test_file.touch()
+
+        romanizer = ArtistRomanizer(enabled_supplier=lambda: True, fetcher=lambda _: "Hikaru Utada")
+        MetadataExtractor.configure_romanizer(romanizer)
+
+        _ = mocker.patch.object(
+            MetadataExtractor,
+            "_extract_mp3",
+            return_value=TrackMetadata(artist="宇多田ヒカル", album_artist="宇多田ヒカル", file_extension=".mp3"),
+        )
+
+        try:
+            metadata = MetadataExtractor.extract(test_file)
+            assert metadata.artist == "Hikaru Utada"
+            assert metadata.album_artist == "Hikaru Utada"
+        finally:
+            MetadataExtractor.configure_romanizer(ArtistRomanizer())
             test_file.unlink()
 
     def test_m4a_extraction(

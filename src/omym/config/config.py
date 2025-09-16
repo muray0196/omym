@@ -30,6 +30,9 @@ class Config:
     # Log file path
     log_file: Path | None = _path_field()
 
+    # MusicBrainz romanization toggle
+    use_mb_romanization: bool = True
+
     # Note: Configuration file path is fixed by policy (XDG). Users cannot
     # override it via config values. See default_config_path().
 
@@ -102,6 +105,14 @@ class Config:
             lines.append(f"log_file = {self._format_toml_value(config['log_file'])}")
         lines.append("")
 
+        # MusicBrainz romanization section
+        lines.append("# MusicBrainz romanization (optional)")
+        lines.append("# Set to true to resolve artist names via MusicBrainz (default true)")
+        lines.append(
+            f"use_mb_romanization = {self._format_toml_value(config['use_mb_romanization'])}"
+        )
+        lines.append("")
+
         toml_str = "\n".join(lines)
 
         with open(path, "w", encoding="utf-8") as f:
@@ -116,6 +127,8 @@ class Config:
         Returns:
             str: Formatted value
         """
+        if isinstance(value, bool):
+            return "true" if value else "false"
         if isinstance(value, (str, Path)):
             return f'"{str(value)}"'
         return str(value)
@@ -144,6 +157,9 @@ class Config:
                         config_dict = tomllib.load(f)
                 except Exception:
                     raise
+
+                # Ensure new fields have defaults if absent (backward compatibility)
+                config_dict.setdefault("use_mb_romanization", True)
 
                 # Convert string paths back to Path objects and handle empty strings
                 for key, value in config_dict.items():

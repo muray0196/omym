@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "langid>=1.1.6",
+    "musicbrainzngs>=0.7.1",
     "mutagen>=1.47.0",
     "pykakasi>=2.3.0",
     "rich>=13.7.0",

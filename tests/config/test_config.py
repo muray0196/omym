@@ -29,6 +29,7 @@ def test_default_config(repo_root: Path) -> None:
     config = Config()
     assert config.base_path is None
     assert config.log_file is None
+    assert config.use_mb_romanization is True
     # Ensure save creates file in XDG default path
     config.save()
     assert default_config_path().exists()
@@ -41,6 +42,7 @@ def test_save_load_toml(repo_root: Path) -> None:
     original_config = Config(
         base_path=Path("/test/music"),
         log_file=Path("/test/logs/omym.log"),
+        use_mb_romanization=False,
     )
     original_config.save()
 
@@ -51,6 +53,7 @@ def test_save_load_toml(repo_root: Path) -> None:
     # Verify values
     assert loaded_config.base_path == Path("/test/music")
     assert loaded_config.log_file == Path("/test/logs/omym.log")
+    assert loaded_config.use_mb_romanization is False
     assert default_config_path().exists()
 
 
@@ -61,6 +64,7 @@ def test_save_load_none_values(repo_root: Path) -> None:
     original_config = Config(
         base_path=None,
         log_file=None,
+        use_mb_romanization=True,
     )
     original_config.save()
 
@@ -71,6 +75,7 @@ def test_save_load_none_values(repo_root: Path) -> None:
     # Verify values
     assert loaded_config.base_path is None
     assert loaded_config.log_file is None
+    assert loaded_config.use_mb_romanization is True
 
 
 def test_singleton_behavior(repo_root: Path) -> None:
@@ -79,12 +84,14 @@ def test_singleton_behavior(repo_root: Path) -> None:
     # Create first instance
     config1 = Config.load()
     config1.base_path = Path("/test/music1")
+    config1.use_mb_romanization = False
     config1.save()
 
     # Load second instance (should be same object)
     config2 = Config.load()
     assert config2 is config1
     assert config2.base_path == Path("/test/music1")
+    assert config2.use_mb_romanization is False
 
 
 def test_toml_comments(repo_root: Path) -> None:
@@ -92,6 +99,7 @@ def test_toml_comments(repo_root: Path) -> None:
     """Test TOML file contains comments."""
     config = Config(
         base_path=Path("/test/music"),
+        use_mb_romanization=False,
     )
     config.save()
 
@@ -103,3 +111,5 @@ def test_toml_comments(repo_root: Path) -> None:
     assert "# OMYM Configuration File" in content
     assert "# Base path for your music library" in content
     assert "# Log file path" in content
+    assert "# MusicBrainz romanization" in content
+    assert "use_mb_romanization = false" in content
