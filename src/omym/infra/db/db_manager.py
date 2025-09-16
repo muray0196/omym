@@ -47,6 +47,7 @@ class DatabaseManager:
                     self.db_path,
                     timeout=30.0,  # Wait up to 30 seconds for locks
                     isolation_level="IMMEDIATE",  # Acquire write lock immediately
+                    check_same_thread=False,  # Allow DAO usage from worker threads
                 )
             except sqlite3.OperationalError as e:
                 if "unable to open database file" in str(e):

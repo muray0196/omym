@@ -28,6 +28,7 @@ def _default_enabled() -> bool:
 
 def _default_fetcher(name: str) -> str | None:
     """Default fetcher delegating to the MusicBrainz client helper."""
+    logger.info("Querying MusicBrainz for romanized name: '%s'", name)
     return fetch_romanized_name(name)
 
 
@@ -68,6 +69,38 @@ class ArtistRomanizer:
     language_detector: LanguageDetector = field(default=_default_language_detector)
     transliterator: Transliterator = field(default=_default_transliterator)
     _cache: dict[str, str] = field(default_factory=dict, init=False)
+    _last_fetch_source: str | None = field(default=None, init=False, repr=False)
+    _last_fetch_original: str | None = field(default=None, init=False, repr=False)
+    _last_fetch_value: str | None = field(default=None, init=False, repr=False)
+
+    def record_fetch_context(
+        self,
+        *,
+        source: str,
+        original: str,
+        value: str | None,
+    ) -> None:
+        """Record how the most recent fetch obtained its value."""
+
+        self._last_fetch_source = source
+        self._last_fetch_original = original
+        self._last_fetch_value = value
+
+    def _consume_fetch_context(self, original: str, value: str | None) -> str | None:
+        if (
+            self._last_fetch_original == original
+            and self._last_fetch_value == value
+            and self._last_fetch_source is not None
+        ):
+            source = self._last_fetch_source
+            self._last_fetch_source = None
+            self._last_fetch_original = None
+            self._last_fetch_value = None
+            return source
+        self._last_fetch_source = None
+        self._last_fetch_original = None
+        self._last_fetch_value = None
+        return None
 
     def romanize_name(self, name: str | None) -> str | None:
         """Return a romanized version of an artist name when available.
@@ -108,7 +141,6 @@ class ArtistRomanizer:
             return text
 
         try:
-            logger.info("Querying MusicBrainz for romanized name: '%s'", text)
             romanized = self.fetcher(text)
         except Exception as exc:  # pragma: no cover - defensive logging only
             logger.warning("Failed to romanize artist '%s': %s", text, exc)
@@ -116,7 +148,11 @@ class ArtistRomanizer:
 
         normalized = romanized.strip() if romanized else None
         if normalized:
-            logger.info("MusicBrainz romanized '%s' -> '%s'", text, normalized)
+            source = self._consume_fetch_context(text, romanized)
+            if source == "cache":
+                logger.info("Using cached MusicBrainz romanized '%s' -> '%s'", text, normalized)
+            else:
+                logger.info("MusicBrainz romanized '%s' -> '%s'", text, normalized)
             self._cache[text] = normalized
             return normalized
 

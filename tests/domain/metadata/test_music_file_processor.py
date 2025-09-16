@@ -65,6 +65,7 @@ def processor(mocker: MockerFixture, tmp_path: Path) -> MusicProcessor:
     _ = mock_before_dao.insert_file.return_value = True
     _ = mock_after_dao.insert_file.return_value = True
     _ = mock_artist_dao.get_artist_id.return_value = "PNKFL"
+    _ = mock_artist_dao.get_romanized_name.return_value = None
     _ = mock_artist_dao.insert_artist_id.return_value = True
 
     # Create processor
@@ -228,6 +229,36 @@ class TestMusicProcessor:
         # Verify that only supported files were processed
         processed_files = {r.source_path.name for r in results}
         assert processed_files == set(music_files)
+
+    def test_cached_romanization_bypasses_musicbrainz(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+    ) -> None:
+        """Ensure cached MusicBrainz romanizations skip HTTP scheduling."""
+
+        cached_name = "米津玄師"
+        cached_romanized = "Kenshi Yonezu"
+
+        processor.artist_dao.get_romanized_name.return_value = cached_romanized
+
+        submit_mock = mocker.patch.object(
+            processor._romanizer_executor,
+            "submit",
+            side_effect=AssertionError("Romanization task should not be scheduled on cache hit"),
+        )
+        processor._schedule_romanization(cached_name)
+
+        assert cached_name in processor._romanize_futures
+        future = processor._romanize_futures[cached_name]
+        assert future.result() == cached_romanized
+
+        processor.artist_dao.upsert_romanized_name.reset_mock()
+
+        assert processor._await_romanization(cached_name) == cached_romanized
+        submit_mock.assert_not_called()
+        processor.artist_dao.get_romanized_name.assert_called_once_with(cached_name)
+        processor.artist_dao.upsert_romanized_name.assert_called_once_with(cached_name, cached_romanized)
 
     def test_file_extension_safety(
         self,

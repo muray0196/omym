@@ -21,6 +21,10 @@ from omym.infra.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.infra.db.daos.processing_before_dao import ProcessingBeforeDAO
 from omym.infra.db.db_manager import DatabaseManager
 from omym.infra.logger.logger import logger
+from omym.infra.musicbrainz.client import (
+    configure_romanization_cache,
+    fetch_romanized_name,
+)
 
 
 @dataclass
@@ -77,12 +81,47 @@ class MusicProcessor:
         self.before_dao = ProcessingBeforeDAO(self.db_manager.conn)
         self.after_dao = ProcessingAfterDAO(self.db_manager.conn)
         self.artist_dao = ArtistCacheDAO(self.db_manager.conn)
+        configure_romanization_cache(self.artist_dao)
+
+        def _fetch_with_persistent_cache(name: str) -> str | None:
+            trimmed = name.strip()
+            if not trimmed:
+                return None
+
+            try:
+                cached = self.artist_dao.get_romanized_name(trimmed)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Failed to consult persistent romanization cache for '%s': %s",
+                    trimmed,
+                    exc,
+                )
+                cached = None
+
+            if cached:
+                if hasattr(self, "_romanizer"):
+                    self._romanizer.record_fetch_context(
+                        source="cache",
+                        original=trimmed,
+                        value=cached,
+                    )
+                return cached
+
+            result = fetch_romanized_name(name)
+            if hasattr(self, "_romanizer"):
+                self._romanizer.record_fetch_context(
+                    source="musicbrainz",
+                    original=trimmed,
+                    value=result,
+                )
+            return result
 
         # Initialize generators.
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)
         self.directory_generator = DirectoryGenerator()
         self.file_name_generator = FileNameGenerator(self.artist_id_generator)
-        self._romanizer = ArtistRomanizer()
+        self._romanizer = ArtistRomanizer(fetcher=_fetch_with_persistent_cache)
+        MetadataExtractor.configure_romanizer(self._romanizer)
         self._romanizer_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mb-romanizer")
         self._romanize_futures = {}
 
@@ -315,7 +354,23 @@ class MusicProcessor:
 
     def _schedule_romanization(self, name: str) -> None:
         trimmed = name.strip()
-        if not trimmed or trimmed in self._romanize_futures:
+        if not trimmed:
+            return
+
+        if trimmed in self._romanize_futures:
+            return
+
+        cached_value: str | None = None
+        try:
+            cached_value = self.artist_dao.get_romanized_name(trimmed)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Failed to read cached romanized name for '%s': %s", trimmed, exc)
+
+        if cached_value:
+            logger.debug("Using persisted romanization cache for '%s'", trimmed)
+            future: Future[str] = Future()
+            future.set_result(cached_value)
+            self._romanize_futures[trimmed] = future
             return
 
         def _romanize() -> str:
