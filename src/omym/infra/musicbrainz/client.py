@@ -27,7 +27,8 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, Final, Protocol
+from collections.abc import Iterable
+from typing import Any, Final, Protocol, cast
 
 from omym.infra.logger.logger import logger
 from omym.config.settings import MB_APP_NAME, MB_APP_VERSION, MB_CONTACT
@@ -155,7 +156,8 @@ def _http_get_json(url: str, params: dict[str, str]) -> _HTTPResult:
 
                 resp = requests.get(url, params=params, headers=headers, timeout=(5.0, 15.0))
                 status: int = int(resp.status_code)
-                resp_headers: dict[str, str] = {str(k): str(v) for k, v in resp.headers.items()}
+                header_items = cast(Iterable[tuple[str, str]], resp.headers.items())
+                resp_headers: dict[str, str] = {str(k): str(v) for k, v in header_items}
                 if status == 429 or status >= 500:
                     retry_after = _parse_retry_after(resp_headers.get("Retry-After"))
                     if attempt < attempts - 1:
@@ -197,13 +199,21 @@ def _http_get_json(url: str, params: dict[str, str]) -> _HTTPResult:
                     with urlopen(req, timeout=15.0) as resp:  # noqa: S310 (trusted domain)
                         status = int(resp.getcode() or 0)
                         # Convert HTTPMessage to dict[str, str]
+                        header_items_ul = cast(
+                            Iterable[tuple[str, str]],
+                            (resp.headers.items() if resp.headers else []),
+                        )
                         resp_headers_ul: dict[str, str] = {
-                            str(k): str(v) for k, v in (resp.headers.items() if resp.headers else [])
+                            str(k): str(v) for k, v in header_items_ul
                         }
                         raw = resp.read()
                 except HTTPError as e:
                     status = int(e.code)
-                    resp_headers_ul = {str(k): str(v) for k, v in (e.headers.items() if e.headers else [])}
+                    header_items_err = cast(
+                        Iterable[tuple[str, str]],
+                        (e.headers.items() if e.headers else []),
+                    )
+                    resp_headers_ul = {str(k): str(v) for k, v in header_items_err}
                     if status == 429 or status >= 500:
                         retry_after = _parse_retry_after(resp_headers_ul.get("Retry-After"))
                         if attempt < attempts - 1:
@@ -338,8 +348,16 @@ def fetch_romanized_name(name: str) -> str | None:
     if data is None:
         return None
 
-    artists = data.get("artists")
-    if not isinstance(artists, list) or not artists:
+    artists_raw = data.get("artists")
+    if not isinstance(artists_raw, list) or not artists_raw:
+        return None
+
+    artists_raw_list = cast(list[object], artists_raw)
+    artists: list[dict[str, Any]] = []
+    for entry in artists_raw_list:
+        if isinstance(entry, dict):
+            artists.append(cast(dict[str, Any], entry))
+    if not artists:
         return None
 
     best = _pick_best_artist(artists)

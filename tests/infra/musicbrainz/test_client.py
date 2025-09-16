@@ -66,7 +66,7 @@ def test_fetch_romanized_name_prefers_ja_latn_primary(monkeypatch: pytest.Monkey
         ]
     }
 
-    def fake_get_json(url: str, params: dict[str, str]) -> Any:
+    def fake_get_json(_url: str, _params: dict[str, str]) -> Any:
         return _wrap_result(sample)
 
     monkeypatch.setattr(client, "_http_get_json", fake_get_json)
@@ -81,7 +81,7 @@ def test_fetch_romanized_name_uses_cache(monkeypatch: pytest.MonkeyPatch) -> Non
     cache = _DummyCache({"宇多田ヒカル": "Hikaru Utada"})
     client.configure_romanization_cache(cache)
 
-    def fake_http(url: str, params: dict[str, str]) -> Any:  # pragma: no cover - should not run
+    def fake_http(_url: str, _params: dict[str, str]) -> Any:  # pragma: no cover - should not run
         raise AssertionError("HTTP should not be called when cache hits")
 
     monkeypatch.setattr(client, "_http_get_json", fake_http)
@@ -109,7 +109,7 @@ def test_fetch_romanized_name_caches_new_values(monkeypatch: pytest.MonkeyPatch)
         ]
     }
 
-    def fake_get_json(url: str, params: dict[str, str]) -> Any:
+    def fake_get_json(_url: str, _params: dict[str, str]) -> Any:
         return _wrap_result(sample)
 
     monkeypatch.setattr(client, "_http_get_json", fake_get_json)
@@ -137,7 +137,7 @@ def test_fetch_romanized_name_falls_back_to_sort_name(monkeypatch: pytest.Monkey
         ]
     }
 
-    def fake_get_json(url: str, params: dict[str, str]) -> Any:
+    def fake_get_json(_url: str, _params: dict[str, str]) -> Any:
         return _wrap_result(sample)
 
     monkeypatch.setattr(client, "_http_get_json", fake_get_json)
@@ -151,14 +151,14 @@ def test_fetch_romanized_name_returns_none_on_empty(monkeypatch: pytest.MonkeyPa
     from omym.infra.musicbrainz import client
 
     # No data case
-    def fake_none(url: str, params: dict[str, str]) -> Any:
+    def fake_none(_url: str, _params: dict[str, str]) -> Any:
         return _wrap_result(None)
 
     monkeypatch.setattr(client, "_http_get_json", fake_none)
     assert client.fetch_romanized_name("nonexistent") is None
 
     # Empty artists case
-    def fake_empty(url: str, params: dict[str, str]) -> Any:
+    def fake_empty(_url: str, _params: dict[str, str]) -> Any:
         return _wrap_result({"artists": []})
 
     monkeypatch.setattr(client, "_http_get_json", fake_empty)
@@ -182,7 +182,7 @@ def test_fetch_romanized_name_accepts_boolean_primary(monkeypatch: pytest.Monkey
         ]
     }
 
-    def fake_get_json(url: str, params: dict[str, str]) -> Any:
+    def fake_get_json(_url: str, _params: dict[str, str]) -> Any:
         return _wrap_result(sample)
 
     monkeypatch.setattr(client, "_http_get_json", fake_get_json)
