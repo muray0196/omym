@@ -5,12 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
+import langid
+import pykakasi
+
 from omym.config.settings import USE_MB_ROMANIZATION
 from omym.infra.logger.logger import logger
 from omym.infra.musicbrainz.client import fetch_romanized_name
 from omym.domain.metadata.track_metadata import TrackMetadata
 
 ArtistFetcher = Callable[[str], str | None]
+LanguageDetector = Callable[[str], str | None]
+Transliterator = Callable[[str], str]
+
+_TARGET_LANGS = {"ja", "zh"}
+_KAKASI = pykakasi.Kakasi()
 
 
 def _default_enabled() -> bool:
@@ -21,6 +29,29 @@ def _default_enabled() -> bool:
 def _default_fetcher(name: str) -> str | None:
     """Default fetcher delegating to the MusicBrainz client helper."""
     return fetch_romanized_name(name)
+
+
+def _default_language_detector(text: str) -> str | None:
+    """Detect language code for deciding whether to romanize via MusicBrainz."""
+
+    try:
+        lang, _ = langid.classify(text)
+        return str(lang)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.debug("Language detection failed for '%s': %s", text, exc)
+        return None
+
+
+def _default_transliterator(text: str) -> str:
+    """Fallback transliteration using pykakasi."""
+
+    try:
+        converted = _KAKASI.convert(text)
+        romanized = "".join(item.get("hepburn", "") for item in converted).strip()
+        return romanized or text
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.warning("Fallback transliteration failed for '%s': %s", text, exc)
+        return text
 
 
 @dataclass(slots=True)
@@ -34,6 +65,8 @@ class ArtistRomanizer:
 
     enabled_supplier: Callable[[], bool] = field(default=_default_enabled)
     fetcher: ArtistFetcher = field(default=_default_fetcher)
+    language_detector: LanguageDetector = field(default=_default_language_detector)
+    transliterator: Transliterator = field(default=_default_transliterator)
     _cache: dict[str, str] = field(default_factory=dict, init=False)
 
     def romanize_name(self, name: str | None) -> str | None:
@@ -53,22 +86,44 @@ class ArtistRomanizer:
             return name
         if not self.enabled_supplier():
             return name
-        if trimmed.isascii():
-            return name
-        cached = self._cache.get(trimmed)
+
+        if ", " in trimmed:
+            parts = [part.strip() for part in trimmed.split(", ") if part.strip()]
+            if not parts:
+                return name
+            romanized_parts = [self._romanize_single(part) for part in parts]
+            return ", ".join(romanized_parts)
+
+        return self._romanize_single(trimmed)
+
+    def _romanize_single(self, text: str) -> str:
+        cached = self._cache.get(text)
         if cached is not None:
             return cached
+
+        detected_lang = self.language_detector(text)
+        if detected_lang not in _TARGET_LANGS:
+            self._cache[text] = text
+            return text
+
         try:
-            romanized = self.fetcher(trimmed)
+            romanized = self.fetcher(text)
         except Exception as exc:  # pragma: no cover - defensive logging only
-            logger.warning("Failed to romanize artist '%s': %s", trimmed, exc)
+            logger.warning("Failed to romanize artist '%s': %s", text, exc)
             romanized = None
+
         normalized = romanized.strip() if romanized else None
         if normalized:
-            self._cache[trimmed] = normalized
+            self._cache[text] = normalized
             return normalized
-        self._cache[trimmed] = name
-        return name
+
+        fallback = self.transliterator(text).strip()
+        if fallback:
+            self._cache[text] = fallback
+            return fallback
+
+        self._cache[text] = text
+        return text
 
     def romanize_metadata(self, metadata: TrackMetadata | None) -> TrackMetadata | None:
         """Apply romanization to artist-related fields within metadata.

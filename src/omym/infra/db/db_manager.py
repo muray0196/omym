@@ -76,6 +76,16 @@ class DatabaseManager:
             cursor = self.conn.cursor()
 
             # Check if tables exist
+            expected_tables = {
+                "processing_before",
+                "processing_after",
+                "artist_cache",
+                "albums",
+                "track_positions",
+                "filter_hierarchies",
+                "filter_values",
+            }
+
             _ = cursor.execute(
                 """
                 SELECT name FROM sqlite_master
@@ -91,8 +101,12 @@ class DatabaseManager:
                 """
             )
             existing_tables = {row[0] for row in cursor.fetchall()}
+            artist_cache_exists = "artist_cache" in existing_tables
 
-            if len(existing_tables) == 7:
+            if existing_tables.issuperset(expected_tables):
+                if artist_cache_exists:
+                    self._ensure_artist_cache_columns(cursor)
+                    self.conn.commit()
                 logger.debug("Tables already exist, skipping schema initialization")
                 return
 
@@ -203,6 +217,9 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     artist_name TEXT NOT NULL,
                     artist_id TEXT NOT NULL,
+                    romanized_name TEXT,
+                    romanization_source TEXT,
+                    romanized_at DATETIME,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE (artist_name)
@@ -217,6 +234,7 @@ class DatabaseManager:
             _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_filter_values_hierarchy ON filter_values(hierarchy_id)")
             _ = cursor.execute("CREATE INDEX IF NOT EXISTS idx_artist_cache_name ON artist_cache(artist_name)")
 
+            self._ensure_artist_cache_columns(cursor)
             self.conn.commit()
             logger.info("Successfully initialized database schema")
 
@@ -225,6 +243,19 @@ class DatabaseManager:
             if self.conn:
                 self.conn.rollback()
             raise
+
+    def _ensure_artist_cache_columns(self, cursor: sqlite3.Cursor) -> None:
+        """Ensure legacy databases include romanization columns."""
+
+        _ = cursor.execute("PRAGMA table_info(artist_cache)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        if "romanized_name" not in columns:
+            _ = cursor.execute("ALTER TABLE artist_cache ADD COLUMN romanized_name TEXT")
+        if "romanization_source" not in columns:
+            _ = cursor.execute("ALTER TABLE artist_cache ADD COLUMN romanization_source TEXT")
+        if "romanized_at" not in columns:
+            _ = cursor.execute("ALTER TABLE artist_cache ADD COLUMN romanized_at DATETIME")
 
     def close(self) -> None:
         """Close database connection."""

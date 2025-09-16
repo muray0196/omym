@@ -5,6 +5,9 @@ from typing import final
 
 from omym.infra.logger.logger import logger
 
+_DEFAULT_ARTIST_ID = "NOART"
+_DEFAULT_ROMANIZATION_SOURCE = "musicbrainz"
+
 
 @final
 class ArtistCacheDAO:
@@ -31,6 +34,9 @@ class ArtistCacheDAO:
             True if successful, False otherwise.
         """
         try:
+            normalized_name = artist_name.strip()
+            if not normalized_name:
+                return False
             cursor = self.conn.cursor()
             _ = cursor.execute(
                 """
@@ -40,7 +46,7 @@ class ArtistCacheDAO:
                     artist_id = excluded.artist_id,
                     updated_at = CURRENT_TIMESTAMP
                 """,
-                (artist_name, artist_id),
+                (normalized_name, artist_id.strip()),
             )
             self.conn.commit()
             return True
@@ -59,6 +65,9 @@ class ArtistCacheDAO:
             Artist ID if found, None otherwise.
         """
         try:
+            normalized_name = artist_name.strip()
+            if not normalized_name:
+                return None
             cursor = self.conn.cursor()
             _ = cursor.execute(
                 """
@@ -66,13 +75,96 @@ class ArtistCacheDAO:
                 FROM artist_cache 
                 WHERE LOWER(artist_name) = LOWER(?)
                 """,
-                (artist_name,),
+                (normalized_name,),
             )
             result = cursor.fetchone()
             return result[0] if result else None
         except sqlite3.Error as e:
             logger.error("Database error: %s", e)
             return None
+
+    def get_romanized_name(self, artist_name: str) -> str | None:
+        """Retrieve cached romanized artist name."""
+
+        normalized_name = artist_name.strip()
+        if not normalized_name:
+            return None
+        try:
+            cursor = self.conn.cursor()
+            _ = cursor.execute(
+                """
+                SELECT romanized_name
+                FROM artist_cache
+                WHERE LOWER(artist_name) = LOWER(?)
+                """,
+                (normalized_name,),
+            )
+            result = cursor.fetchone()
+            romanized = result[0] if result else None
+            if isinstance(romanized, str) and romanized.strip():
+                return romanized
+            return None
+        except sqlite3.Error as e:
+            logger.warning("Failed to fetch romanized name for '%s': %s", normalized_name, e)
+            return None
+
+    def upsert_romanized_name(
+        self,
+        artist_name: str,
+        romanized_name: str,
+        source: str | None = None,
+    ) -> bool:
+        """Insert or update romanized artist name information."""
+
+        normalized_name = artist_name.strip()
+        normalized_romanized = romanized_name.strip()
+        if not normalized_name or not normalized_romanized:
+            return False
+
+        effective_source = (source or _DEFAULT_ROMANIZATION_SOURCE).strip() or _DEFAULT_ROMANIZATION_SOURCE
+
+        try:
+            cursor = self.conn.cursor()
+            _ = cursor.execute(
+                """
+                UPDATE artist_cache
+                SET romanized_name = ?,
+                    romanization_source = ?,
+                    romanized_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE LOWER(artist_name) = LOWER(?)
+                """,
+                (normalized_romanized, effective_source, normalized_name),
+            )
+            if cursor.rowcount == 0:
+                _ = cursor.execute(
+                    """
+                    INSERT INTO artist_cache (
+                        artist_name,
+                        artist_id,
+                        romanized_name,
+                        romanization_source,
+                        romanized_at
+                    )
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (
+                        normalized_name,
+                        _DEFAULT_ARTIST_ID,
+                        normalized_romanized,
+                        effective_source,
+                    ),
+                )
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            logger.warning(
+                "Failed to upsert romanized name for '%s': %s",
+                normalized_name,
+                e,
+            )
+            self.conn.rollback()
+            return False
 
     def clear_cache(self) -> bool:
         """Clear the artist cache.

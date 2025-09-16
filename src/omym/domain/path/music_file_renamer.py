@@ -109,6 +109,12 @@ class ArtistIdGenerator:
             if not artist_name or not artist_name.strip():
                 return cls.DEFAULT_ID
 
+            # Split multi-artist strings separated by comma-space and combine
+            if ", " in artist_name:
+                parts = [part.strip() for part in artist_name.split(", ") if part.strip()]
+                if parts:
+                    artist_name = "".join(parts)
+
             # First, try to detect language and transliterate if needed
             name = artist_name
             try:

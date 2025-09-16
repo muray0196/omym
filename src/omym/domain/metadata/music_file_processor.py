@@ -19,6 +19,7 @@ from omym.infra.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.infra.db.daos.processing_before_dao import ProcessingBeforeDAO
 from omym.infra.db.db_manager import DatabaseManager
 from omym.infra.logger.logger import logger
+from omym.infra.musicbrainz.client import configure_romanization_cache
 
 
 @dataclass
@@ -72,6 +73,7 @@ class MusicProcessor:
         self.before_dao = ProcessingBeforeDAO(self.db_manager.conn)
         self.after_dao = ProcessingAfterDAO(self.db_manager.conn)
         self.artist_dao = ArtistCacheDAO(self.db_manager.conn)
+        configure_romanization_cache(self.artist_dao)
 
         # Initialize generators.
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)

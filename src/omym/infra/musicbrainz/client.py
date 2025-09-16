@@ -27,7 +27,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, Final
+from typing import Any, Final, Protocol
 
 from omym.infra.logger.logger import logger
 from omym.config.settings import MB_APP_NAME, MB_APP_VERSION, MB_CONTACT
@@ -93,7 +93,21 @@ def _parse_retry_after(value: str | None) -> float | None:
 MB_BASE_URL: Final[str] = "https://musicbrainz.org/ws/2/artist/"
 
 
+class _RomanizationCache(Protocol):
+    def get_romanized_name(self, artist_name: str) -> str | None:
+        ...
+
+    def upsert_romanized_name(
+        self,
+        artist_name: str,
+        romanized_name: str,
+        source: str | None = None,
+    ) -> bool:
+        ...
+
+
 _client_ua: str | None = None
+_romanization_cache: _RomanizationCache | None = None
 
 
 def _user_agent() -> str:
@@ -230,6 +244,28 @@ def _http_get_json(url: str, params: dict[str, str]) -> _HTTPResult:
 
 # --- Domain helpers --------------------------------------------------------
 
+
+def configure_romanization_cache(cache: _RomanizationCache | None) -> None:
+    """Configure the cache used to persist romanized artist names."""
+
+    global _romanization_cache
+    _romanization_cache = cache
+
+
+def _cache_romanized_name(original: str, romanized: str, *, source: str | None = None) -> None:
+    if _romanization_cache is None:
+        return
+    try:
+        if not romanized.strip():
+            return
+        _ = _romanization_cache.upsert_romanized_name(
+            original,
+            romanized.strip(),
+            source=source,
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.warning("Failed to cache romanized name for '%s': %s", original, exc)
+
 def _truthy(value: Any) -> bool:
     """Return True if the value is a truthy indicator (for 'primary')."""
     if isinstance(value, bool):
@@ -282,9 +318,20 @@ def fetch_romanized_name(name: str) -> str | None:
         The romanized artist name, or ``None`` if not determinable or upon
         HTTP/JSON errors.
     """
-    q = f"artist:{name.strip()}"
-    if not name.strip():
+    trimmed = name.strip()
+    if not trimmed:
         return None
+
+    cached_value: str | None = None
+    if _romanization_cache is not None:
+        try:
+            cached_value = _romanization_cache.get_romanized_name(trimmed)
+        except Exception as exc:  # pragma: no cover - cache read failures logged only
+            logger.warning("Failed to read romanization cache for '%s': %s", trimmed, exc)
+    if cached_value:
+        return cached_value
+
+    q = f"artist:{trimmed}"
 
     result = _http_get_json(MB_BASE_URL, {"query": q, "fmt": "json"})
     data = result.data
@@ -301,12 +348,15 @@ def fetch_romanized_name(name: str) -> str | None:
 
     romanized = _choose_romanized_from_aliases(best.get("aliases"))
     if romanized:
+        _cache_romanized_name(trimmed, romanized, source="musicbrainz")
         return romanized
 
     # Fallback to sort-name
     sort_name = best.get("sort-name")
     if isinstance(sort_name, str) and sort_name.strip():
-        return sort_name
+        sanitized = sort_name.strip()
+        _cache_romanized_name(trimmed, sanitized, source="musicbrainz")
+        return sanitized
 
     return None
 
@@ -350,6 +400,7 @@ _client_ua = _DEFAULT_CLIENT.user_agent
 
 
 __all__ = [
+    "configure_romanization_cache",
     "fetch_romanized_name",
     "MusicBrainzClient",
     "format_user_agent",

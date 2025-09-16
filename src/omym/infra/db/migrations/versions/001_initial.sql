@@ -93,6 +93,9 @@ CREATE TABLE artist_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     artist_name TEXT NOT NULL,
     artist_id TEXT NOT NULL,
+    romanized_name TEXT,
+    romanization_source TEXT,
+    romanized_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (artist_name)

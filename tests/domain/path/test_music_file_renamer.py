@@ -40,6 +40,11 @@ class TestArtistIdGenerator:
         # Test Vowel removal
         assert ArtistIdGenerator.generate("On the Ant") == "ONTHA"
 
+    def test_generate_multi_artist(self) -> None:
+        """Multiple artists separated by comma use combined string for ID."""
+
+        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHNSM"
+
     def test_generate_japanese(self) -> None:
         """Test ID generation with Japanese text."""
         assert ArtistIdGenerator.generate("やまだたろう") == "YMDTR"
