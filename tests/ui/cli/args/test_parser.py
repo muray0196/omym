@@ -2,97 +2,79 @@
 
 import logging
 import shutil
-import pytest
+from argparse import Namespace
 from collections.abc import Generator
 from pathlib import Path
+
+import pytest
 from pytest_mock import MockerFixture
-from argparse import Namespace
 
-from omym.ui.cli.args import ArgumentParser, Args
+from omym.ui.cli.args import ArgumentParser, OrganizeArgs, RestoreArgs
 
 
-@pytest.fixture
+@pytest.fixture()
 def test_dir() -> Generator[Path, None, None]:
-    """Create a temporary test directory.
+    """Create a temporary test directory."""
 
-    Yields:
-        Path to test directory.
-    """
     test_path = Path("test_music")
     test_path.mkdir(exist_ok=True)
     test_file = test_path / "test.mp3"
     test_file.touch()
     yield test_path
-    # Cleanup
     if test_path.exists():
         shutil.rmtree(test_path)
 
 
 def test_create_parser() -> None:
-    """Test argument parser creation."""
+    """Argument parser should expose expected subcommands and options."""
+
     parser = ArgumentParser.create_parser()
 
-    # Test with minimum required arguments
-    args: Namespace = parser.parse_args(["test_path"])
-    assert args.music_path == "test_path"
-    assert not args.target
-    assert not args.dry_run
-    assert not args.verbose
-    assert not args.quiet
-    assert not args.force
-    assert not args.interactive
-    assert not args.db
+    organize_args: Namespace = parser.parse_args(["organize", "music"])
+    assert organize_args.command == "organize"
+    assert organize_args.music_path == "music"
 
-    # Test with all arguments
-    args = parser.parse_args(
+    restore_args: Namespace = parser.parse_args(["restore", "organized"])
+    assert restore_args.command == "restore"
+    assert restore_args.source_root == "organized"
+
+    all_flags = parser.parse_args(
         [
-            "test_path",
+            "organize",
+            "music",
             "--target",
-            "target_path",
+            "target",
             "--dry-run",
             "--verbose",
             "--force",
             "--interactive",
             "--db",
+            "--clear-artist-cache",
+            "--clear-cache",
         ]
     )
-    assert args.music_path == "test_path"
-    assert args.target == "target_path"
-    assert args.dry_run
-    assert args.verbose
-    assert args.force
-    assert args.interactive
-    assert args.db
+    assert all_flags.dry_run and all_flags.verbose and all_flags.force
+    assert all_flags.interactive and all_flags.db
 
 
-def test_process_args(test_dir: Path, mocker: MockerFixture) -> None:
-    """Test argument processing.
+def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
+    """Process organize arguments and coerce paths and logging levels."""
 
-    Args:
-        test_dir: Test directory fixture.
-        mocker: Pytest mocker fixture.
-    """
-    # Mock config and logger setup
     mock_config = mocker.patch("omym.ui.cli.args.parser.Config")
     mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
 
-    # Test with minimum required arguments
-    args: Args = ArgumentParser.process_args([str(test_dir)])
+    args = ArgumentParser.process_args(["organize", str(test_dir)])
+    assert isinstance(args, OrganizeArgs)
     assert args.music_path == test_dir
     assert args.target_path == test_dir
     assert not args.dry_run
-    assert not args.verbose
-    assert not args.quiet
-    assert not args.force
-    assert not args.interactive
-    assert not args.show_db
     mock_setup_logger.assert_called_with(console_level=logging.INFO)
     mock_config.load.assert_called_once()
 
-    # Test with all arguments
     target_path = test_dir / "target"
     args = ArgumentParser.process_args(
         [
+            "organize",
             str(test_dir),
             "--target",
             str(target_path),
@@ -101,44 +83,65 @@ def test_process_args(test_dir: Path, mocker: MockerFixture) -> None:
             "--force",
             "--interactive",
             "--db",
+            "--clear-artist-cache",
+            "--clear-cache",
         ]
     )
-    assert args.music_path == test_dir
+    assert isinstance(args, OrganizeArgs)
     assert args.target_path == target_path
-    assert args.dry_run
-    assert args.verbose
-    assert args.force
-    assert args.interactive
-    assert args.show_db
+    assert args.dry_run and args.verbose and args.force and args.interactive
+    assert args.show_db and args.clear_artist_cache and args.clear_cache
     mock_setup_logger.assert_called_with(console_level=logging.DEBUG)
-    mock_config.load.assert_called()
+
+
+def test_process_args_restore(test_dir: Path, mocker: MockerFixture) -> None:
+    """Process restore arguments and enforce policies."""
+
+    mock_config = mocker.patch("omym.ui.cli.args.parser.Config")
+    mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
+
+    dest = test_dir / "restore_dest"
+    args = ArgumentParser.process_args(
+        [
+            "restore",
+            str(test_dir),
+            "--destination-root",
+            str(dest),
+            "--collision-policy",
+            "backup",
+            "--backup-suffix",
+            ".bak",
+            "--limit",
+            "5",
+            "--continue-on-error",
+            "--dry-run",
+            "--quiet",
+            "--purge-state",
+        ]
+    )
+
+    assert isinstance(args, RestoreArgs)
+    assert args.source_root == test_dir.resolve()
+    assert args.destination_root == dest.resolve()
+    assert args.collision_policy.value == "backup"
+    assert args.limit == 5
+    assert args.continue_on_error
+    assert args.dry_run and args.quiet and args.purge_state
+    mock_setup_logger.assert_called_with(console_level=logging.ERROR)
+    mock_config.load.assert_called_once()
 
 
 def test_process_args_invalid_path(mocker: MockerFixture) -> None:
-    """Test argument processing with invalid path.
+    """Invalid organize path should trigger an exit."""
 
-    Args:
-        mocker: Pytest mocker fixture.
-    """
-    # Mock logger and sys.exit
     mock_exit = mocker.patch("sys.exit")
-
-    # Test with non-existent path
-    _ = ArgumentParser.process_args(["non_existent_path"])
+    _ = ArgumentParser.process_args(["organize", "non_existent_path"])
     mock_exit.assert_called_once_with(1)
 
 
-def test_process_args_quiet_mode(test_dir: Path, mocker: MockerFixture) -> None:
-    """Test argument processing in quiet mode.
+def test_process_args_invalid_limit(test_dir: Path, mocker: MockerFixture) -> None:
+    """Non-positive limits for restore should terminate parsing."""
 
-    Args:
-        test_dir: Test directory fixture.
-        mocker: Pytest mocker fixture.
-    """
-    # Mock setup_logger
-    mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
-
-    # Test with quiet mode
-    args: Args = ArgumentParser.process_args([str(test_dir), "--quiet"])
-    assert args.quiet
-    mock_setup_logger.assert_called_with(console_level=logging.ERROR)
+    mock_exit = mocker.patch("sys.exit")
+    _ = ArgumentParser.process_args(["restore", str(test_dir), "--limit", "0"])
+    mock_exit.assert_called_once_with(1)

@@ -1,15 +1,18 @@
 """Tests for CLI functionality."""
 
-import pytest
-from pathlib import Path
-from collections.abc import Generator
 import shutil
-from pytest_mock import MockerFixture
+from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import MagicMock
 
-from omym.domain.metadata.track_metadata import TrackMetadata
+import pytest
+from pytest_mock import MockerFixture
+
 from omym.domain.metadata.music_file_processor import ProcessResult
+from omym.domain.metadata.track_metadata import TrackMetadata
+from omym.domain.restoration import CollisionPolicy, RestorePlanItem, RestoreResult
 from omym.ui.cli import CommandProcessor
+from omym.ui.cli.args.options import RestoreArgs
 
 
 @pytest.fixture
@@ -95,7 +98,7 @@ def test_process_single_file(test_dir: Path, mock_processor: MagicMock, mocker: 
 
     # Process single file
     test_file = test_dir / "test.mp3"
-    CommandProcessor.process_command([str(test_file)])
+    CommandProcessor.process_command(['organize', str(test_file)])
 
     # Verify
     mock_processor.process_file.assert_called_once_with(test_file)
@@ -121,7 +124,7 @@ def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: Mo
     mock_progress_instance.run_with_service.return_value = [mock_processor.process_file.return_value]
 
     # Process directory
-    CommandProcessor.process_command([str(test_dir)])
+    CommandProcessor.process_command(['organize', str(test_dir)])
 
     # Verify
     assert mock_progress_instance.run_with_service.call_count == 1
@@ -146,7 +149,7 @@ def test_dry_run_mode(test_dir: Path, mocker: MockerFixture) -> None:
     mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
 
     # Process in dry-run mode
-    CommandProcessor.process_command([str(test_dir), "--dry-run"])
+    CommandProcessor.process_command(['organize', str(test_dir), '--dry-run'])
 
     # Verify
     mock_preview.return_value.show_preview.assert_called_once()
@@ -172,7 +175,7 @@ def test_error_handling(
 
     # Process file (should catch exception)
     test_file = test_dir / "test.mp3"
-    CommandProcessor.process_command([str(test_file)])
+    CommandProcessor.process_command(['organize', str(test_file)])
 
     # Verify
     mock_logger.error.assert_called_once_with("An unexpected error occurred: %s", "Test error")
@@ -198,8 +201,74 @@ def test_keyboard_interrupt(
 
     # Process file (should catch KeyboardInterrupt)
     test_file = test_dir / "test.mp3"
-    CommandProcessor.process_command([str(test_file)])
+    CommandProcessor.process_command(['organize', str(test_file)])
 
     # Verify
     mock_logger.info.assert_called_once_with("\nOperation cancelled by user")
     mock_exit.assert_called_once_with(130)
+
+
+def test_restore_command_invocation(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Restore command should delegate to the restore command executor."""
+
+    restore_args = RestoreArgs(
+        command="restore",
+        source_root=tmp_path,
+        destination_root=None,
+        dry_run=False,
+        verbose=False,
+        quiet=False,
+        collision_policy=CollisionPolicy.ABORT,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+        purge_state=False,
+    )
+
+    plan_item = RestorePlanItem(
+        file_hash="abc",
+        source_path=tmp_path / "a",
+        destination_path=tmp_path / "b",
+    )
+    restore_result = RestoreResult(plan=plan_item, moved=True)
+
+    _ = mocker.patch("omym.ui.cli.cli.ArgumentParser.process_args", return_value=restore_args)
+    restore_command = mocker.patch("omym.ui.cli.cli.RestoreCommand")
+    restore_command.return_value.execute.return_value = [restore_result]
+
+    CommandProcessor.process_command()
+
+    restore_command.return_value.execute.assert_called_once()
+
+
+def test_restore_command_failure_exit(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Restore failures should trigger a non-zero exit code."""
+
+    restore_args = RestoreArgs(
+        command="restore",
+        source_root=tmp_path,
+        destination_root=None,
+        dry_run=False,
+        verbose=False,
+        quiet=False,
+        collision_policy=CollisionPolicy.ABORT,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+        purge_state=False,
+    )
+    plan_item = RestorePlanItem(
+        file_hash="abc",
+        source_path=tmp_path / "a",
+        destination_path=tmp_path / "b",
+    )
+    restore_result = RestoreResult(plan=plan_item, moved=False, message="failure")
+
+    _ = mocker.patch("omym.ui.cli.cli.ArgumentParser.process_args", return_value=restore_args)
+    restore_command = mocker.patch("omym.ui.cli.cli.RestoreCommand")
+    restore_command.return_value.execute.return_value = [restore_result]
+    mock_exit = mocker.patch("sys.exit")
+
+    CommandProcessor.process_command()
+
+    mock_exit.assert_called_once_with(1)

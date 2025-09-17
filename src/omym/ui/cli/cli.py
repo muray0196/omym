@@ -3,8 +3,10 @@
 import sys
 from typing import final
 
+from omym.domain.restoration import RestoreResult
 from omym.ui.cli.args import ArgumentParser
-from omym.ui.cli.commands import FileCommand, DirectoryCommand
+from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, RestoreArgs
+from omym.ui.cli.commands import DirectoryCommand, FileCommand, RestoreCommand
 from omym.infra.logger.logger import logger
 
 
@@ -20,20 +22,24 @@ class CommandProcessor:
             args_list: List of command line arguments (for testing).
         """
         try:
-            # Process arguments
-            args = ArgumentParser.process_args(args_list)
+            args: CLIArgs = ArgumentParser.process_args(args_list)
 
-            if args.target_path is None:
-                logger.error("Target path is required")
+            if isinstance(args, OrganizeArgs):
+                command = (
+                    FileCommand(args)
+                    if args.music_path.is_file()
+                    else DirectoryCommand(args)
+                )
+                results = command.execute()
+                if any(not r.success for r in results):
+                    sys.exit(1)
+                return
+
+            assert isinstance(args, RestoreArgs)
+            results = RestoreCommand(args).execute()
+            if CommandProcessor._has_restore_failures(results):
                 sys.exit(1)
-
-            # Create and execute appropriate command
-            command = FileCommand(args) if args.music_path.is_file() else DirectoryCommand(args)
-
-            # Execute command and check for failures
-            results = command.execute()
-            if any(not r.success for r in results):
-                sys.exit(1)
+            return
 
         except KeyboardInterrupt:
             logger.info("\nOperation cancelled by user")
@@ -41,6 +47,20 @@ class CommandProcessor:
         except Exception as e:
             logger.error("An unexpected error occurred: %s", str(e))
             sys.exit(1)
+
+    @staticmethod
+    def _has_restore_failures(results: list[RestoreResult]) -> bool:
+        """Determine whether a restore run encountered irrecoverable failures."""
+
+        for result in results:
+            if result.moved:
+                continue
+            if result.message in {"dry_run", "destination_exists"}:
+                continue
+            if result.message is None:
+                continue
+            return True
+        return False
 
 
 def main() -> int:
@@ -53,4 +73,3 @@ def main() -> int:
     """
     CommandProcessor.process_command()
     return 0
-

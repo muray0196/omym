@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import shutil
 import time
 import uuid
@@ -14,6 +13,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, ClassVar, final
 
+from omym.domain.common import remove_empty_directories
 from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.domain.metadata.track_metadata_extractor import MetadataExtractor
@@ -391,7 +391,7 @@ class MusicProcessor:
                     progress_callback(processed_count, total_files, current_file)
 
             if not self.dry_run:
-                self._cleanup_empty_directories(directory)
+                remove_empty_directories(directory)
 
             conn = self.db_manager.conn
             if conn is None:
@@ -876,20 +876,6 @@ class MusicProcessor:
             target_base_path=target_root or dest_path.parent,
         )
         _ = shutil.move(str(src_path), str(dest_path))
-
-    def _cleanup_empty_directories(self, directory: Path) -> None:
-        """Clean up empty directories.
-
-        Args:
-            directory: Directory to clean up.
-        """
-        for root, _, _ in os.walk(str(directory), topdown=False):
-            try:
-                root_path = Path(root)
-                if root_path.exists() and not any(root_path.iterdir()):
-                    root_path.rmdir()
-            except OSError:
-                continue
 
     def _generate_target_path(self, metadata: TrackMetadata) -> Path | None:
         """Generate target path for a file based on its metadata.

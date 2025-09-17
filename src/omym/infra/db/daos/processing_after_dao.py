@@ -1,8 +1,9 @@
 """Data access object for processing_after table."""
 
+import os
 import sqlite3
 from pathlib import Path
-from typing import final
+from typing import Any, final
 
 from omym.infra.logger.logger import logger
 
@@ -73,3 +74,59 @@ class ProcessingAfterDAO:
         except sqlite3.Error as e:
             logger.error("Database error: %s", e)
             return None
+
+    def fetch_restore_candidates(
+        self,
+        base_path: Path | None = None,
+        *,
+        limit: int | None = None,
+    ) -> list[tuple[str, Path, Path]]:
+        """Return tuples of ``(file_hash, target_path, original_path)`` for restore runs.
+
+        Args:
+            base_path: Optional path prefix to filter targets below a specific directory.
+            limit: Optional maximum number of records to stream.
+
+        Returns:
+            List of tuples containing the file hash, current target path, and original source path.
+        """
+
+        try:
+            cursor = self.conn.cursor()
+            query = (
+                """
+                SELECT pa.file_hash, pa.target_path, pb.file_path
+                FROM processing_after pa
+                INNER JOIN processing_before pb ON pb.file_hash = pa.file_hash
+                {where_clause}
+                ORDER BY pa.updated_at ASC
+                {limit_clause}
+                """
+            )
+
+            where_clause = ""
+            limit_clause = ""
+            params: list[Any] = []
+
+            if base_path is not None:
+                target_prefix = str(base_path.resolve())
+                separator = os.sep
+                if not target_prefix.endswith(separator):
+                    target_prefix = f"{target_prefix}{separator}"
+                where_clause = "WHERE pa.target_path LIKE ?"
+                params.append(f"{target_prefix}%")
+
+            if limit is not None:
+                limit_clause = "LIMIT ?"
+                params.append(limit)
+
+            formatted_query = query.format(where_clause=where_clause, limit_clause=limit_clause)
+            _ = cursor.execute(formatted_query, params)
+            rows = cursor.fetchall()
+            return [
+                (str(file_hash), Path(target_path), Path(original_path))
+                for file_hash, target_path, original_path in rows
+            ]
+        except sqlite3.Error as e:
+            logger.error("Database error while iterating restore candidates: %s", e)
+            return []

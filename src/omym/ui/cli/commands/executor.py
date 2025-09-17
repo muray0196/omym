@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
 from omym.application.services.organize_service import OrganizeMusicService, OrganizeRequest
-from omym.ui.cli.args.options import Args
+from omym.ui.cli.args.options import OrganizeArgs
 from omym.ui.cli.display.preview import PreviewDisplay
 from omym.ui.cli.display.progress import ProgressDisplay
 from omym.ui.cli.display.result import ResultDisplay
@@ -13,7 +13,7 @@ from omym.ui.cli.display.result import ResultDisplay
 class CommandExecutor(ABC):
     """Base class for command execution."""
 
-    args: Args
+    args: OrganizeArgs
     processor: MusicProcessor
     app: OrganizeMusicService
     request: OrganizeRequest
@@ -21,15 +21,13 @@ class CommandExecutor(ABC):
     progress_display: ProgressDisplay
     result_display: ResultDisplay
 
-    def __init__(self, args: Args) -> None:
+    def __init__(self, args: OrganizeArgs) -> None:
         """Initialize command executor.
 
         Args:
             args: Command line arguments.
         """
         self.args = args
-        if args.target_path is None:
-            raise ValueError("Target path is required")
         # Build processor through application layer to centralize orchestration
         self.app = OrganizeMusicService()
         self.request = OrganizeRequest(

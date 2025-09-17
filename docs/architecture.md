@@ -5,7 +5,7 @@ review_cadence: quarterly
 
 ## System and Module Boundaries
 - Entry point `omym.main:main` provides a CLI interface.
-- `core` handles metadata extraction, path generation, and file organization.
+- `core` handles metadata extraction, path generation, and file organization, and now includes restoration orchestration built atop the same data layer.
 - `db` contains SQLite access layers and migrations.
 - `ui` renders console output using Rich.
 - `utils` supplies helpers such as filename sanitization.
@@ -31,4 +31,3 @@ review_cadence: quarterly
 
 ## Compatibility / Support Policy
 - Intended for local execution on Linux, macOS, and Windows file systems.
-

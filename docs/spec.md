@@ -17,6 +17,7 @@ review_cadence: quarterly
 
 ## Flows
 - Primary: CLI invocation → configuration loading → metadata extraction → path generation → file operations → database update.
+- Restore: CLI invocation → configuration loading → restoration plan build from SQLite → collision handling → file moves → optional database purge.
 - Error paths: missing tags or DB errors are logged and the affected files are skipped.
 - The tool runs synchronously with no built-in retry logic beyond the current process.
 
@@ -33,4 +34,3 @@ review_cadence: quarterly
 ## Test Ideas / Examples
 - Run `uv run pytest` to validate metadata parsing, path generation, and database operations.
 - Simulate unsupported formats or missing tags to verify error handling.
-

@@ -10,6 +10,22 @@ A Python tool to organize your music library by automatically processing metadat
 - Creates organized folder structure
 - Handles multi-disc albums and compilations
 - Sanitizes filenames for cross-platform compatibility
+- Restores previously organized files to their original locations or a new target
+
+## Usage
+
+```bash
+# Organize files or directories
+uv run python -m omym organize /path/to/music --target /dest/library
+
+# Preview the restore plan without moving files
+uv run python -m omym restore /dest/library --dry-run
+
+# Restore files back to their original paths recorded in the database
+uv run python -m omym restore /dest/library --purge-state
+```
+
+Use `--collision-policy` (`abort`, `skip`, or `backup`) to control how existing files at the destination are handled during restore. The default behaviour is `abort`.
 
 ## Continuous Integration
 

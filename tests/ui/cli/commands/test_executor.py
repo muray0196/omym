@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.domain.metadata.music_file_processor import ProcessResult
-from omym.ui.cli.args.options import Args
+from omym.ui.cli.args.options import OrganizeArgs
 from omym.ui.cli.commands import FileCommand, DirectoryCommand
 
 
@@ -31,16 +31,17 @@ def test_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def test_args(test_dir: Path) -> Args:
+def test_args(test_dir: Path) -> OrganizeArgs:
     """Create test arguments.
 
     Args:
         test_dir: Test directory fixture.
 
     Returns:
-        Args: Test arguments.
+        OrganizeArgs: Test arguments.
     """
-    return Args(
+    return OrganizeArgs(
+        command='organize',
         music_path=test_dir,
         target_path=test_dir,
         dry_run=False,
@@ -49,6 +50,8 @@ def test_args(test_dir: Path) -> Args:
         force=False,
         interactive=False,
         show_db=False,
+        clear_artist_cache=False,
+        clear_cache=False,
     )
 
 
@@ -90,7 +93,7 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
     return mock_instance
 
 
-def test_file_command(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
+def test_file_command(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test file command execution.
 
     Args:
@@ -114,7 +117,7 @@ def test_file_command(test_args: Args, mock_processor: MagicMock, mocker: Mocker
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_directory_command(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
+def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test directory command execution.
 
     Args:
@@ -147,7 +150,7 @@ def test_directory_command(test_args: Args, mock_processor: MagicMock, mocker: M
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_dry_run_mode(test_args: Args, mocker: MockerFixture) -> None:
+def test_dry_run_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
     """Test command execution in dry-run mode.
 
     Args:
@@ -172,7 +175,7 @@ def test_dry_run_mode(test_args: Args, mocker: MockerFixture) -> None:
     mock_result.return_value.show_results.assert_not_called()
 
 
-def test_file_command_error(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
+def test_file_command_error(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test file command error handling.
 
     Args:
@@ -201,7 +204,7 @@ def test_file_command_error(test_args: Args, mock_processor: MagicMock, mocker: 
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_directory_command_interactive(test_args: Args, mock_processor: MagicMock, mocker: MockerFixture) -> None:
+def test_directory_command_interactive(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
     """Test directory command in interactive mode.
 
     Args:
@@ -235,7 +238,7 @@ def test_directory_command_interactive(test_args: Args, mock_processor: MagicMoc
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_quiet_mode(test_args: Args, mocker: MockerFixture) -> None:
+def test_quiet_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
     """Test command execution in quiet mode.
 
     Args:
