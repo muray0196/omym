@@ -144,6 +144,7 @@ class TestMusicProcessor:
         result = processor.process_file(source_file)
 
         assert result.success is True
+        assert result.target_path is not None
         assert len(result.artwork_results) == 1
 
         artwork_result = result.artwork_results[0]

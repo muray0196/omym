@@ -326,7 +326,6 @@ class RestorationService:
     def _restore_directory_artwork(self, ctx: _RestoreContext) -> list[str]:
         """Restore artwork files that accompanied the organized track."""
 
-        request = ctx.request
         source_audio = ctx.plan.source_path
         destination_audio = ctx.plan.destination_path
         parent = source_audio.parent

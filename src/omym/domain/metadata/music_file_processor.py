@@ -11,7 +11,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Iterable, final
+from collections.abc import Iterable
+from typing import Any, Callable, ClassVar, final
 
 from omym.domain.common import remove_empty_directories
 from omym.domain.metadata.artist_romanizer import ArtistRomanizer
