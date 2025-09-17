@@ -122,6 +122,33 @@ class TestMusicProcessor:
         assert result.artwork_results == []
         assert result.warnings == []  # Original file should be moved
 
+    def test_process_file_preserves_existing_name(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+    ) -> None:
+        """Reprocessing a file already in place must not add a numeric suffix."""
+
+        destination_dir = processor.base_path / processor.directory_generator.generate(metadata)
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        file_name = processor.file_name_generator.generate(metadata)
+        source_file = destination_dir / file_name
+        _ = source_file.write_bytes(b"audio")
+
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        assert result.target_path == source_file
+        assert source_file.exists()
+        assert "(1)" not in source_file.name
+        assert all("(1)" not in candidate.name for candidate in destination_dir.iterdir())
+
     def test_process_file_moves_artwork(
         self,
         mocker: MockerFixture,
@@ -173,7 +200,10 @@ class TestMusicProcessor:
             return_value=metadata,
         )
 
-        target_path = processor._generate_target_path(metadata)  # pyright: ignore[reportPrivateUsage] - tests compute the destination for collision priming
+        target_path = processor._generate_target_path(  # pyright: ignore[reportPrivateUsage] - tests compute the destination for collision priming
+            metadata,
+            existing_path=source_file,
+        )
         assert target_path is not None
         conflict_target = target_path.parent / artwork_file.name
         conflict_target.parent.mkdir(parents=True, exist_ok=True)
@@ -242,7 +272,10 @@ class TestMusicProcessor:
             return_value=metadata,
         )
 
-        target_path = processor._generate_target_path(metadata)  # pyright: ignore[reportPrivateUsage] - tests may consult the helper to stage collision scenarios
+        target_path = processor._generate_target_path(  # pyright: ignore[reportPrivateUsage] - tests may consult the helper to stage collision scenarios
+            metadata,
+            existing_path=source_file,
+        )
         assert target_path is not None
         lyrics_target = target_path.with_suffix(".lrc")
         lyrics_target.parent.mkdir(parents=True, exist_ok=True)

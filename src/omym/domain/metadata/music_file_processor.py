@@ -558,7 +558,7 @@ class MusicProcessor:
                 metadata.album_artist = self._await_romanization(metadata.album_artist)
 
             # Generate target path.
-            target_path = self._generate_target_path(metadata)
+            target_path = self._generate_target_path(metadata, existing_path=file_path)
             if not target_path:
                 raise ValueError("Failed to generate target path")
 
@@ -1209,11 +1209,18 @@ class MusicProcessor:
         )
         _ = shutil.move(str(src_path), str(dest_path))
 
-    def _generate_target_path(self, metadata: TrackMetadata) -> Path | None:
+    def _generate_target_path(
+        self,
+        metadata: TrackMetadata,
+        *,
+        existing_path: Path | None = None,
+    ) -> Path | None:
         """Generate target path for a file based on its metadata.
 
         Args:
             metadata: Track metadata.
+            existing_path: Optional source path used to detect when the file already
+                resides at the desired destination so spurious suffixes are avoided.
 
         Returns:
             Target path if successful, None otherwise.
@@ -1225,8 +1232,8 @@ class MusicProcessor:
             if not dir_path or not file_name:
                 return None
 
-            target_path = self._find_available_path(self.base_path / dir_path / file_name)
-            return target_path
+            target_path = self.base_path / dir_path / file_name
+            return self._find_available_path(target_path, existing_path=existing_path)
 
         except Exception as e:
             logger.error("Error generating target path: %s", e)
@@ -1293,24 +1300,41 @@ class MusicProcessor:
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
 
-    def _find_available_path(self, target_path: Path) -> Path:
+    def _find_available_path(
+        self,
+        target_path: Path,
+        *,
+        existing_path: Path | None = None,
+    ) -> Path:
         """Find an available file path by appending a number if needed.
 
         Args:
-            target_path: Initial target path.
+            target_path: Proposed destination path.
+            existing_path: Optional source path that should be considered equivalent to the
+                target when the file already resides at the desired location.
 
         Returns:
-            Available file path.
+            An available file path.
         """
         if not target_path.exists():
             return target_path
 
-        base = target_path.parent / target_path.stem
+        if existing_path is not None:
+            try:
+                if target_path.samefile(existing_path):
+                    return target_path
+            except FileNotFoundError:
+                # Either the source or the destination disappeared between checks.
+                # Fall back to collision handling in that case.
+                pass
+
+        parent = target_path.parent
+        stem = target_path.stem
         extension = target_path.suffix
         counter = 1
 
         while True:
-            new_path = Path(f"{base} ({counter}){extension}")
-            if not new_path.exists():
-                return new_path
+            candidate = parent / f"{stem} ({counter}){extension}"
+            if not candidate.exists():
+                return candidate
             counter += 1
