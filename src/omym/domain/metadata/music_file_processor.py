@@ -1,12 +1,16 @@
 """Process music files for organization."""
 
 import hashlib
+import logging
 import os
 import shutil
+import time
+import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
-from typing import Callable, ClassVar, final
+from typing import Any, Callable, ClassVar, final
 
 from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
@@ -26,6 +30,69 @@ from omym.infra.musicbrainz.client import (
     fetch_romanized_name,
 )
 
+
+
+
+class ProcessingEvent(StrEnum):
+    """Structured event identifiers for music file processing logs."""
+
+    DIRECTORY_START = "processing.directory.start"
+    DIRECTORY_COMPLETE = "processing.directory.complete"
+    DIRECTORY_ERROR = "processing.directory.error"
+    DIRECTORY_NO_FILES = "processing.directory.no_files"
+    FILE_START = "processing.file.start"
+    FILE_SKIP_DUPLICATE = "processing.file.skip.duplicate"
+    FILE_SUCCESS = "processing.file.success"
+    FILE_ERROR = "processing.file.error"
+    FILE_MOVE = "processing.file.move"
+
+
+@dataclass(slots=True)
+class ProcessingLogContext:
+    """Mutable bookkeeping for a directory processing run."""
+
+    process_id: str
+    directory: Path
+    total_files: int
+    dry_run: bool
+    start_time: float = field(default_factory=time.perf_counter)
+    processed: int = 0
+    skipped: int = 0
+    failed: int = 0
+
+    def record_success(self) -> None:
+        """Increment the counter of successfully processed files."""
+
+        self.processed += 1
+
+    def record_skip(self) -> None:
+        """Increment the counter of skipped files."""
+
+        self.skipped += 1
+
+    def record_failure(self) -> None:
+        """Increment the counter of failed files."""
+
+        self.failed += 1
+
+    def duration_seconds(self) -> float:
+        """Return the elapsed processing time in seconds."""
+
+        return time.perf_counter() - self.start_time
+
+    def summary_extra(self) -> dict[str, Any]:
+        """Return a dictionary suitable for structured logging extras."""
+
+        return {
+            "process_id": self.process_id,
+            "directory": str(self.directory),
+            "total_files": self.total_files,
+            "processed": self.processed,
+            "skipped": self.skipped,
+            "failed": self.failed,
+            "dry_run": self.dry_run,
+            "duration_seconds": round(self.duration_seconds(), 4),
+        }
 
 @dataclass
 class ProcessResult:
@@ -125,6 +192,24 @@ class MusicProcessor:
         self._romanizer_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mb-romanizer")
         self._romanize_futures = {}
 
+    def _log_processing(
+        self,
+        level: int,
+        event: ProcessingEvent,
+        message: str,
+        *message_args: object,
+        **context: Any,
+    ) -> None:
+        """Emit a structured log entry for processing operations."""
+
+        extra: dict[str, Any] = {"processing_event": event.value}
+        for key, value in context.items():
+            if isinstance(value, Path):
+                extra[key] = str(value)
+            else:
+                extra[key] = value
+        logger.log(level, message, *message_args, extra=extra, stacklevel=2)
+
     def process_directory(
         self,
         directory: Path,
@@ -143,13 +228,43 @@ class MusicProcessor:
         if not directory.is_dir():
             raise ValueError(f"Not a directory: {directory}")
 
+        process_id = uuid.uuid4().hex[:12]
         results: list[ProcessResult] = []
-        # Build a list of supported files.
         supported_files = [f for f in directory.rglob("*") if self._is_supported(f)]
         total_files = len(supported_files)
+
         if total_files == 0:
-            logger.warning("No supported music files found in directory: %s", directory)
+            self._log_processing(
+                logging.WARNING,
+                ProcessingEvent.DIRECTORY_NO_FILES,
+                "No supported music files found [id=%s, path=%s]",
+                process_id,
+                directory,
+                process_id=process_id,
+                directory=directory,
+                total_files=0,
+                dry_run=self.dry_run,
+                source_base_path=directory,
+            )
             return results
+
+        stats = ProcessingLogContext(
+            process_id=process_id,
+            directory=directory,
+            total_files=total_files,
+            dry_run=self.dry_run,
+        )
+        self._log_processing(
+            logging.INFO,
+            ProcessingEvent.DIRECTORY_START,
+            "Directory processing started [id=%s, files=%d, dry_run=%s, path=%s]",
+            process_id,
+            total_files,
+            self.dry_run,
+            directory,
+            **stats.summary_extra(),
+            source_base_path=directory,
+        )
 
         # Pre-scan metadata to register album years across the whole directory.
         # This ensures the album-level earliest year is known before generating any paths,
@@ -170,30 +285,70 @@ class MusicProcessor:
 
         processed_count = 0
         try:
-            # Begin transaction for the entire directory.
             conn = self.db_manager.conn
             if conn is None:
                 raise RuntimeError("Database connection is not initialized")
             _ = conn.execute("BEGIN TRANSACTION")
 
-            for current_file in supported_files:
-                logger.info("Processing %s", current_file)
+            for index, current_file in enumerate(supported_files, start=1):
                 try:
                     file_hash = self._calculate_file_hash(current_file)
-                    # Skip files that have already been processed.
                     if self.before_dao.check_file_exists(file_hash):
-                        logger.info("Already processed %s", current_file.name)
+                        target_path: Path | None = None
+                        try:
+                            target_raw = self.before_dao.get_target_path(file_hash)
+                            target_path = Path(target_raw) if target_raw else None
+                        except Exception:
+                            target_path = None
+
+                        stats.record_skip()
+                        self._log_processing(
+                            logging.INFO,
+                            ProcessingEvent.FILE_SKIP_DUPLICATE,
+                            "Skipping already-processed file #%d/%d [id=%s, name=%s, target=%s]",
+                            index,
+                            total_files,
+                            process_id,
+                            current_file.name,
+                            target_path or "<unknown>",
+                            process_id=process_id,
+                            sequence=index,
+                            total_files=total_files,
+                            source_path=current_file,
+                            source_base_path=directory,
+                            target_path=target_path,
+                            target_base_path=self.base_path,
+                            file_hash=file_hash,
+                        )
                         continue
 
-                    result = self.process_file(current_file)
-                    results.append(result)
-                    processed_count += 1
-                    if progress_callback:
-                        progress_callback(processed_count, total_files, current_file)
-
-                except Exception as e:
-                    error_message = str(e) if str(e) else type(e).__name__
-                    logger.error("Error processing file '%s': %s", current_file, error_message)
+                    result = self.process_file(
+                        current_file,
+                        process_id=process_id,
+                        sequence=index,
+                        total=total_files,
+                        source_root=directory,
+                        target_root=self.base_path,
+                    )
+                except Exception as exc:
+                    error_message = str(exc) if str(exc) else type(exc).__name__
+                    stats.record_failure()
+                    self._log_processing(
+                        logging.ERROR,
+                        ProcessingEvent.FILE_ERROR,
+                        "Unhandled error processing file #%d/%d [id=%s, name=%s, error=%s]",
+                        index,
+                        total_files,
+                        process_id,
+                        current_file.name,
+                        error_message,
+                        process_id=process_id,
+                        sequence=index,
+                        total_files=total_files,
+                        source_path=current_file,
+                        source_base_path=directory,
+                        error_message=error_message,
+                    )
                     results.append(
                         ProcessResult(
                             source_path=current_file,
@@ -202,6 +357,18 @@ class MusicProcessor:
                             dry_run=self.dry_run,
                         )
                     )
+                    continue
+
+                results.append(result)
+                processed_count += 1
+
+                if result.success:
+                    stats.record_success()
+                else:
+                    stats.record_failure()
+
+                if progress_callback:
+                    progress_callback(processed_count, total_files, current_file)
 
             if not self.dry_run:
                 self._cleanup_empty_directories(directory)
@@ -210,36 +377,109 @@ class MusicProcessor:
             if conn is None:
                 raise RuntimeError("Database connection is not initialized")
             conn.commit()
-            logger.info("Successfully committed all changes to database")
 
-        except Exception as e:
-            error_message = str(e) if str(e) else type(e).__name__
-            logger.error("Error processing directory '%s': %s", directory, error_message)
+            summary_extra = stats.summary_extra()
+            self._log_processing(
+                logging.INFO,
+                ProcessingEvent.DIRECTORY_COMPLETE,
+                "Directory processing completed [id=%s, processed=%d, skipped=%d, failed=%d, duration=%.2fs]",
+                process_id,
+                stats.processed,
+                stats.skipped,
+                stats.failed,
+                summary_extra.get("duration_seconds", 0.0),
+                **summary_extra,
+                source_base_path=directory,
+            )
+        except Exception as exc:
+            error_message = str(exc) if str(exc) else type(exc).__name__
+            error_extra = stats.summary_extra()
+            error_extra["error_message"] = error_message
+            self._log_processing(
+                logging.ERROR,
+                ProcessingEvent.DIRECTORY_ERROR,
+                "Error processing directory [id=%s, path=%s, error=%s]",
+                process_id,
+                directory,
+                error_message,
+                **error_extra,
+                source_base_path=directory,
+            )
             conn = self.db_manager.conn
             if conn is not None:
                 conn.rollback()
 
         return results
 
-    def process_file(self, file_path: Path) -> ProcessResult:
+    def process_file(
+        self,
+        file_path: Path,
+        *,
+        process_id: str | None = None,
+        sequence: int | None = None,
+        total: int | None = None,
+        source_root: Path | None = None,
+        target_root: Path | None = None,
+    ) -> ProcessResult:
         """Process a single music file.
 
         Args:
             file_path: Path to the music file.
+            process_id: Optional identifier used to correlate log entries.
+            sequence: Optional sequence number for the file inside a batch.
+            total: Optional total number of files in the batch.
+            source_root: Optional root directory used to abbreviate source paths in logs.
+            target_root: Optional root directory used to abbreviate target paths in logs.
 
         Returns:
             ProcessResult object containing the result of processing.
         """
         file_hash: str | None = None
+        start_time = time.perf_counter()
+        current_process_id = process_id or uuid.uuid4().hex[:12]
+        effective_source_root = source_root or file_path.parent
+        effective_target_root = target_root or self.base_path
+
         try:
             # Calculate file hash.
             file_hash = self._calculate_file_hash(file_path)
+            self._log_processing(
+                logging.DEBUG,
+                ProcessingEvent.FILE_START,
+                "Processing file [id=%s, name=%s, hash=%s, dry_run=%s]",
+                current_process_id,
+                file_path.name,
+                file_hash,
+                self.dry_run,
+                process_id=current_process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=file_path,
+                source_base_path=effective_source_root,
+                file_hash=file_hash,
+                dry_run=self.dry_run,
+            )
 
             if self.before_dao.check_file_exists(file_hash):
-                # Get existing target path.
-                target_path = self.before_dao.get_target_path(file_hash)
+                target_raw = self.before_dao.get_target_path(file_hash)
+                target_path = Path(target_raw) if target_raw else None
                 if target_path and target_path.exists():
-                    logger.info("File already processed: %s -> %s", file_path, target_path)
+                    self._log_processing(
+                        logging.INFO,
+                        ProcessingEvent.FILE_SKIP_DUPLICATE,
+                        "File already processed [id=%s, name=%s, target=%s]",
+                        current_process_id,
+                        file_path.name,
+                        target_path,
+                        process_id=current_process_id,
+                        sequence=sequence,
+                        total_files=total,
+                        source_path=file_path,
+                        source_base_path=effective_source_root,
+                        target_path=target_path,
+                        target_base_path=effective_target_root,
+                        file_hash=file_hash,
+                    )
                     return ProcessResult(
                         source_path=file_path,
                         target_path=target_path,
@@ -269,9 +509,41 @@ class MusicProcessor:
 
             # If not in dry run mode, move the file and record updated state.
             if not self.dry_run:
-                self._move_file(file_path, target_path)
+                self._move_file(
+                    file_path,
+                    target_path,
+                    process_id=current_process_id,
+                    sequence=sequence,
+                    total=total,
+                    source_root=effective_source_root,
+                    target_root=effective_target_root,
+                )
                 if not self.after_dao.insert_file(file_hash, file_path, target_path):
                     raise ValueError("Failed to save file state to database")
+
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            self._log_processing(
+                logging.INFO,
+                ProcessingEvent.FILE_SUCCESS,
+                "File processed [id=%s, name=%s, target=%s, duration_ms=%.2f]",
+                current_process_id,
+                file_path.name,
+                target_path,
+                duration_ms,
+                process_id=current_process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=file_path,
+                source_base_path=effective_source_root,
+                target_path=target_path,
+                target_base_path=effective_target_root,
+                file_hash=file_hash,
+                duration_ms=duration_ms,
+                artist=metadata.artist,
+                album=metadata.album,
+                title=metadata.title,
+                dry_run=self.dry_run,
+            )
 
             return ProcessResult(
                 source_path=file_path,
@@ -282,9 +554,27 @@ class MusicProcessor:
                 metadata=metadata,
             )
 
-        except Exception as e:
-            error_message = str(e) if str(e) else type(e).__name__
-            logger.error("Error processing file '%s': %s", file_path, error_message)
+        except Exception as exc:
+            error_message = str(exc) if str(exc) else type(exc).__name__
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            self._log_processing(
+                logging.ERROR,
+                ProcessingEvent.FILE_ERROR,
+                "Error processing file [id=%s, name=%s, error=%s, duration_ms=%.2f]",
+                current_process_id,
+                file_path.name,
+                error_message,
+                duration_ms,
+                process_id=current_process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=file_path,
+                source_base_path=effective_source_root,
+                file_hash=file_hash,
+                error_message=error_message,
+                duration_ms=duration_ms,
+                dry_run=self.dry_run,
+            )
             return ProcessResult(
                 source_path=file_path,
                 success=False,
@@ -304,15 +594,45 @@ class MusicProcessor:
         """
         return file.is_file() and file.suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def _move_file(self, src_path: Path, dest_path: Path) -> None:
+    def _move_file(
+        self,
+        src_path: Path,
+        dest_path: Path,
+        *,
+        process_id: str | None = None,
+        sequence: int | None = None,
+        total: int | None = None,
+        source_root: Path | None = None,
+        target_root: Path | None = None,
+    ) -> None:
         """Move a file from the source path to the target path.
 
         Args:
-            src_path: Source file path.
-            dest_path: Target file path.
+            src_path: Original file location.
+            dest_path: Destination path for the moved file.
+            process_id: Optional identifier used to correlate log entries.
+            sequence: Optional sequence number for the file inside a batch.
+            total: Optional total number of files in the batch.
+            source_root: Optional root directory used to abbreviate source paths in logs.
+            target_root: Optional root directory used to abbreviate target paths in logs.
         """
+
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.info("Moving file from %s to %s", src_path, dest_path)
+        self._log_processing(
+            logging.INFO,
+            ProcessingEvent.FILE_MOVE,
+            "Moving file [id=%s, src=%s, dest=%s]",
+            process_id or "-",
+            src_path,
+            dest_path,
+            process_id=process_id,
+            sequence=sequence,
+            total_files=total,
+            source_path=src_path,
+            source_base_path=source_root or src_path.parent,
+            target_path=dest_path,
+            target_base_path=target_root or dest_path.parent,
+        )
         _ = shutil.move(str(src_path), str(dest_path))
 
     def _cleanup_empty_directories(self, directory: Path) -> None:

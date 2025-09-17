@@ -1,6 +1,9 @@
 """Tests for music file processing functionality."""
 
+import logging
 from pathlib import Path
+from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
@@ -230,6 +233,122 @@ class TestMusicProcessor:
         processed_files = {r.source_path.name for r in results}
         assert processed_files == set(music_files)
 
+    def test_process_directory_emits_structured_logs(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Ensure directory processing emits structured, correlated log records."""
+
+        source_dir = tmp_path / "incoming"
+        source_dir.mkdir()
+        duplicate_file = source_dir / "duplicate.mp3"
+        new_file = source_dir / "fresh.mp3"
+        duplicate_file.touch()
+        new_file.touch()
+
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        _ = mocker.patch.object(
+            processor,
+            "_calculate_file_hash",
+            side_effect=["hash-duplicate", "hash-new", "hash-new"],
+        )
+        before_dao_mock = cast(MagicMock, processor.before_dao)
+        before_dao_mock.check_file_exists.side_effect = [True, False, False]
+        before_dao_mock.get_target_path.return_value = str(tmp_path / "library/existing.mp3")
+
+        caplog.set_level(logging.DEBUG, logger="omym")
+
+        results = processor.process_directory(source_dir)
+
+        assert len(results) == 1
+        assert results[0].success is True
+
+        summary_record = next(
+            record
+            for record in caplog.records
+            if getattr(record, "processing_event", "") == "processing.directory.complete"
+        )
+        summary_data = summary_record.__dict__
+        assert summary_data["processed"] == 1
+        assert summary_data["skipped"] == 1
+        assert summary_data["failed"] == 0
+        assert summary_data["directory"] == str(source_dir)
+
+        skip_record = next(
+            record
+            for record in caplog.records
+            if getattr(record, "processing_event", "") == "processing.file.skip.duplicate"
+        )
+        skip_data = skip_record.__dict__
+        processed_source = str(results[0].source_path)
+        expected_skip_sources = {str(duplicate_file), str(new_file)} - {processed_source}
+        assert skip_data["source_path"] in expected_skip_sources
+        assert str(skip_data["target_path"]).endswith("existing.mp3")
+
+        success_record = next(
+            record
+            for record in caplog.records
+            if getattr(record, "processing_event", "") == "processing.file.success"
+        )
+        success_data = success_record.__dict__
+        assert success_data["artist"] == metadata.artist
+        assert success_data["title"] == metadata.title
+        assert float(success_data.get("duration_ms", 0.0)) >= 0.0
+
+        process_ids = {
+            getattr(record, "process_id", None)
+            for record in caplog.records
+            if getattr(record, "processing_event", "")
+        }
+        process_ids.discard(None)
+        assert len(process_ids) == 1
+
+    def test_process_file_duplicate_logs_skip(
+        self,
+        processor: MusicProcessor,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Duplicate files short-circuit with explicit logging context."""
+
+        source_file = tmp_path / "song.mp3"
+        source_file.touch()
+        target_path = tmp_path / "library" / "song.mp3"
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.touch()
+
+        before_dao_mock = cast(MagicMock, processor.before_dao)
+        before_dao_mock.check_file_exists.return_value = True
+        before_dao_mock.get_target_path.return_value = str(target_path)
+
+        caplog.set_level(logging.DEBUG, logger="omym")
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        assert result.target_path == target_path
+
+        events = [getattr(record, "processing_event", "") for record in caplog.records]
+        assert "processing.file.start" in events
+        assert "processing.file.skip.duplicate" in events
+
+        skip_record = next(
+            record
+            for record in caplog.records
+            if getattr(record, "processing_event", "") == "processing.file.skip.duplicate"
+        )
+        skip_data = skip_record.__dict__
+        assert skip_data["target_path"] == str(target_path)
+        assert skip_data["source_path"] == str(source_file)
+
     def test_cached_romanization_bypasses_musicbrainz(
         self,
         mocker: MockerFixture,
@@ -240,25 +359,26 @@ class TestMusicProcessor:
         cached_name = "米津玄師"
         cached_romanized = "Kenshi Yonezu"
 
-        processor.artist_dao.get_romanized_name.return_value = cached_romanized
+        artist_dao_mock = cast(MagicMock, processor.artist_dao)
+        artist_dao_mock.get_romanized_name.return_value = cached_romanized
 
         submit_mock = mocker.patch.object(
-            processor._romanizer_executor,
+            processor._romanizer_executor,  # pyright: ignore[reportPrivateUsage] - tests may hook executor internals
             "submit",
             side_effect=AssertionError("Romanization task should not be scheduled on cache hit"),
         )
-        processor._schedule_romanization(cached_name)
+        processor._schedule_romanization(cached_name)  # pyright: ignore[reportPrivateUsage] - exercising cache-aware path
 
-        assert cached_name in processor._romanize_futures
-        future = processor._romanize_futures[cached_name]
+        assert cached_name in processor._romanize_futures  # pyright: ignore[reportPrivateUsage] - validate future caching
+        future = processor._romanize_futures[cached_name]  # pyright: ignore[reportPrivateUsage] - retrieve prepared future
         assert future.result() == cached_romanized
 
-        processor.artist_dao.upsert_romanized_name.reset_mock()
+        artist_dao_mock.upsert_romanized_name.reset_mock()
 
-        assert processor._await_romanization(cached_name) == cached_romanized
+        assert processor._await_romanization(cached_name) == cached_romanized  # pyright: ignore[reportPrivateUsage] - ensure reuse
         submit_mock.assert_not_called()
-        processor.artist_dao.get_romanized_name.assert_called_once_with(cached_name)
-        processor.artist_dao.upsert_romanized_name.assert_called_once_with(cached_name, cached_romanized)
+        artist_dao_mock.get_romanized_name.assert_called_once_with(cached_name)
+        artist_dao_mock.upsert_romanized_name.assert_called_once_with(cached_name, cached_romanized)
 
     def test_file_extension_safety(
         self,

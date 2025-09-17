@@ -80,7 +80,11 @@ class OrganizeMusicService:
             Processing result object.
         """
         processor = self.build_processor(request)
-        return processor.process_file(file_path)
+        return processor.process_file(
+            file_path,
+            source_root=file_path.parent,
+            target_root=request.base_path,
+        )
 
     def process_directory(self, request: OrganizeRequest, directory: Path) -> list[ProcessResult]:
         """Process a directory via a freshly built processor.
