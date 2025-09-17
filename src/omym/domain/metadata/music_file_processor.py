@@ -11,7 +11,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, ClassVar, final
+from typing import Any, Callable, ClassVar, Iterable, final
 
 from omym.domain.common import remove_empty_directories
 from omym.domain.metadata.artist_romanizer import ArtistRomanizer
@@ -52,6 +52,13 @@ class ProcessingEvent(StrEnum):
     LYRICS_SKIP_MISSING = "processing.lyrics.skip.missing"
     LYRICS_SKIP_CONFLICT = "processing.lyrics.skip.conflict"
     LYRICS_ERROR = "processing.lyrics.error"
+    ARTWORK_MOVE = "processing.artwork.move"
+    ARTWORK_PLAN = "processing.artwork.plan"
+    ARTWORK_SKIP_MISSING = "processing.artwork.skip.missing"
+    ARTWORK_SKIP_CONFLICT = "processing.artwork.skip.conflict"
+    ARTWORK_SKIP_ALREADY_AT_TARGET = "processing.artwork.skip.already_at_target"
+    ARTWORK_SKIP_NO_TARGET = "processing.artwork.skip.no_target"
+    ARTWORK_ERROR = "processing.artwork.error"
 
 
 @dataclass(slots=True)
@@ -114,7 +121,9 @@ class ProcessResult:
     metadata: TrackMetadata | None = None
     artist_id: str | None = None
     lyrics_result: LyricsProcessingResult | None = None
+    artwork_results: list["ArtworkProcessingResult"] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    skipped_duplicate: bool = False
 
 
 @dataclass
@@ -128,12 +137,26 @@ class LyricsProcessingResult:
     reason: str | None = None
 
 
+@dataclass
+class ArtworkProcessingResult:
+    """Outcome of processing artwork assets that accompany a track."""
+
+    source_path: Path
+    target_path: Path
+    linked_track: Path | None
+    moved: bool
+    dry_run: bool
+    reason: str | None = None
+
+
 @final
 class MusicProcessor:
     """Process music files for organization."""
 
     # Supported file extensions.
     SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".mp3", ".flac", ".m4a", ".dsf", ".aac", ".alac", ".opus"}
+
+    SUPPORTED_IMAGE_EXTENSIONS: ClassVar[set[str]] = {".jpg", ".png"}
 
     base_path: Path
     dry_run: bool
@@ -312,36 +335,6 @@ class MusicProcessor:
 
             for index, current_file in enumerate(supported_files, start=1):
                 try:
-                    file_hash = self._calculate_file_hash(current_file)
-                    if self.before_dao.check_file_exists(file_hash):
-                        target_path: Path | None = None
-                        try:
-                            target_raw = self.before_dao.get_target_path(file_hash)
-                            target_path = Path(target_raw) if target_raw else None
-                        except Exception:
-                            target_path = None
-
-                        stats.record_skip()
-                        self._log_processing(
-                            logging.INFO,
-                            ProcessingEvent.FILE_SKIP_DUPLICATE,
-                            "Skipping already-processed file #%d/%d [id=%s, name=%s, target=%s]",
-                            index,
-                            total_files,
-                            process_id,
-                            current_file.name,
-                            target_path or "<unknown>",
-                            process_id=process_id,
-                            sequence=index,
-                            total_files=total_files,
-                            source_path=current_file,
-                            source_base_path=directory,
-                            target_path=target_path,
-                            target_base_path=self.base_path,
-                            file_hash=file_hash,
-                        )
-                        continue
-
                     result = self.process_file(
                         current_file,
                         process_id=process_id,
@@ -377,6 +370,10 @@ class MusicProcessor:
                             dry_run=self.dry_run,
                         )
                     )
+                    continue
+
+                if result.skipped_duplicate:
+                    stats.record_skip()
                     continue
 
                 results.append(result)
@@ -450,10 +447,15 @@ class MusicProcessor:
         effective_target_root = target_root or self.base_path
         warnings: list[str] = []
         lyrics_result: LyricsProcessingResult | None = None
+        artwork_results: list[ArtworkProcessingResult] = []
         detected_lyrics, detection_warnings = self._find_associated_lyrics(file_path)
         associated_lyrics: Path | None = detected_lyrics
         if detection_warnings:
             warnings.extend(detection_warnings)
+
+        associated_artwork, is_primary_track = self._resolve_directory_artwork(file_path)
+        if not is_primary_track:
+            associated_artwork = []
 
         try:
             # Calculate file hash.
@@ -490,31 +492,59 @@ class MusicProcessor:
                             target_root=effective_target_root,
                         )
                         warnings.extend(self._summarize_lyrics_result(lyrics_result))
-                    self._log_processing(
-                        logging.INFO,
-                        ProcessingEvent.FILE_SKIP_DUPLICATE,
-                        "File already processed [id=%s, name=%s, target=%s]",
-                        current_process_id,
-                        file_path.name,
-                        target_path,
+                    if associated_artwork:
+                        artwork_plan = self._process_associated_artwork(
+                            associated_artwork,
+                            target_path,
+                            process_id=current_process_id,
+                            sequence=sequence,
+                            total=total,
+                            source_root=effective_source_root,
+                            target_root=effective_target_root,
+                        )
+                        artwork_results.extend(artwork_plan)
+                        warnings.extend(self._summarize_artwork_results(artwork_plan))
+                elif associated_artwork:
+                    artwork_plan = self._process_associated_artwork(
+                        associated_artwork,
+                        None,
                         process_id=current_process_id,
                         sequence=sequence,
-                        total_files=total,
-                        source_path=file_path,
-                        source_base_path=effective_source_root,
-                        target_path=target_path,
-                        target_base_path=effective_target_root,
-                        file_hash=file_hash,
+                        total=total,
+                        source_root=effective_source_root,
+                        target_root=effective_target_root,
                     )
-                    return ProcessResult(
-                        source_path=file_path,
-                        target_path=target_path,
-                        success=True,
-                        dry_run=self.dry_run,
-                        file_hash=file_hash,
-                        lyrics_result=lyrics_result,
-                        warnings=warnings,
-                    )
+                    artwork_results.extend(artwork_plan)
+                    warnings.extend(self._summarize_artwork_results(artwork_plan))
+
+                target_display = target_path if target_path is not None else "<unknown>"
+                self._log_processing(
+                    logging.INFO,
+                    ProcessingEvent.FILE_SKIP_DUPLICATE,
+                    "File already processed [id=%s, name=%s, target=%s]",
+                    current_process_id,
+                    file_path.name,
+                    target_display,
+                    process_id=current_process_id,
+                    sequence=sequence,
+                    total_files=total,
+                    source_path=file_path,
+                    source_base_path=effective_source_root,
+                    target_path=target_path,
+                    target_base_path=effective_target_root,
+                    file_hash=file_hash,
+                )
+                return ProcessResult(
+                    source_path=file_path,
+                    target_path=target_path,
+                    success=True,
+                    dry_run=self.dry_run,
+                    file_hash=file_hash,
+                    lyrics_result=lyrics_result,
+                    artwork_results=artwork_results,
+                    warnings=warnings,
+                    skipped_duplicate=True,
+                )
 
             # Extract metadata.
             metadata = MetadataExtractor.extract(file_path)
@@ -561,6 +591,19 @@ class MusicProcessor:
                 )
                 warnings.extend(self._summarize_lyrics_result(lyrics_result))
 
+            if associated_artwork:
+                artwork_plan = self._process_associated_artwork(
+                    associated_artwork,
+                    target_path,
+                    process_id=current_process_id,
+                    sequence=sequence,
+                    total=total,
+                    source_root=effective_source_root,
+                    target_root=effective_target_root,
+                )
+                artwork_results.extend(artwork_plan)
+                warnings.extend(self._summarize_artwork_results(artwork_plan))
+
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
             self._log_processing(
                 logging.INFO,
@@ -593,6 +636,7 @@ class MusicProcessor:
                 file_hash=file_hash,
                 metadata=metadata,
                 lyrics_result=lyrics_result,
+                artwork_results=artwork_results,
                 warnings=warnings,
             )
 
@@ -623,6 +667,7 @@ class MusicProcessor:
                 error_message=error_message,
                 dry_run=self.dry_run,
                 file_hash=file_hash,
+                artwork_results=artwork_results,
                 warnings=warnings,
             )
 
@@ -667,6 +712,33 @@ class MusicProcessor:
             )
 
         return candidates[0], warnings
+
+    def _resolve_directory_artwork(self, file_path: Path) -> tuple[list[Path], bool]:
+        """Resolve artwork files in the same directory if the track is primary."""
+
+        parent = file_path.parent
+        if not parent.exists():
+            return [], False
+
+        try:
+            entries = [candidate for candidate in parent.iterdir() if candidate.is_file()]
+        except OSError:
+            return [], False
+
+        supported_tracks = sorted(
+            entry
+            for entry in entries
+            if entry.suffix.lower() in self.SUPPORTED_EXTENSIONS
+        )
+        if not supported_tracks or supported_tracks[0] != file_path:
+            return [], False
+
+        artworks = sorted(
+            entry
+            for entry in entries
+            if entry.suffix.lower() in self.SUPPORTED_IMAGE_EXTENSIONS
+        )
+        return artworks, True
 
     def _process_associated_lyrics(
         self,
@@ -807,6 +879,234 @@ class MusicProcessor:
             dry_run=False,
         )
 
+    def _process_associated_artwork(
+        self,
+        artwork_paths: Iterable[Path],
+        target_track_path: Path | None,
+        *,
+        process_id: str,
+        sequence: int | None,
+        total: int | None,
+        source_root: Path,
+        target_root: Path,
+    ) -> list[ArtworkProcessingResult]:
+        """Move artwork files so they follow the resolved track target."""
+
+        results: list[ArtworkProcessingResult] = []
+
+        for artwork_path in artwork_paths:
+            if target_track_path is None:
+                self._log_processing(
+                    logging.WARNING,
+                    ProcessingEvent.ARTWORK_SKIP_NO_TARGET,
+                    "Artwork skipped: target track unavailable [id=%s, src=%s]",
+                    process_id,
+                    artwork_path,
+                    process_id=process_id,
+                    sequence=sequence,
+                    total_files=total,
+                    source_path=artwork_path,
+                    source_base_path=source_root,
+                    target_path=artwork_path,
+                    target_base_path=target_root,
+                    linked_track_path=None,
+                )
+                results.append(
+                    ArtworkProcessingResult(
+                        source_path=artwork_path,
+                        target_path=artwork_path,
+                        linked_track=None,
+                        moved=False,
+                        dry_run=self.dry_run,
+                        reason="no_target_track",
+                    )
+                )
+                continue
+
+            target_artwork_path = target_track_path.parent / artwork_path.name
+
+            if not artwork_path.exists():
+                self._log_processing(
+                    logging.WARNING,
+                    ProcessingEvent.ARTWORK_SKIP_MISSING,
+                    "Artwork source missing before move [id=%s, src=%s]",
+                    process_id,
+                    artwork_path,
+                    process_id=process_id,
+                    sequence=sequence,
+                    total_files=total,
+                    source_path=artwork_path,
+                    source_base_path=source_root,
+                    target_path=target_artwork_path,
+                    target_base_path=target_root,
+                    linked_track_path=target_track_path,
+                    error_message="artwork_source_missing",
+                )
+                results.append(
+                    ArtworkProcessingResult(
+                        source_path=artwork_path,
+                        target_path=target_artwork_path,
+                        linked_track=target_track_path,
+                        moved=False,
+                        dry_run=self.dry_run,
+                        reason="source_missing",
+                    )
+                )
+                continue
+
+            if target_artwork_path.exists():
+                self._log_processing(
+                    logging.WARNING,
+                    ProcessingEvent.ARTWORK_SKIP_CONFLICT,
+                    "Artwork target already exists [id=%s, src=%s, dest=%s]",
+                    process_id,
+                    artwork_path,
+                    target_artwork_path,
+                    process_id=process_id,
+                    sequence=sequence,
+                    total_files=total,
+                    source_path=artwork_path,
+                    source_base_path=source_root,
+                    target_path=target_artwork_path,
+                    target_base_path=target_root,
+                    linked_track_path=target_track_path,
+                )
+                results.append(
+                    ArtworkProcessingResult(
+                        source_path=artwork_path,
+                        target_path=target_artwork_path,
+                        linked_track=target_track_path,
+                        moved=False,
+                        dry_run=self.dry_run,
+                        reason="target_exists",
+                    )
+                )
+                continue
+
+            try:
+                if artwork_path.resolve() == target_artwork_path.resolve():
+                    self._log_processing(
+                        logging.INFO,
+                        ProcessingEvent.ARTWORK_SKIP_ALREADY_AT_TARGET,
+                        "Artwork already at target [id=%s, path=%s]",
+                        process_id,
+                        artwork_path,
+                        process_id=process_id,
+                        sequence=sequence,
+                        total_files=total,
+                        source_path=artwork_path,
+                        source_base_path=source_root,
+                        target_path=target_artwork_path,
+                        target_base_path=target_root,
+                        linked_track_path=target_track_path,
+                    )
+                    results.append(
+                        ArtworkProcessingResult(
+                            source_path=artwork_path,
+                            target_path=target_artwork_path,
+                            linked_track=target_track_path,
+                            moved=False,
+                            dry_run=self.dry_run,
+                            reason="already_at_target",
+                        )
+                    )
+                    continue
+            except OSError:
+                # If resolve fails (e.g., due to permissions), continue with move handling.
+                pass
+
+            if self.dry_run:
+                self._log_processing(
+                    logging.INFO,
+                    ProcessingEvent.ARTWORK_PLAN,
+                    "Planned artwork move [id=%s, src=%s, dest=%s]",
+                    process_id,
+                    artwork_path,
+                    target_artwork_path,
+                    process_id=process_id,
+                    sequence=sequence,
+                    total_files=total,
+                    source_path=artwork_path,
+                    source_base_path=source_root,
+                    target_path=target_artwork_path,
+                    target_base_path=target_root,
+                    linked_track_path=target_track_path,
+                    dry_run=self.dry_run,
+                )
+                results.append(
+                    ArtworkProcessingResult(
+                        source_path=artwork_path,
+                        target_path=target_artwork_path,
+                        linked_track=target_track_path,
+                        moved=False,
+                        dry_run=True,
+                    )
+                )
+                continue
+
+            try:
+                target_artwork_path.parent.mkdir(parents=True, exist_ok=True)
+                _ = shutil.move(str(artwork_path), str(target_artwork_path))
+            except Exception as exc:
+                error_message = str(exc) if str(exc) else type(exc).__name__
+                self._log_processing(
+                    logging.ERROR,
+                    ProcessingEvent.ARTWORK_ERROR,
+                    "Error moving artwork [id=%s, src=%s, dest=%s, error=%s]",
+                    process_id,
+                    artwork_path,
+                    target_artwork_path,
+                    error_message,
+                    process_id=process_id,
+                    sequence=sequence,
+                    total_files=total,
+                    source_path=artwork_path,
+                    source_base_path=source_root,
+                    target_path=target_artwork_path,
+                    target_base_path=target_root,
+                    linked_track_path=target_track_path,
+                    error_message=error_message,
+                )
+                results.append(
+                    ArtworkProcessingResult(
+                        source_path=artwork_path,
+                        target_path=target_artwork_path,
+                        linked_track=target_track_path,
+                        moved=False,
+                        dry_run=self.dry_run,
+                        reason=error_message,
+                    )
+                )
+                continue
+
+            self._log_processing(
+                logging.INFO,
+                ProcessingEvent.ARTWORK_MOVE,
+                "Artwork moved [id=%s, src=%s, dest=%s]",
+                process_id,
+                artwork_path,
+                target_artwork_path,
+                process_id=process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=artwork_path,
+                source_base_path=source_root,
+                target_path=target_artwork_path,
+                target_base_path=target_root,
+                linked_track_path=target_track_path,
+            )
+            results.append(
+                ArtworkProcessingResult(
+                    source_path=artwork_path,
+                    target_path=target_artwork_path,
+                    linked_track=target_track_path,
+                    moved=True,
+                    dry_run=False,
+                )
+            )
+
+        return results
+
     def _summarize_lyrics_result(
         self, result: LyricsProcessingResult | None
     ) -> list[str]:
@@ -835,6 +1135,37 @@ class MusicProcessor:
             ]
 
         return []
+
+    def _summarize_artwork_results(
+        self, results: Iterable[ArtworkProcessingResult]
+    ) -> list[str]:
+        """Convert artwork move outcomes into user-facing warnings."""
+
+        warnings: list[str] = []
+        for result in results:
+            if result.dry_run and not result.moved:
+                warnings.append(
+                    (
+                        "Dry run: artwork "
+                        f"{result.source_path.name} would move to {result.target_path.name}"
+                    )
+                )
+                continue
+
+            if not result.moved:
+                reason_map = {
+                    "target_exists": "target already exists",
+                    "source_missing": "source artwork missing",
+                    "already_at_target": "already at destination",
+                    "no_target_track": "target track unavailable",
+                }
+                reason = result.reason or "unknown reason"
+                friendly_reason = reason_map.get(reason, reason)
+                warnings.append(
+                    f"Artwork file {result.source_path.name} not moved: {friendly_reason}"
+                )
+
+        return warnings
 
     def _move_file(
         self,

@@ -119,7 +119,108 @@ class TestMusicProcessor:
         assert result.lyrics_result.moved is True
         assert result.lyrics_result.target_path == lyrics_target
         assert not lyrics_file.exists()  # Lyrics should follow the audio file
+        assert result.artwork_results == []
         assert result.warnings == []  # Original file should be moved
+
+    def test_process_file_moves_artwork(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """Artwork files follow the primary track when processing a single file."""
+
+        source_file = tmp_path / "song.mp3"
+        source_file.touch()
+        artwork_file = tmp_path / "cover.jpg"
+        _ = artwork_file.write_bytes(b"artwork")
+
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        assert len(result.artwork_results) == 1
+
+        artwork_result = result.artwork_results[0]
+        assert artwork_result.moved is True
+        assert artwork_result.target_path.parent == result.target_path.parent
+        assert not artwork_file.exists()
+        assert artwork_result.target_path.exists()
+        assert result.warnings == []
+
+    def test_process_file_artwork_conflict(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """Artwork files remain when the destination already contains an image."""
+
+        source_file = tmp_path / "song.mp3"
+        source_file.touch()
+        artwork_file = tmp_path / "cover.png"
+        _ = artwork_file.write_bytes(b"artwork")
+
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        target_path = processor._generate_target_path(metadata)  # pyright: ignore[reportPrivateUsage] - tests compute the destination for collision priming
+        assert target_path is not None
+        conflict_target = target_path.parent / artwork_file.name
+        conflict_target.parent.mkdir(parents=True, exist_ok=True)
+        _ = conflict_target.write_bytes(b"existing")
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        assert len(result.artwork_results) == 1
+        artwork_result = result.artwork_results[0]
+        assert artwork_result.moved is False
+        assert artwork_result.reason == "target_exists"
+        assert artwork_file.exists()
+        assert conflict_target.read_bytes() == b"existing"
+        assert (
+            f"Artwork file {artwork_file.name} not moved: target already exists" in result.warnings
+        )
+
+    def test_process_file_duplicate_moves_artwork(
+        self,
+        processor: MusicProcessor,
+        tmp_path: Path,
+    ) -> None:
+        """Duplicate detection still relocates artwork alongside the stored track."""
+
+        source_file = tmp_path / "song.mp3"
+        source_file.touch()
+        artwork_file = tmp_path / "cover.jpg"
+        _ = artwork_file.write_bytes(b"artwork")
+
+        target_path = tmp_path / "library" / "song.mp3"
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.touch()
+
+        before_dao_mock = cast(MagicMock, processor.before_dao)
+        before_dao_mock.check_file_exists.return_value = True
+        before_dao_mock.get_target_path.return_value = str(target_path)
+
+        result = processor.process_file(source_file)
+
+        assert result.skipped_duplicate is True
+        assert len(result.artwork_results) == 1
+
+        artwork_result = result.artwork_results[0]
+        assert artwork_result.moved is True
+        assert artwork_result.target_path.parent == target_path.parent
+        assert not artwork_file.exists()
+        assert artwork_result.target_path.exists()
 
     def test_process_file_lyrics_conflict(
         self,
@@ -244,9 +345,10 @@ class TestMusicProcessor:
 
         # Create test files
         music_files = ["test1.mp3", "test2.mp3"]
-        other_files = ["test.txt", "test.jpg"]
+        image_files = ["cover.jpg"]
+        other_files = ["notes.txt"]
 
-        for name in music_files + other_files:
+        for name in music_files + image_files + other_files:
             (source_dir / name).touch()
 
         # Mock metadata extraction
@@ -262,6 +364,7 @@ class TestMusicProcessor:
             Returns:
                 Hash based on file name.
             """
+
             return f"{file_path.name}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
         _ = mocker.patch.object(processor, "_calculate_file_hash", side_effect=mock_hash)
@@ -270,18 +373,25 @@ class TestMusicProcessor:
         results = processor.process_directory(source_dir)
 
         # Assert
-        # Filter results based on file extension
         file_results = [r for r in results if r.source_path.suffix.lower() in processor.SUPPORTED_EXTENSIONS]
         assert len(file_results) == len(music_files)
 
-        for result in file_results:
-            assert result.success is True
+        primary_track_name = min(music_files)
+        primary_result = next(r for r in file_results if r.source_path.name == primary_track_name)
+        assert len(primary_result.artwork_results) == len(image_files)
+        assert all(art.moved for art in primary_result.artwork_results)
+        assert primary_result.warnings == []
 
-        # Non-music files should still exist
+        non_primary_results = [r for r in file_results if r.source_path.name != primary_track_name]
+        for result in non_primary_results:
+            assert result.artwork_results == []
+
+        for image in image_files:
+            assert not (source_dir / image).exists()
+
         for name in other_files:
             assert (source_dir / name).exists()
 
-        # Verify that only supported files were processed
         processed_files = {r.source_path.name for r in results}
         assert processed_files == set(music_files)
 
@@ -386,7 +496,10 @@ class TestMusicProcessor:
         result = processor.process_file(source_file)
 
         assert result.success is True
+        assert result.skipped_duplicate is True
         assert result.target_path == target_path
+        assert result.artwork_results == []
+        assert result.warnings == []
 
         events = [getattr(record, "processing_event", "") for record in caplog.records]
         assert "processing.file.start" in events

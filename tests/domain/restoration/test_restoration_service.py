@@ -212,6 +212,99 @@ def test_restore_moves_lyrics_and_cleans_directories(tmp_path: Path, service: Re
     assert not organized_dir.exists()
 
 
+def test_restore_moves_artwork(tmp_path: Path, service: RestorationService) -> None:
+    """Artwork assets travel back with the primary restored track."""
+
+    original_dir = tmp_path / "original"
+    organized_dir = tmp_path / "organized"
+    original_dir.mkdir()
+    organized_dir.mkdir()
+
+    original_path = original_dir / "song.mp3"
+    target_path = organized_dir / "Artist" / "song.mp3"
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    _ = target_path.write_bytes(b"data")
+    artwork_source = target_path.parent / "cover.jpg"
+    _ = artwork_source.write_bytes(b"art")
+
+    file_hash = hashlib.sha256(target_path.read_bytes()).hexdigest()
+    _register_sample_record(
+        service,
+        file_hash=file_hash,
+        original_path=original_path,
+        target_path=target_path,
+    )
+
+    request = RestoreRequest(
+        source_root=organized_dir,
+        destination_root=None,
+        dry_run=False,
+        collision_policy=CollisionPolicy.ABORT,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+    )
+
+    results = service.run(request)
+
+    original_artwork = original_dir / "cover.jpg"
+    assert results and results[0].moved is True
+    assert original_path.exists()
+    assert original_path.read_bytes() == b"data"
+    assert original_artwork.exists()
+    assert original_artwork.read_bytes() == b"art"
+    assert not artwork_source.exists()
+
+
+def test_restore_artwork_collision_backup(tmp_path: Path, service: RestorationService) -> None:
+    """Artwork restoration honours the configured collision policy."""
+
+    original_dir = tmp_path / "original"
+    organized_dir = tmp_path / "organized"
+    original_dir.mkdir()
+    organized_dir.mkdir()
+
+    original_path = original_dir / "song.mp3"
+    target_path = organized_dir / "Artist" / "song.mp3"
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    _ = target_path.write_bytes(b"data")
+
+    existing_artwork = original_dir / "cover.jpg"
+    _ = existing_artwork.write_bytes(b"old")
+
+    artwork_source = target_path.parent / "cover.jpg"
+    _ = artwork_source.write_bytes(b"new")
+
+    file_hash = hashlib.sha256(target_path.read_bytes()).hexdigest()
+    _register_sample_record(
+        service,
+        file_hash=file_hash,
+        original_path=original_path,
+        target_path=target_path,
+    )
+
+    request = RestoreRequest(
+        source_root=organized_dir,
+        destination_root=None,
+        dry_run=False,
+        collision_policy=CollisionPolicy.BACKUP,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+    )
+
+    results = service.run(request)
+
+    backup_artwork = original_dir / "cover.bak.jpg"
+    restored_artwork = original_dir / "cover.jpg"
+    assert results and results[0].moved is True
+    assert restored_artwork.exists()
+    assert restored_artwork.read_bytes() == b"new"
+    assert backup_artwork.exists()
+    assert backup_artwork.read_bytes() == b"old"
+    assert not artwork_source.exists()
+
+
 def test_restore_lyrics_collision_backup(tmp_path: Path, service: RestorationService) -> None:
     """Existing lyrics honour the configured collision policy."""
 

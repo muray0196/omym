@@ -8,7 +8,7 @@ review_cadence: quarterly
 - Success is measured by correctly processing supported files without data loss.
 
 ## In-scope / Out-of-scope
-- In-scope: scanning directories, reading metadata, moving and renaming files, and caching results in SQLite. Lyrics (.lrc) files that share a stem with supported audio are moved and renamed alongside their tracks.
+- In-scope: scanning directories, reading metadata, moving and renaming files, and caching results in SQLite. Lyrics (.lrc) files that share a stem with supported audio are moved and renamed alongside their tracks. Artwork (.jpg/.png) stored with supported audio travels with the directory's primary track without renaming.
 - Out-of-scope: editing tags, network operations, or streaming media.
 
 ## User Stories and Acceptance Criteria
@@ -17,7 +17,7 @@ review_cadence: quarterly
 
 ## Flows
 - Primary: CLI invocation → configuration loading → metadata extraction → path generation → file operations → database update.
-- Restore: CLI invocation → configuration loading → restoration plan build from SQLite → collision handling → file moves → optional database purge.
+- Restore: CLI invocation → configuration loading → restoration plan build from SQLite → collision handling → file moves (audio + lyrics/artwork) → optional database purge.
 - Error paths: missing tags or DB errors are logged and the affected files are skipped.
 - The tool runs synchronously with no built-in retry logic beyond the current process.
 
@@ -33,4 +33,5 @@ review_cadence: quarterly
 
 ## Test Ideas / Examples
 - Run `uv run pytest` to validate metadata parsing, path generation, and database operations.
+- Add fixtures where artwork assets accompany tracks to confirm images relocate during organization.
 - Simulate unsupported formats or missing tags to verify error handling.

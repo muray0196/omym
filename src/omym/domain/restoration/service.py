@@ -14,11 +14,16 @@ from omym.domain.restoration.models import (
     RestoreRequest,
     RestoreResult,
 )
+from omym.domain.metadata.music_file_processor import MusicProcessor
 from omym.infra.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.infra.db.daos.processing_before_dao import ProcessingBeforeDAO
 from omym.infra.db.daos.maintenance_dao import MaintenanceDAO
 from omym.infra.db.db_manager import DatabaseManager
 from omym.infra.logger.logger import logger
+
+
+SUPPORTED_AUDIO_EXTENSIONS = MusicProcessor.SUPPORTED_EXTENSIONS
+SUPPORTED_IMAGE_EXTENSIONS = MusicProcessor.SUPPORTED_IMAGE_EXTENSIONS
 
 
 @dataclass(slots=True)
@@ -231,18 +236,26 @@ class RestorationService:
         return request.destination_root / relative
 
     def _restore_associated_assets(self, ctx: _RestoreContext) -> list[str]:
-        """Restore sidecar files (e.g., lyrics) that accompany the audio file."""
+        """Restore sidecar files (e.g., lyrics and artwork) that accompany the audio file."""
+
+        warnings: list[str] = []
+        warnings.extend(self._restore_lyrics(ctx))
+        warnings.extend(self._restore_directory_artwork(ctx))
+        return warnings
+
+    def _restore_lyrics(self, ctx: _RestoreContext) -> list[str]:
+        """Restore associated lyrics file if present."""
 
         request = ctx.request
         source_audio = ctx.plan.source_path
         destination_audio = ctx.plan.destination_path
-
         lyrics_source = source_audio.with_suffix(".lrc")
+
+        warnings: list[str] = []
         if not lyrics_source.exists():
-            return []
+            return warnings
 
         lyrics_target = destination_audio.with_suffix(".lrc")
-        warnings: list[str] = []
 
         if request.dry_run:
             if lyrics_target.exists():
@@ -307,6 +320,134 @@ class RestorationService:
             "Restored lyrics %s → %s",
             self._relative_source(lyrics_source, request),
             self._relative_destination(lyrics_target, request, ctx),
+        )
+        return warnings
+
+    def _restore_directory_artwork(self, ctx: _RestoreContext) -> list[str]:
+        """Restore artwork files that accompanied the organized track."""
+
+        request = ctx.request
+        source_audio = ctx.plan.source_path
+        destination_audio = ctx.plan.destination_path
+        parent = source_audio.parent
+
+        warnings: list[str] = []
+        if not parent.exists():
+            return warnings
+
+        try:
+            entries = [entry for entry in parent.iterdir() if entry.is_file()]
+        except OSError:
+            return warnings
+
+        supported_tracks = sorted(
+            entry for entry in entries if entry.suffix.lower() in SUPPORTED_AUDIO_EXTENSIONS
+        )
+        track_candidates = list(supported_tracks)
+        if source_audio not in track_candidates:
+            track_candidates.append(source_audio)
+            track_candidates.sort()
+        if not track_candidates or track_candidates[0] != source_audio:
+            return warnings
+
+        artwork_sources = sorted(
+            entry for entry in entries if entry.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
+        )
+        for artwork_source in artwork_sources:
+            warnings.extend(self._restore_single_artwork(ctx, artwork_source, destination_audio))
+        return warnings
+
+    def _restore_single_artwork(
+        self,
+        ctx: _RestoreContext,
+        artwork_source: Path,
+        destination_audio: Path,
+    ) -> list[str]:
+        """Restore a single artwork file with collision handling."""
+
+        request = ctx.request
+        warnings: list[str] = []
+
+        if not artwork_source.exists():
+            _ = logger.warning(
+                "Artwork source missing before restore: %s",
+                self._relative_source(artwork_source, request),
+            )
+            warnings.append("artwork_source_missing")
+            return warnings
+
+        artwork_target = destination_audio.parent / artwork_source.name
+
+        try:
+            if artwork_source.resolve() == artwork_target.resolve():
+                return warnings
+        except OSError:
+            # Fall back to move behaviour if resolution fails.
+            pass
+
+        if request.dry_run:
+            if artwork_target.exists():
+                if request.collision_policy is CollisionPolicy.ABORT:
+                    _ = logger.warning(
+                        "Dry run: artwork destination exists and would abort (%s)",
+                        self._relative_destination(artwork_target, request, ctx),
+                    )
+                elif request.collision_policy is CollisionPolicy.BACKUP:
+                    backup_path = self._compute_backup_path(artwork_target, request.backup_suffix)
+                    _ = logger.info(
+                        "Dry run: would rename existing artwork %s → %s",
+                        self._relative_destination(artwork_target, request, ctx),
+                        self._relative_destination(
+                            backup_path,
+                            request,
+                            ctx,
+                            original_destination=artwork_target,
+                        ),
+                    )
+                else:
+                    _ = logger.info(
+                        "Dry run: would skip restoring artwork because destination exists: %s",
+                        self._relative_destination(artwork_target, request, ctx),
+                    )
+            _ = logger.info(
+                "Dry run: would move artwork %s → %s",
+                self._relative_source(artwork_source, request),
+                self._relative_destination(artwork_target, request, ctx),
+            )
+            warnings.append("artwork_dry_run")
+            return warnings
+
+        if artwork_target.exists():
+            if request.collision_policy is CollisionPolicy.ABORT:
+                raise FileExistsError(
+                    f"Destination artwork already exists: {self._relative_destination(artwork_target, request, ctx)}"
+                )
+            if request.collision_policy is CollisionPolicy.SKIP:
+                _ = logger.info(
+                    "Skipping artwork restore because destination exists: %s",
+                    self._relative_destination(artwork_target, request, ctx),
+                )
+                warnings.append("artwork_destination_exists")
+                return warnings
+            backup_path = self._compute_backup_path(artwork_target, request.backup_suffix)
+            _ = shutil.move(str(artwork_target), str(backup_path))
+            _ = logger.info(
+                "Renamed existing artwork %s → %s",
+                self._relative_destination(artwork_target, request, ctx),
+                self._relative_destination(
+                    backup_path,
+                    request,
+                    ctx,
+                    original_destination=artwork_target,
+                ),
+            )
+
+        artwork_target.parent.mkdir(parents=True, exist_ok=True)
+        _ = shutil.move(str(artwork_source), str(artwork_target))
+        _ = logger.info(
+            "Restored artwork %s → %s",
+            self._relative_source(artwork_source, request),
+            self._relative_destination(artwork_target, request, ctx),
         )
         return warnings
 
