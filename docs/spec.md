@@ -8,7 +8,7 @@ review_cadence: quarterly
 - Success is measured by correctly processing supported files without data loss.
 
 ## In-scope / Out-of-scope
-- In-scope: scanning directories, reading metadata, moving and renaming files, and caching results in SQLite.
+- In-scope: scanning directories, reading metadata, moving and renaming files, and caching results in SQLite. Lyrics (.lrc) files that share a stem with supported audio are moved and renamed alongside their tracks.
 - Out-of-scope: editing tags, network operations, or streaming media.
 
 ## User Stories and Acceptance Criteria

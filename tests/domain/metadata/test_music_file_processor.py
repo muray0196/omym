@@ -90,20 +90,19 @@ class TestMusicProcessor:
         metadata: TrackMetadata,
         tmp_path: Path,
     ) -> None:
-        """Test successful processing of a single music file.
+        """Test successful processing of a single music file."""
 
-        Args:
-            mocker: Pytest mocker fixture.
-            processor: Test processor.
-            metadata: Test metadata.
-            tmp_path: Temporary path fixture.
-        """
         # Arrange
         source_file = tmp_path / "test.mp3"
         source_file.touch()
+        lyrics_file = tmp_path / "test.lrc"
+        _ = lyrics_file.write_text("[00:00.00]Hello world\n")
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
 
         # Act
         result = processor.process_file(source_file)
@@ -113,6 +112,51 @@ class TestMusicProcessor:
         assert result.target_path is not None
         assert result.target_path.exists()
         assert not source_file.exists()  # Original file should be moved
+
+        lyrics_target = result.target_path.with_suffix(".lrc")
+        assert lyrics_target.exists()
+        assert result.lyrics_result is not None
+        assert result.lyrics_result.moved is True
+        assert result.lyrics_result.target_path == lyrics_target
+        assert not lyrics_file.exists()  # Lyrics should follow the audio file
+        assert result.warnings == []  # Original file should be moved
+
+    def test_process_file_lyrics_conflict(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """Lyrics file should remain in place when the target already exists."""
+
+        source_file = tmp_path / "track.mp3"
+        source_file.touch()
+        lyrics_file = tmp_path / "track.lrc"
+        _ = lyrics_file.write_text("[00:00.00]Existing\n")
+
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        target_path = processor._generate_target_path(metadata)  # pyright: ignore[reportPrivateUsage] - tests may consult the helper to stage collision scenarios
+        assert target_path is not None
+        lyrics_target = target_path.with_suffix(".lrc")
+        lyrics_target.parent.mkdir(parents=True, exist_ok=True)
+        _ = lyrics_target.write_text("[00:00.00]Conflict\n")
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        assert result.lyrics_result is not None
+        assert result.lyrics_result.moved is False
+        assert result.lyrics_result.reason == "target_exists"
+        assert lyrics_file.exists()  # Lyrics should stay at the source due to conflict
+        assert lyrics_target.read_text() == "[00:00.00]Conflict\n"
+        assert (
+            f"Lyrics file {lyrics_file.name} not moved: target already exists" in result.warnings
+        )
 
     def test_process_file_metadata_error(
         self, mocker: MockerFixture, processor: MusicProcessor, tmp_path: Path
@@ -146,21 +190,20 @@ class TestMusicProcessor:
         metadata: TrackMetadata,
         tmp_path: Path,
     ) -> None:
-        """Test dry run mode.
+        """Test dry run mode."""
 
-        Args:
-            mocker: Pytest mocker fixture.
-            processor: Test processor.
-            metadata: Test metadata.
-            tmp_path: Temporary path fixture.
-        """
         # Arrange
         source_file = tmp_path / "test.mp3"
         source_file.touch()
+        lyrics_file = tmp_path / "test.lrc"
+        _ = lyrics_file.write_text("[00:00.00]Preview\n")
         processor.dry_run = True
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.domain.metadata.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
 
         # Act
         result = processor.process_file(source_file)
@@ -170,6 +213,15 @@ class TestMusicProcessor:
         assert result.target_path is not None
         assert not result.target_path.exists()  # Target file should not be created
         assert source_file.exists()  # Original file should not be moved
+        assert lyrics_file.exists()  # Lyrics stay due to dry run
+        assert result.lyrics_result is not None
+        assert result.lyrics_result.dry_run is True
+        assert result.lyrics_result.moved is False
+        assert result.lyrics_result.target_path == result.target_path.with_suffix(".lrc")
+        assert (
+            f"Dry run: lyrics {lyrics_file.name} would move to {result.lyrics_result.target_path.name}"
+            in result.warnings
+        )  # Original file should not be moved
 
     def test_process_directory(
         self,

@@ -1,5 +1,7 @@
 """Process music files for organization."""
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
@@ -45,6 +47,11 @@ class ProcessingEvent(StrEnum):
     FILE_SUCCESS = "processing.file.success"
     FILE_ERROR = "processing.file.error"
     FILE_MOVE = "processing.file.move"
+    LYRICS_MOVE = "processing.lyrics.move"
+    LYRICS_PLAN = "processing.lyrics.plan"
+    LYRICS_SKIP_MISSING = "processing.lyrics.skip.missing"
+    LYRICS_SKIP_CONFLICT = "processing.lyrics.skip.conflict"
+    LYRICS_ERROR = "processing.lyrics.error"
 
 
 @dataclass(slots=True)
@@ -106,6 +113,19 @@ class ProcessResult:
     file_hash: str | None = None
     metadata: TrackMetadata | None = None
     artist_id: str | None = None
+    lyrics_result: LyricsProcessingResult | None = None
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class LyricsProcessingResult:
+    """Outcome of processing an associated lyrics (.lrc) file."""
+
+    source_path: Path
+    target_path: Path
+    moved: bool
+    dry_run: bool
+    reason: str | None = None
 
 
 @final
@@ -421,24 +441,19 @@ class MusicProcessor:
         source_root: Path | None = None,
         target_root: Path | None = None,
     ) -> ProcessResult:
-        """Process a single music file.
+        """Process a single music file."""
 
-        Args:
-            file_path: Path to the music file.
-            process_id: Optional identifier used to correlate log entries.
-            sequence: Optional sequence number for the file inside a batch.
-            total: Optional total number of files in the batch.
-            source_root: Optional root directory used to abbreviate source paths in logs.
-            target_root: Optional root directory used to abbreviate target paths in logs.
-
-        Returns:
-            ProcessResult object containing the result of processing.
-        """
         file_hash: str | None = None
         start_time = time.perf_counter()
         current_process_id = process_id or uuid.uuid4().hex[:12]
         effective_source_root = source_root or file_path.parent
         effective_target_root = target_root or self.base_path
+        warnings: list[str] = []
+        lyrics_result: LyricsProcessingResult | None = None
+        detected_lyrics, detection_warnings = self._find_associated_lyrics(file_path)
+        associated_lyrics: Path | None = detected_lyrics
+        if detection_warnings:
+            warnings.extend(detection_warnings)
 
         try:
             # Calculate file hash.
@@ -464,6 +479,17 @@ class MusicProcessor:
                 target_raw = self.before_dao.get_target_path(file_hash)
                 target_path = Path(target_raw) if target_raw else None
                 if target_path and target_path.exists():
+                    if associated_lyrics is not None:
+                        lyrics_result = self._process_associated_lyrics(
+                            associated_lyrics,
+                            target_path,
+                            process_id=current_process_id,
+                            sequence=sequence,
+                            total=total,
+                            source_root=effective_source_root,
+                            target_root=effective_target_root,
+                        )
+                        warnings.extend(self._summarize_lyrics_result(lyrics_result))
                     self._log_processing(
                         logging.INFO,
                         ProcessingEvent.FILE_SKIP_DUPLICATE,
@@ -486,6 +512,8 @@ class MusicProcessor:
                         success=True,
                         dry_run=self.dry_run,
                         file_hash=file_hash,
+                        lyrics_result=lyrics_result,
+                        warnings=warnings,
                     )
 
             # Extract metadata.
@@ -521,6 +549,18 @@ class MusicProcessor:
                 if not self.after_dao.insert_file(file_hash, file_path, target_path):
                     raise ValueError("Failed to save file state to database")
 
+            if associated_lyrics is not None:
+                lyrics_result = self._process_associated_lyrics(
+                    associated_lyrics,
+                    target_path,
+                    process_id=current_process_id,
+                    sequence=sequence,
+                    total=total,
+                    source_root=effective_source_root,
+                    target_root=effective_target_root,
+                )
+                warnings.extend(self._summarize_lyrics_result(lyrics_result))
+
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
             self._log_processing(
                 logging.INFO,
@@ -552,6 +592,8 @@ class MusicProcessor:
                 dry_run=self.dry_run,
                 file_hash=file_hash,
                 metadata=metadata,
+                lyrics_result=lyrics_result,
+                warnings=warnings,
             )
 
         except Exception as exc:
@@ -581,6 +623,7 @@ class MusicProcessor:
                 error_message=error_message,
                 dry_run=self.dry_run,
                 file_hash=file_hash,
+                warnings=warnings,
             )
 
     def _is_supported(self, file: Path) -> bool:
@@ -593,6 +636,205 @@ class MusicProcessor:
             True if file is supported; otherwise, False.
         """
         return file.is_file() and file.suffix.lower() in self.SUPPORTED_EXTENSIONS
+
+    def _find_associated_lyrics(self, file_path: Path) -> tuple[Path | None, list[str]]:
+        """Locate an .lrc file that shares the same stem as the given music file."""
+
+        parent = file_path.parent
+        warnings: list[str] = []
+
+        if not parent.exists():
+            return None, warnings
+
+        try:
+            candidates = [
+                candidate
+                for candidate in parent.iterdir()
+                if candidate.is_file()
+                and candidate.stem == file_path.stem
+                and candidate.suffix.lower() == ".lrc"
+            ]
+        except OSError:
+            return None, warnings
+
+        if not candidates:
+            return None, warnings
+
+        candidates.sort()
+        if len(candidates) > 1:
+            warnings.append(
+                f"Multiple lyrics files found for {file_path.name}; using {candidates[0].name}"
+            )
+
+        return candidates[0], warnings
+
+    def _process_associated_lyrics(
+        self,
+        lyrics_path: Path,
+        target_file_path: Path,
+        *,
+        process_id: str,
+        sequence: int | None,
+        total: int | None,
+        source_root: Path,
+        target_root: Path,
+    ) -> LyricsProcessingResult:
+        """Move a lyrics file so that it matches the target music file path."""
+
+        target_lyrics_path = target_file_path.with_suffix(".lrc")
+
+        if not lyrics_path.exists():
+            self._log_processing(
+                logging.WARNING,
+                ProcessingEvent.LYRICS_ERROR,
+                "Lyrics file missing before move [id=%s, src=%s]",
+                process_id,
+                lyrics_path,
+                process_id=process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=lyrics_path,
+                source_base_path=source_root,
+                target_path=target_lyrics_path,
+                target_base_path=target_root,
+                error_message="lyrics_source_missing",
+            )
+            return LyricsProcessingResult(
+                source_path=lyrics_path,
+                target_path=target_lyrics_path,
+                moved=False,
+                dry_run=self.dry_run,
+                reason="lyrics_source_missing",
+            )
+
+        if target_lyrics_path.exists():
+            self._log_processing(
+                logging.WARNING,
+                ProcessingEvent.LYRICS_SKIP_CONFLICT,
+                "Target lyrics already exists [id=%s, src=%s, dest=%s]",
+                process_id,
+                lyrics_path,
+                target_lyrics_path,
+                process_id=process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=lyrics_path,
+                source_base_path=source_root,
+                target_path=target_lyrics_path,
+                target_base_path=target_root,
+            )
+            return LyricsProcessingResult(
+                source_path=lyrics_path,
+                target_path=target_lyrics_path,
+                moved=False,
+                dry_run=self.dry_run,
+                reason="target_exists",
+            )
+
+        if self.dry_run:
+            self._log_processing(
+                logging.INFO,
+                ProcessingEvent.LYRICS_PLAN,
+                "Planned lyrics move [id=%s, src=%s, dest=%s]",
+                process_id,
+                lyrics_path,
+                target_lyrics_path,
+                process_id=process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=lyrics_path,
+                source_base_path=source_root,
+                target_path=target_lyrics_path,
+                target_base_path=target_root,
+                dry_run=self.dry_run,
+            )
+            return LyricsProcessingResult(
+                source_path=lyrics_path,
+                target_path=target_lyrics_path,
+                moved=False,
+                dry_run=True,
+            )
+
+        try:
+            target_lyrics_path.parent.mkdir(parents=True, exist_ok=True)
+            _ = shutil.move(str(lyrics_path), str(target_lyrics_path))
+        except Exception as exc:  # pragma: no cover - defensive logging of unexpected failure
+            error_message = str(exc) if str(exc) else type(exc).__name__
+            self._log_processing(
+                logging.ERROR,
+                ProcessingEvent.LYRICS_ERROR,
+                "Error moving lyrics file [id=%s, src=%s, dest=%s, error=%s]",
+                process_id,
+                lyrics_path,
+                target_lyrics_path,
+                error_message,
+                process_id=process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=lyrics_path,
+                source_base_path=source_root,
+                target_path=target_lyrics_path,
+                target_base_path=target_root,
+                error_message=error_message,
+            )
+            return LyricsProcessingResult(
+                source_path=lyrics_path,
+                target_path=target_lyrics_path,
+                moved=False,
+                dry_run=False,
+                reason=error_message,
+            )
+
+        self._log_processing(
+            logging.INFO,
+            ProcessingEvent.LYRICS_MOVE,
+            "Lyrics file moved [id=%s, src=%s, dest=%s]",
+            process_id,
+            lyrics_path,
+            target_lyrics_path,
+            process_id=process_id,
+            sequence=sequence,
+            total_files=total,
+            source_path=lyrics_path,
+            source_base_path=source_root,
+            target_path=target_lyrics_path,
+            target_base_path=target_root,
+        )
+        return LyricsProcessingResult(
+            source_path=lyrics_path,
+            target_path=target_lyrics_path,
+            moved=True,
+            dry_run=False,
+        )
+
+    def _summarize_lyrics_result(
+        self, result: LyricsProcessingResult | None
+    ) -> list[str]:
+        """Convert a lyrics move outcome into user-facing warnings."""
+
+        if result is None:
+            return []
+
+        if result.dry_run and not result.moved:
+            return [
+                (
+                    "Dry run: lyrics "
+                    f"{result.source_path.name} would move to {result.target_path.name}"
+                )
+            ]
+
+        if not result.moved:
+            reason_map = {
+                "target_exists": "target already exists",
+                "lyrics_source_missing": "source lyrics missing",
+            }
+            reason = result.reason or "unknown reason"
+            friendly_reason = reason_map.get(reason, reason)
+            return [
+                f"Lyrics file {result.source_path.name} not moved: {friendly_reason}"
+            ]
+
+        return []
 
     def _move_file(
         self,

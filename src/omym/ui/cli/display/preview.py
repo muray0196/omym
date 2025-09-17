@@ -1,7 +1,7 @@
 """Preview display functionality for CLI."""
 
 from pathlib import Path
-from typing import final
+from typing import Literal, final
 from rich.console import Console
 from rich.tree import Tree
 
@@ -19,63 +19,113 @@ class PreviewDisplay:
         self.console = Console()
 
     def show_preview(self, results: list[ProcessResult], base_path: Path, show_db: bool = False) -> None:
-        """Display a preview of the planned file organization.
+        """Display a preview of the planned file organization."""
 
-        Args:
-            results: List of processing results.
-            base_path: Base path for the music library.
-            show_db: Whether to show database operations preview.
-        """
         self.console.print("\n[bold cyan]Preview of planned changes:[/bold cyan]")
 
-        # Create a tree structure for visualization
         tree = Tree(f"📁 {base_path}")
         current_artist: str | None = None
         current_album: str | None = None
         artist_node = None
         album_node = None
 
-        # Sort results by target path to group by artist/album
-        sorted_results = sorted([r for r in results if r.target_path], key=lambda r: str(r.target_path))
+        def add_entry(
+            path: Path,
+            success: bool,
+            dry_run: bool,
+            warning_reason: str | None,
+            entry_type: Literal["audio", "lyrics"],
+        ) -> None:
+            nonlocal current_artist, current_album, artist_node, album_node
 
-        for result in sorted_results:
-            if not result.target_path:
-                continue
+            try:
+                rel_path = path.relative_to(base_path)
+            except ValueError:
+                rel_path = path
 
-            # Get relative paths
-            rel_path = result.target_path.relative_to(base_path)
             parts = rel_path.parts
+            if not parts:
+                return
 
-            if len(parts) >= 1 and (current_artist is None or parts[0] != current_artist):
+            if current_artist is None or parts[0] != current_artist:
                 current_artist = parts[0]
                 artist_node = tree.add(f"📁 {current_artist}")
                 current_album = None
 
             if len(parts) >= 2 and (current_album is None or parts[1] != current_album):
                 current_album = parts[1]
-                if artist_node:
+                if artist_node is not None:
                     album_node = artist_node.add(f"📁 {current_album}")
 
-            if album_node and len(parts) >= 3:
-                icon = "❌" if not result.success else "✨" if result.dry_run else "✅"
-                status = (
-                    "[red]Error[/red]"
-                    if not result.success
-                    else "[yellow]Preview[/yellow]"
-                    if result.dry_run
-                    else "[green]Done[/green]"
-                )
-                _ = album_node.add(f"{icon} {parts[-1]} {status}")
+            target_node = album_node or artist_node or tree
+            icon, status = self._determine_preview_icon(success, dry_run, warning_reason)
+            type_marker = "🎵" if entry_type == "audio" else "📝"
+            filename = rel_path.name
+            label = f"{type_marker} {icon} {filename} {status}"
+            _ = target_node.add(label)
 
-        # Print the tree
+        sorted_results = sorted(
+            [result for result in results if result.target_path],
+            key=lambda result: str(result.target_path),
+        )
+
+        for result in sorted_results:
+            if not result.target_path:
+                continue
+
+            add_entry(result.target_path, result.success, result.dry_run, None, "audio")
+
+            lyrics_result = result.lyrics_result
+            if lyrics_result and lyrics_result.target_path:
+                warning_reason: str | None = None
+                if not lyrics_result.moved and not lyrics_result.dry_run:
+                    warning_reason = self._format_lyrics_warning(lyrics_result.reason)
+                add_entry(
+                    lyrics_result.target_path,
+                    lyrics_result.moved or lyrics_result.dry_run,
+                    lyrics_result.dry_run,
+                    warning_reason,
+                    "lyrics",
+                )
+
         self.console.print(tree)
 
-        # Show database operations if requested
         if show_db:
             self._show_db_preview(results)
 
-        # Print summary
         self._show_summary(results)
+
+    def _determine_preview_icon(
+        self,
+        success: bool,
+        dry_run: bool,
+        warning_reason: str | None,
+    ) -> tuple[str, str]:
+        """Return the icon and status label for a preview entry."""
+
+        if warning_reason:
+            return "\u26a0\ufe0f", f"[yellow]Skipped ({warning_reason})[/yellow]"
+        if not success:
+            return "\u274c", "[red]Error[/red]"
+        if dry_run:
+            return "\u2728", "[yellow]Preview[/yellow]"
+        return "\u2705", "[green]Done[/green]"
+
+    def _format_lyrics_warning(self, reason: str | None) -> str:
+        """Convert an internal lyrics warning reason into a user-facing message."""
+
+        if reason is None:
+            return "skipped"
+
+        normalized = reason.strip()
+        if not normalized:
+            return "skipped"
+
+        mapping = {
+            "target_exists": "target already exists",
+            "lyrics_source_missing": "source lyrics missing",
+        }
+        return mapping.get(normalized, normalized.replace("_", " "))
 
     def _show_db_preview(self, results: list[ProcessResult]) -> None:
         """Display a preview of database operations.
