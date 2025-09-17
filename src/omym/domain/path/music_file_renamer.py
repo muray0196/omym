@@ -307,6 +307,8 @@ class FileNameGenerator:
     artist_id_generator: CachedArtistIdGenerator
     # Cache for per-album track number width (minimum 2)
     _album_track_widths: ClassVar[dict[str, int]] = {}
+    # Cache of albums that require disc prefixes in file names
+    _albums_requiring_disc_prefix: ClassVar[set[str]] = set()
 
     @classmethod
     def _get_album_key(cls, album_artist: str, album: str) -> str:
@@ -327,20 +329,28 @@ class FileNameGenerator:
 
     @classmethod
     def register_album_track_width(cls, metadata: TrackMetadata) -> None:
-        """Register track-number width for an album based on a track.
+        """Register album-level caches derived from a track's metadata.
 
-        The effective album width is max(2, max digits across all tracks in the album)).
-        Tracks without a valid number are ignored.
+        This populates the track-number padding width and notes whether the
+        album requires disc prefixes in generated file names. Tracks missing a
+        usable number are ignored for padding purposes.
 
         Args:
             metadata: Track metadata containing album and track information.
         """
-        # Determine album artist strictly (no fallback to track artist)
         album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
         album = metadata.album if metadata.album else "Unknown-Album"
         key = cls._get_album_key(album_artist, album)
 
-        # Determine width candidate from track number
+        disc_number = metadata.disc_number
+        disc_total = metadata.disc_total
+        if (
+            isinstance(disc_total, int) and disc_total > 1
+        ) or (
+            isinstance(disc_number, int) and disc_number > 1
+        ):
+            cls._albums_requiring_disc_prefix.add(key)
+
         width = 0
         if isinstance(metadata.track_number, int) and metadata.track_number > 0:
             width = len(str(metadata.track_number))
@@ -351,6 +361,30 @@ class FileNameGenerator:
         current = cls._album_track_widths.get(key)
         if current is None or width > current:
             cls._album_track_widths[key] = width
+
+    @classmethod
+    def _should_include_disc_prefix(cls, key: str, metadata: TrackMetadata) -> bool:
+        """Determine whether a disc prefix is required for the album.
+
+        Args:
+            key: Album cache key built from album artist and title.
+            metadata: Track metadata for the file being processed.
+
+        Returns:
+            bool: True when the generated file name should include the disc prefix.
+        """
+        disc_number = metadata.disc_number
+        if not isinstance(disc_number, int) or disc_number <= 0:
+            return False
+
+        disc_total = metadata.disc_total
+        if isinstance(disc_total, int) and disc_total > 1:
+            return True
+
+        if disc_number > 1:
+            return True
+
+        return key in cls._albums_requiring_disc_prefix
 
     def __init__(self, artist_id_generator: CachedArtistIdGenerator):
         """Initialize generator.
@@ -364,8 +398,8 @@ class FileNameGenerator:
         """Generate a file name from track metadata.
 
         Format:
-        - With disc number: D{disc_number}_{track_number}_{title}_{artist_id}.{extension}
-        - Without disc number: {track_number}_{title}_{artist_id}.{extension}
+            - Multi-disc albums: D{disc_number}_{track_number}_{title}_{artist_id}.{extension}
+            - Single-disc albums: {track_number}_{title}_{artist_id}.{extension}
 
         Args:
             metadata: Track metadata to generate file name from.
@@ -376,13 +410,10 @@ class FileNameGenerator:
                 placeholder values (e.g., "XX" for missing track numbers).
         """
         try:
-            # Generate artist ID
             artist_id = self.artist_id_generator.generate(metadata.artist)
 
-            # Get sanitized title
             title = Sanitizer.sanitize_title(metadata.title)
 
-            # Format track number using album-scoped width (min 2)
             album_artist = metadata.album_artist if metadata.album_artist else "Unknown-Artist"
             album = metadata.album if metadata.album else "Unknown-Album"
             key = self._get_album_key(album_artist, album)
@@ -393,18 +424,17 @@ class FileNameGenerator:
                 else "XX"
             )
 
-            # Format disc number if present
-            prefix = f"D{metadata.disc_number}" if metadata.disc_number else ""
+            include_disc_prefix = self._should_include_disc_prefix(key, metadata)
+            prefix = f"D{metadata.disc_number}" if include_disc_prefix else ""
 
-            # Combine all parts with underscores
+            extension = metadata.file_extension or ""
+
             if prefix:
-                return f"{prefix}_{track_num}_{title}_{artist_id}{metadata.file_extension}"
-            else:
-                return f"{track_num}_{title}_{artist_id}{metadata.file_extension}"
+                return f"{prefix}_{track_num}_{title}_{artist_id}{extension}"
+            return f"{track_num}_{title}_{artist_id}{extension}"
 
         except Exception as e:
             logger.error("Failed to generate file name: %s", e)
-            # Return a safe default name in case of error
             return f"ERROR_{metadata.file_extension}"
 
 

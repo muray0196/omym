@@ -9,7 +9,6 @@ class TestFileNamePadding:
 
     def test_album_uses_max_digits_over_min_two(self) -> None:
         """When any track has 3 digits, pad all tracks in album to 3 digits."""
-        # Arrange: two tracks in the same album with 3-digit and 2-digit numbers
         meta_103 = TrackMetadata(
             title="Track 103",
             artist="ヰ世界情緒",
@@ -17,6 +16,7 @@ class TestFileNamePadding:
             album_artist="ヰ世界情緒",
             year=2024,
             disc_number=1,
+            disc_total=2,
             track_number=103,
             file_extension=".opus",
         )
@@ -27,11 +27,11 @@ class TestFileNamePadding:
             album_artist="ヰ世界情緒",
             year=2024,
             disc_number=1,
+            disc_total=2,
             track_number=86,
             file_extension=".opus",
         )
 
-        # Register album width based on all tracks
         FileNameGenerator.register_album_track_width(meta_103)
         FileNameGenerator.register_album_track_width(meta_86)
 
@@ -40,11 +40,9 @@ class TestFileNamePadding:
         assert dbm.conn is not None
         gen = FileNameGenerator(CachedArtistIdGenerator(ArtistCacheDAO(dbm.conn)))
 
-        # Act
         name_103 = gen.generate(meta_103)
         name_86 = gen.generate(meta_86)
 
-        # Assert
         assert name_103.startswith("D1_103_")
         assert name_86.startswith("D1_086_")
 
@@ -57,6 +55,7 @@ class TestFileNamePadding:
             album_artist="Sample Artist",
             year=2024,
             disc_number=1,
+            disc_total=1,
             track_number=1,
             file_extension=".mp3",
         )
@@ -67,6 +66,7 @@ class TestFileNamePadding:
             album_artist="Sample Artist",
             year=2024,
             disc_number=1,
+            disc_total=1,
             track_number=12,
             file_extension=".mp3",
         )
@@ -82,5 +82,44 @@ class TestFileNamePadding:
         name_1 = gen.generate(meta_1)
         name_12 = gen.generate(meta_12)
 
-        assert name_1.startswith("D1_01_")
-        assert name_12.startswith("D1_12_")
+        assert name_1.startswith("01_")
+        assert name_12.startswith("12_")
+
+    def test_disc_prefix_inferred_from_other_track(self) -> None:
+        """Disc prefix toggles on when any track announces an additional disc."""
+        meta_disc1 = TrackMetadata(
+            title="Disc1 Track",
+            artist="Band",
+            album="TwoDisc",
+            album_artist="Band",
+            year=2024,
+            disc_number=1,
+            disc_total=None,
+            track_number=1,
+            file_extension=".flac",
+        )
+        meta_disc2 = TrackMetadata(
+            title="Disc2 Track",
+            artist="Band",
+            album="TwoDisc",
+            album_artist="Band",
+            year=2024,
+            disc_number=2,
+            disc_total=None,
+            track_number=1,
+            file_extension=".flac",
+        )
+
+        FileNameGenerator.register_album_track_width(meta_disc1)
+        FileNameGenerator.register_album_track_width(meta_disc2)
+
+        dbm = DatabaseManager(":memory:")
+        dbm.connect()
+        assert dbm.conn is not None
+        gen = FileNameGenerator(CachedArtistIdGenerator(ArtistCacheDAO(dbm.conn)))
+
+        name_disc1 = gen.generate(meta_disc1)
+        name_disc2 = gen.generate(meta_disc2)
+
+        assert name_disc1.startswith("D1_01_")
+        assert name_disc2.startswith("D2_01_")
