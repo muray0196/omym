@@ -33,6 +33,24 @@ review_cadence: quarterly
 - Logging follows module-specific loggers with structured event identifiers to aid downstream analysis; CLI output uses Rich with ANSI-aware formatting.
 - Supports Windows, macOS, and Linux path semantics by sanitising filenames and normalising Unicode.
 
+## Artist Override Configuration
+- Override resolution now honours the precedence `user overrides → MusicBrainz → pykakasi transliteration`.
+- Users can provide overrides at `config/artist_overrides.yaml`; set `OMYM_ARTIST_OVERRIDES_PATH` to point elsewhere.
+- The loader accepts a minimal YAML mapping:
+  ```toml
+  metadata_version = 1
+
+  [defaults]
+  locale = "en_US"
+
+  [overrides]
+  "宇多田ヒカル" = "Utada Hikaru"
+  Perfume = "Perfume"
+  ```
+- Keep the document to simple key/value pairs. Duplicate keys after case normalisation are rejected to avoid ambiguity.
+- A starter file is created automatically on first run at `config/artist_overrides.toml`. As you run dry-run or organise commands, encountered artists are appended with empty values for quick editing.
+- Run targeted tests with `uv run pytest tests/config/test_artist_overrides.py` after editing overrides logic.
+
 ## Assumptions, Constraints, Dependencies
 - Requires Python ≥3.13 with dependencies pinned in [`pyproject.toml`](../pyproject.toml) and managed via `uv`.
 - Expects all files on locally mounted filesystems accessible by the running user; network shares are treated as opaque POSIX/NTFS mounts.

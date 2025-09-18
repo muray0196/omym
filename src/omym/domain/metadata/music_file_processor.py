@@ -15,6 +15,12 @@ from pathlib import Path
 from collections.abc import Iterable
 from typing import Any, Callable, ClassVar, final
 
+from omym.config.artist_overrides import (
+    ArtistOverrideRepository,
+    ArtistOverridesError,
+    load_artist_overrides,
+)
+
 from omym.domain.common import remove_empty_directories
 from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
@@ -224,6 +230,7 @@ class MusicProcessor:
     before_dao: ProcessingBeforeDAO
     after_dao: ProcessingAfterDAO
     artist_dao: ArtistCacheDAO | _DryRunArtistCacheAdapter
+    artist_overrides: ArtistOverrideRepository
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
     file_name_generator: FileNameGenerator
@@ -240,6 +247,13 @@ class MusicProcessor:
         """
         self.base_path = base_path
         self.dry_run = dry_run
+
+        try:
+            self.artist_overrides = load_artist_overrides()
+        except ArtistOverridesError as exc:
+            raise RuntimeError(
+                f"Failed to load artist override configuration: {exc}"
+            ) from exc
 
         # Initialize database connection.
         self.db_manager = DatabaseManager()
@@ -259,6 +273,18 @@ class MusicProcessor:
             trimmed = name.strip()
             if not trimmed:
                 return None
+
+            self.artist_overrides.ensure_placeholder(trimmed)
+            override = self.artist_overrides.resolve(trimmed)
+            if override is not None:
+                if hasattr(self, "_romanizer"):
+                    self._romanizer.record_fetch_context(
+                        source="user_override",
+                        original=trimmed,
+                        value=override,
+                    )
+                logger.info("Using user-defined override for '%s' -> '%s'", trimmed, override)
+                return override
 
             try:
                 cached = self.artist_dao.get_romanized_name(trimmed)
@@ -1311,6 +1337,14 @@ class MusicProcessor:
         if trimmed in self._romanize_futures:
             return
 
+        override = self.artist_overrides.resolve(trimmed)
+        if override is not None:
+            override_future: Future[str] = Future()
+            override_future.set_result(override)
+            self._romanize_futures[trimmed] = override_future
+            logger.debug("Using artist override for '%s' during scheduling", trimmed)
+            return
+
         cached_value: str | None = None
         try:
             cached_value = self.artist_dao.get_romanized_name(trimmed)
@@ -1319,9 +1353,9 @@ class MusicProcessor:
 
         if cached_value:
             logger.debug("Using persisted romanization cache for '%s'", trimmed)
-            future: Future[str] = Future()
-            future.set_result(cached_value)
-            self._romanize_futures[trimmed] = future
+            cached_future: Future[str] = Future()
+            cached_future.set_result(cached_value)
+            self._romanize_futures[trimmed] = cached_future
             return
 
         def _romanize() -> str:

@@ -1,5 +1,7 @@
 # Project
 config/
+!src/omym/config/
+!tests/config/
 .data/
 # Editor
 .vscode/

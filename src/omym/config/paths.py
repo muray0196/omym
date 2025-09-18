@@ -48,6 +48,15 @@ def default_config_path() -> Path:
     return (repo_root / "config" / "omym" / "config.toml").resolve()
 
 
+def default_artist_overrides_path() -> Path:
+    """Get the default path to the artist overrides file.
+
+    Portable layout: ``<repo_root>/config/artist_overrides.toml``.
+    """
+    repo_root = _detect_repo_root()
+    return (repo_root / "config" / "artist_overrides.toml").resolve()
+
+
 def default_data_dir() -> Path:
     """Get the default directory for app data (e.g., the SQLite DB).
 
@@ -63,5 +72,6 @@ def default_data_dir() -> Path:
 
 __all__ = [
     "default_config_path",
+    "default_artist_overrides_path",
     "default_data_dir",
 ]
