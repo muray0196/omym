@@ -6,6 +6,7 @@ from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
+from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
 from omym.domain.metadata.track_metadata import TrackMetadata
@@ -749,3 +750,56 @@ class TestMusicProcessor:
         assert result.success is False
         assert "Failed to move file" in str(result.error_message)
         assert source_file.exists()  # Original file should still exist
+
+
+def test_dry_run_skips_persistent_state(
+    tmp_path: Path,
+    mocker: MockerFixture,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Dry-run execution must leave the persistent database untouched."""
+
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("OMYM_DATA_DIR", str(data_dir))
+
+    source_dir = tmp_path / "source"
+    destination_dir = tmp_path / "destination"
+    source_dir.mkdir()
+    destination_dir.mkdir()
+
+    audio_file = source_dir / "track.mp3"
+    _ = audio_file.write_bytes(b"test-audio")
+
+    metadata = TrackMetadata(
+        title="Track",
+        artist=None,
+        album=None,
+        album_artist=None,
+        file_extension=".mp3",
+    )
+    _ = mocker.patch(
+        "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+        return_value=metadata,
+    )
+
+    processor = MusicProcessor(base_path=destination_dir, dry_run=True)
+    target_candidate = destination_dir / "Track.mp3"
+    _ = mocker.patch.object(processor, "_generate_target_path", return_value=target_candidate)
+
+    result = processor.process_file(audio_file, source_root=source_dir, target_root=destination_dir)
+
+    assert result.success is True
+    assert result.dry_run is True
+    assert audio_file.exists()
+    assert processor.db_manager.conn is not None
+
+    cursor = processor.db_manager.conn.cursor()
+    _ = cursor.execute("SELECT COUNT(*) FROM processing_before")
+    assert cursor.fetchone()[0] == 0
+    _ = cursor.execute("SELECT COUNT(*) FROM processing_after")
+    assert cursor.fetchone()[0] == 0
+    _ = cursor.execute("SELECT COUNT(*) FROM artist_cache")
+    assert cursor.fetchone()[0] == 0
+
+    processor._romanizer_executor.shutdown(wait=False)  # pyright: ignore[reportPrivateUsage] - executor cleanup for test
+    processor.db_manager.conn.close()

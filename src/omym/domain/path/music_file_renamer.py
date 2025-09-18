@@ -1,15 +1,29 @@
 """Renaming logic functionality."""
 
 import re
-from typing import final, ClassVar
+from typing import ClassVar, Protocol, final, runtime_checkable
 from pathlib import Path
 from unidecode import unidecode
 import pykakasi
 import langid
 from omym.domain.path.sanitizer import Sanitizer
 from omym.domain.metadata.track_metadata import TrackMetadata
-from omym.infra.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.infra.logger.logger import logger
+
+
+@runtime_checkable
+class ArtistCacheWriter(Protocol):
+    """Protocol for artist cache interactions used by ID generation."""
+
+    def get_artist_id(self, artist_name: str) -> str | None:
+        """Return a cached artist ID if present."""
+
+        ...
+
+    def insert_artist_id(self, artist_name: str, artist_id: str) -> bool:
+        """Persist a generated artist ID; returns True on success."""
+
+        ...
 
 
 @final
@@ -171,13 +185,13 @@ class ArtistIdGenerator:
 class CachedArtistIdGenerator:
     """Generate and cache artist IDs."""
 
-    dao: ArtistCacheDAO
+    dao: ArtistCacheWriter
 
-    def __init__(self, dao: ArtistCacheDAO):
+    def __init__(self, dao: ArtistCacheWriter):
         """Initialize generator with a DAO.
 
         Args:
-            dao: ArtistCacheDAO instance for database access.
+            dao: Artist cache interface for database access.
         """
         self.dao = dao
 

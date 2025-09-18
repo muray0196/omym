@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
+import sqlite3
 import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -151,6 +152,64 @@ class ArtworkProcessingResult:
 
 
 @final
+class _DryRunArtistCacheAdapter:
+    """Artist cache adapter that avoids persistent writes during dry runs."""
+
+    _DEFAULT_SOURCE: ClassVar[str] = "musicbrainz"
+
+    def __init__(self, delegate: ArtistCacheDAO) -> None:
+        self._delegate = delegate
+        self.conn = delegate.conn
+        self._memory_artist_ids: dict[str, str] = {}
+        self._memory_romanized: dict[str, tuple[str, str]] = {}
+
+    def insert_artist_id(self, artist_name: str, artist_id: str) -> bool:
+        normalized_name = artist_name.strip()
+        normalized_id = artist_id.strip()
+        if not normalized_name or not normalized_id:
+            return False
+        self._memory_artist_ids[normalized_name] = normalized_id
+        return True
+
+    def get_artist_id(self, artist_name: str) -> str | None:
+        normalized_name = artist_name.strip()
+        if not normalized_name:
+            return None
+        in_memory = self._memory_artist_ids.get(normalized_name)
+        if in_memory:
+            return in_memory
+        return self._delegate.get_artist_id(artist_name)
+
+    def upsert_romanized_name(
+        self,
+        artist_name: str,
+        romanized_name: str,
+        source: str | None = None,
+    ) -> bool:
+        normalized_name = artist_name.strip()
+        normalized_romanized = romanized_name.strip()
+        if not normalized_name or not normalized_romanized:
+            return False
+        effective_source = (source or self._DEFAULT_SOURCE).strip() or self._DEFAULT_SOURCE
+        self._memory_romanized[normalized_name] = (normalized_romanized, effective_source)
+        return True
+
+    def get_romanized_name(self, artist_name: str) -> str | None:
+        normalized_name = artist_name.strip()
+        if not normalized_name:
+            return None
+        in_memory = self._memory_romanized.get(normalized_name)
+        if in_memory:
+            return in_memory[0]
+        return self._delegate.get_romanized_name(artist_name)
+
+    def clear_cache(self) -> bool:
+        self._memory_artist_ids.clear()
+        self._memory_romanized.clear()
+        return True
+
+
+@final
 class MusicProcessor:
     """Process music files for organization."""
 
@@ -164,7 +223,7 @@ class MusicProcessor:
     db_manager: DatabaseManager
     before_dao: ProcessingBeforeDAO
     after_dao: ProcessingAfterDAO
-    artist_dao: ArtistCacheDAO
+    artist_dao: ArtistCacheDAO | _DryRunArtistCacheAdapter
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
     file_name_generator: FileNameGenerator
@@ -185,13 +244,15 @@ class MusicProcessor:
         # Initialize database connection.
         self.db_manager = DatabaseManager()
         self.db_manager.connect()
-        if self.db_manager.conn is None:
+        conn = self.db_manager.conn
+        if conn is None:
             raise RuntimeError("Failed to connect to database")
 
         # Initialize DAOs.
-        self.before_dao = ProcessingBeforeDAO(self.db_manager.conn)
-        self.after_dao = ProcessingAfterDAO(self.db_manager.conn)
-        self.artist_dao = ArtistCacheDAO(self.db_manager.conn)
+        self.before_dao = ProcessingBeforeDAO(conn)
+        self.after_dao = ProcessingAfterDAO(conn)
+        base_artist_dao = ArtistCacheDAO(conn)
+        self.artist_dao = _DryRunArtistCacheAdapter(base_artist_dao) if self.dry_run else base_artist_dao
         configure_romanization_cache(self.artist_dao)
 
         def _fetch_with_persistent_cache(name: str) -> str | None:
@@ -328,11 +389,13 @@ class MusicProcessor:
                 continue
 
         processed_count = 0
+        conn = self.db_manager.conn
+        if conn is None:
+            raise RuntimeError("Database connection is not initialized")
+
         try:
-            conn = self.db_manager.conn
-            if conn is None:
-                raise RuntimeError("Database connection is not initialized")
-            _ = conn.execute("BEGIN TRANSACTION")
+            if not self.dry_run:
+                _ = conn.execute("BEGIN TRANSACTION")
 
             for index, current_file in enumerate(supported_files, start=1):
                 try:
@@ -391,10 +454,8 @@ class MusicProcessor:
             if not self.dry_run:
                 remove_empty_directories(directory)
 
-            conn = self.db_manager.conn
-            if conn is None:
-                raise RuntimeError("Database connection is not initialized")
-            conn.commit()
+            if not self.dry_run:
+                conn.commit()
 
             summary_extra = stats.summary_extra()
             self._log_processing(
@@ -423,9 +484,11 @@ class MusicProcessor:
                 **error_extra,
                 source_base_path=directory,
             )
-            conn = self.db_manager.conn
-            if conn is not None:
-                conn.rollback()
+            if not self.dry_run:
+                try:
+                    conn.rollback()
+                except sqlite3.Error:
+                    pass
 
         return results
 
@@ -563,8 +626,9 @@ class MusicProcessor:
                 raise ValueError("Failed to generate target path")
 
             # Save file state.
-            if not self.before_dao.insert_file(file_hash, file_path):
-                raise ValueError("Failed to save file state to database")
+            if not self.dry_run:
+                if not self.before_dao.insert_file(file_hash, file_path):
+                    raise ValueError("Failed to save file state to database")
 
             # If not in dry run mode, move the file and record updated state.
             if not self.dry_run:
