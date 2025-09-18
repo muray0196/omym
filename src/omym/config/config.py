@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omym.config.file_ops import write_text_file
 from omym.infra.logger.logger import logger
 from omym.config.paths import default_config_path
 
@@ -69,23 +70,18 @@ class Config:
                 config_dict[key] = str(value)
 
         try:
-            # If the file exists and is JSON, convert it to TOML
-            # Save as TOML with comments at default XDG path
+            # Save as TOML with comments at default portable path
             target = default_config_path()
-            target.parent.mkdir(parents=True, exist_ok=True)
-            self._save_toml(target, config_dict)
+            content = self._render_toml(config_dict)
+            write_text_file(target, content)
             logger.info("Configuration saved to %s", target)
         except Exception as e:
             logger.error("Failed to save configuration: %s", e)
             raise
 
-    def _save_toml(self, path: Path, config: dict[str, Any]) -> None:
-        """Save configuration as TOML with comments.
+    def _render_toml(self, config: dict[str, Any]) -> str:
+        """Render configuration as TOML with inline guidance."""
 
-        Args:
-            path: Path to save the configuration to
-            config: Configuration dictionary to save
-        """
         lines: list[str] = []
 
         # Header
@@ -127,10 +123,7 @@ class Config:
             lines.append(f"mb_contact = {self._format_toml_value(config['mb_contact'])}")
         lines.append("")
 
-        toml_str = "\n".join(lines)
-
-        with open(path, "w", encoding="utf-8") as f:
-            _ = f.write(toml_str)  # Assign to _ to acknowledge unused result
+        return "\n".join(lines)
 
     def _format_toml_value(self, value: Any) -> str:
         """Format a value for TOML serialization.

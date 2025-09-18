@@ -13,10 +13,34 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Final
+from collections.abc import Mapping
+from typing import Callable, Final
 
 
 _ENV_DATA_DIR: Final[str] = "OMYM_DATA_DIR"
+
+
+def resolve_overridable_path(
+    *,
+    explicit_path: Path | str | None,
+    env: Mapping[str, str] | None,
+    env_var: str | None,
+    default_factory: Callable[[], Path],
+) -> Path:
+    """Resolve a configuration path honoring explicit and environment overrides."""
+
+    if explicit_path is not None:
+        return Path(explicit_path).expanduser().resolve()
+
+    mapping = env if env is not None else os.environ
+    if env_var:
+        candidate = mapping.get(env_var) or ""
+        candidate = candidate.strip()
+        if candidate:
+            return Path(candidate).expanduser().resolve()
+
+    default_path = default_factory()
+    return default_path.expanduser().resolve()
 
 
 def _detect_repo_root(start: Path | None = None) -> Path:
@@ -58,20 +82,19 @@ def default_artist_overrides_path() -> Path:
 
 
 def default_data_dir() -> Path:
-    """Get the default directory for app data (e.g., the SQLite DB).
+    """Get the default directory for app data (e.g., the SQLite DB)."""
 
-    Honors the ``OMYM_DATA_DIR`` environment variable when set, else
-    resolves to ``<repo_root>/.data``.
-    """
-    env_dir = os.getenv(_ENV_DATA_DIR)
-    if env_dir:
-        return Path(env_dir).expanduser().resolve()
-    repo_root = _detect_repo_root()
-    return (repo_root / ".data").resolve()
+    return resolve_overridable_path(
+        explicit_path=None,
+        env=None,
+        env_var=_ENV_DATA_DIR,
+        default_factory=lambda: (_detect_repo_root() / ".data").resolve(),
+    )
 
 
 __all__ = [
     "default_config_path",
     "default_artist_overrides_path",
     "default_data_dir",
+    "resolve_overridable_path",
 ]

@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from omym.domain.common import remove_empty_directories
+from omym.core.filesystem import ensure_parent_directory, remove_empty_directories
 from omym.domain.restoration.models import (
     CollisionPolicy,
     RestorePlanItem,
@@ -125,9 +125,8 @@ class RestorationService:
             )
             return RestoreResult(plan=item, moved=False, message=message)
 
-        destination_parent = item.destination_path.parent
         if not request.dry_run:
-            destination_parent.mkdir(parents=True, exist_ok=True)
+            _ = ensure_parent_directory(item.destination_path)
 
         collision_result = self._handle_collision(ctx)
         if collision_result is not None:
@@ -314,7 +313,7 @@ class RestorationService:
                 ),
             )
 
-        lyrics_target.parent.mkdir(parents=True, exist_ok=True)
+        _ = ensure_parent_directory(lyrics_target)
         _ = shutil.move(str(lyrics_source), str(lyrics_target))
         _ = logger.info(
             "Restored lyrics %s → %s",
@@ -441,7 +440,7 @@ class RestorationService:
                 ),
             )
 
-        artwork_target.parent.mkdir(parents=True, exist_ok=True)
+        _ = ensure_parent_directory(artwork_target)
         _ = shutil.move(str(artwork_source), str(artwork_target))
         _ = logger.info(
             "Restored artwork %s → %s",

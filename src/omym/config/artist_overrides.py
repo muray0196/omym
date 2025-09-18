@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import textwrap
 import tomllib
 from collections.abc import Mapping
@@ -10,7 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
-from omym.config.paths import default_artist_overrides_path
+from omym.config.file_ops import ensure_file_with_template, write_text_file
+from omym.config.paths import default_artist_overrides_path, resolve_overridable_path
 from omym.infra.logger.logger import logger
 
 _ARTIST_OVERRIDES_ENV = "OMYM_ARTIST_OVERRIDES_PATH"
@@ -176,8 +176,7 @@ class ArtistOverrideRepository:
         lines.append("")
 
         content = "\n".join(lines)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        _ = self.path.write_text(content, encoding="utf-8")
+        write_text_file(self.path, content)
 
     @staticmethod
     def _quote(value: str) -> str:
@@ -195,12 +194,18 @@ def load_artist_overrides(
         env: Optional environment mapping to read configuration from.
 
     Returns:
-        ArtistOverrideStore: Loaded overrides (possibly empty).
+        ArtistOverrideRepository: Loaded overrides (possibly empty).
     """
 
-    resolved_path = _resolve_configuration_path(path=path, env=env)
-    if not resolved_path.exists():
-        _write_template(resolved_path)
+    resolved_path = resolve_overridable_path(
+        explicit_path=path,
+        env=env,
+        env_var=_ARTIST_OVERRIDES_ENV,
+        default_factory=default_artist_overrides_path,
+    )
+    if ensure_file_with_template(
+        resolved_path, template_provider=lambda: _TEMPLATE
+    ):
         logger.info("Created artist override template at %s", resolved_path)
         return ArtistOverrideRepository(
             path=resolved_path,
@@ -241,26 +246,6 @@ def load_artist_overrides(
         )
 
     return repository
-
-
-def _resolve_configuration_path(
-    *, path: Path | None, env: Mapping[str, str] | None
-) -> Path:
-    if path is not None:
-        return path.expanduser().resolve()
-
-    env_mapping = env if env is not None else os.environ
-    candidate = env_mapping.get(_ARTIST_OVERRIDES_ENV) or ""
-    candidate = candidate.strip()
-    if candidate:
-        return Path(candidate).expanduser().resolve()
-
-    return default_artist_overrides_path()
-
-
-def _write_template(target: Path) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    _ = target.write_text(_TEMPLATE, encoding="utf-8")
 
 
 def _extract_metadata_version(document: Mapping[str, Any]) -> int:

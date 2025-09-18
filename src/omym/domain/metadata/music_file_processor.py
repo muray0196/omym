@@ -21,7 +21,7 @@ from omym.config.artist_overrides import (
     load_artist_overrides,
 )
 
-from omym.domain.common import remove_empty_directories
+from omym.core.filesystem import ensure_parent_directory, remove_empty_directories
 from omym.domain.metadata.artist_romanizer import ArtistRomanizer
 from omym.domain.metadata.track_metadata import TrackMetadata
 from omym.domain.metadata.track_metadata_extractor import MetadataExtractor
@@ -919,7 +919,7 @@ class MusicProcessor:
             )
 
         try:
-            target_lyrics_path.parent.mkdir(parents=True, exist_ok=True)
+            _ = ensure_parent_directory(target_lyrics_path)
             _ = shutil.move(str(lyrics_path), str(target_lyrics_path))
         except Exception as exc:  # pragma: no cover - defensive logging of unexpected failure
             error_message = str(exc) if str(exc) else type(exc).__name__
@@ -1136,7 +1136,7 @@ class MusicProcessor:
                 continue
 
             try:
-                target_artwork_path.parent.mkdir(parents=True, exist_ok=True)
+                _ = ensure_parent_directory(target_artwork_path)
                 _ = shutil.move(str(artwork_path), str(target_artwork_path))
             except Exception as exc:
                 error_message = str(exc) if str(exc) else type(exc).__name__
@@ -1281,7 +1281,7 @@ class MusicProcessor:
             target_root: Optional root directory used to abbreviate target paths in logs.
         """
 
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        _ = ensure_parent_directory(dest_path)
         self._log_processing(
             logging.INFO,
             ProcessingEvent.FILE_MOVE,

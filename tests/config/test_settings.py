@@ -3,44 +3,11 @@
 from __future__ import annotations
 
 import importlib
-from collections.abc import Iterator
-from pathlib import Path
-
-import pytest
 
 
-@pytest.fixture
-def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Isolate config paths to a temporary repository root."""
-    # Create repo marker so _detect_repo_root resolves to tmp_path
-    _ = (tmp_path / "pyproject.toml").write_text("[project]\nname='tmp'\n")
-
-    import omym.config.paths as paths
-
-    def _fake_detect_repo_root(_start: Path | None = None) -> Path:
-        return tmp_path
-
-    monkeypatch.setattr(paths, "_detect_repo_root", _fake_detect_repo_root, raising=True)
-
-    # Reset config singleton before reloading settings
-    import omym.config.config as config_module
-
-    config_module.Config._instance = None  # pyright: ignore[reportPrivateUsage]
-    config_module.Config._loaded_from = None  # pyright: ignore[reportPrivateUsage]
-    config_module.config = config_module.Config.load()
-
-    yield
-
-    # Clean up singletons after test
-    config_module.Config._instance = None  # pyright: ignore[reportPrivateUsage]
-    config_module.Config._loaded_from = None  # pyright: ignore[reportPrivateUsage]
-
-
-def test_use_mb_romanization_defaults_true(
-    isolated_environment: None,
-) -> None:
+def test_use_mb_romanization_defaults_true(config_runtime_env: None) -> None:
     """Default configuration enables MusicBrainz romanization."""
-    _ = isolated_environment
+    _ = config_runtime_env
 
     import omym.config.settings as settings
 
@@ -50,11 +17,11 @@ def test_use_mb_romanization_defaults_true(
 
 
 def test_musicbrainz_identity_uses_config_defaults(
-    isolated_environment: None,
+    config_runtime_env: None,
 ) -> None:
     """MusicBrainz identity derives from config values."""
 
-    _ = isolated_environment
+    _ = config_runtime_env
 
     from omym.config.config import config as app_config
 

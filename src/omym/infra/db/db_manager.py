@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import final, Any
 
+from omym.core.filesystem import ensure_directory, ensure_parent_directory
 from omym.infra.logger.logger import logger
 from omym.config.paths import default_data_dir
 
@@ -27,7 +28,7 @@ class DatabaseManager:
         elif db_path is None:
             # Prefer repository-root data directory, env overridable
             data_dir = default_data_dir()
-            data_dir.mkdir(parents=True, exist_ok=True)
+            _ = ensure_directory(data_dir)
             self.db_path = data_dir / "omym.db"
         else:
             self.db_path = Path(db_path) if isinstance(db_path, str) else db_path
@@ -39,7 +40,7 @@ class DatabaseManager:
             # Ensure directory exists if using file-based database
             if self.db_path != ":memory:":
                 if isinstance(self.db_path, Path):
-                    self.db_path.parent.mkdir(parents=True, exist_ok=True)
+                    _ = ensure_parent_directory(self.db_path)
 
             # Connect with proper settings
             try:

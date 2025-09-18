@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import final
 
+from omym.core.filesystem import ensure_directory
 from omym.infra.logger.logger import logger, setup_logger
 from omym.config.config import Config
 from omym.domain.restoration import CollisionPolicy
@@ -195,7 +196,7 @@ class ArgumentParser:
 
         if parsed_args.target:
             target_path = Path(parsed_args.target)
-            target_path.mkdir(parents=True, exist_ok=True)
+            _ = ensure_directory(target_path)
         else:
             target_path = music_path.parent if music_path.is_file() else music_path
 

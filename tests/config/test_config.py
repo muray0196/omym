@@ -2,29 +2,12 @@
 
 from pathlib import Path
 
-import pytest
-
 from omym.config.config import Config
 from omym.config.paths import default_config_path
 
 
-@pytest.fixture
-def repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Force portable repo root to a temporary directory for isolation."""
-    # Create repo markers so _detect_repo_root() returns tmp_path
-    _ = (tmp_path / "pyproject.toml").write_text("[tool.poetry]\nname='tmp'\n")
-    # Monkeypatch the detector to be explicit and fast
-    import omym.config.paths as p
-
-    def _fake_detect_repo_root(_start: Path | None = None) -> Path:
-        return tmp_path
-
-    monkeypatch.setattr(p, "_detect_repo_root", _fake_detect_repo_root, raising=True)
-    return tmp_path
-
-
-def test_default_config(repo_root: Path) -> None:
-    _ = repo_root  # acknowledge fixture usage
+def test_default_config(portable_repo_root: Path) -> None:
+    _ = portable_repo_root  # acknowledge fixture usage
     """Test default configuration creation at portable repo location."""
     config = Config()
     assert config.base_path is None
@@ -38,8 +21,8 @@ def test_default_config(repo_root: Path) -> None:
     assert default_config_path().exists()
 
 
-def test_save_load_toml(repo_root: Path) -> None:
-    _ = repo_root  # acknowledge fixture usage
+def test_save_load_toml(portable_repo_root: Path) -> None:
+    _ = portable_repo_root  # acknowledge fixture usage
     """Test saving and loading configuration in TOML format at repo path."""
     # Create and save config
     original_config = Config(
@@ -66,8 +49,8 @@ def test_save_load_toml(repo_root: Path) -> None:
     assert default_config_path().exists()
 
 
-def test_save_load_none_values(repo_root: Path) -> None:
-    _ = repo_root  # acknowledge fixture usage
+def test_save_load_none_values(portable_repo_root: Path) -> None:
+    _ = portable_repo_root  # acknowledge fixture usage
     """Test saving and loading configuration with None values."""
     # Create and save config with None values
     original_config = Config(
@@ -93,8 +76,8 @@ def test_save_load_none_values(repo_root: Path) -> None:
     assert loaded_config.mb_contact is None
 
 
-def test_singleton_behavior(repo_root: Path) -> None:
-    _ = repo_root  # acknowledge fixture usage
+def test_singleton_behavior(portable_repo_root: Path) -> None:
+    _ = portable_repo_root  # acknowledge fixture usage
     """Test singleton pattern behavior with fixed XDG path."""
     # Create first instance
     config1 = Config.load()
@@ -115,8 +98,8 @@ def test_singleton_behavior(repo_root: Path) -> None:
     assert config2.mb_contact == "https://example.com"
 
 
-def test_toml_comments(repo_root: Path) -> None:
-    _ = repo_root  # acknowledge fixture usage
+def test_toml_comments(portable_repo_root: Path) -> None:
+    _ = portable_repo_root  # acknowledge fixture usage
     """Test TOML file contains comments."""
     config = Config(
         base_path=Path("/test/music"),
