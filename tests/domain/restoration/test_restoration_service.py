@@ -348,3 +348,39 @@ def test_restore_lyrics_collision_backup(tmp_path: Path, service: RestorationSer
     assert backup_path.read_text() == "existing"
     assert original_lyrics.exists()
     assert original_lyrics.read_text() == "new"
+
+
+def test_restore_skips_when_source_matches_destination(
+    tmp_path: Path, service: RestorationService
+) -> None:
+    """Restoration should treat identical source and destination paths as a no-op."""
+
+    library_dir = tmp_path / "library"
+    library_dir.mkdir()
+    track_path = library_dir / "song.mp3"
+    _ = track_path.write_bytes(b"data")
+
+    file_hash = hashlib.sha256(track_path.read_bytes()).hexdigest()
+    _register_sample_record(
+        service,
+        file_hash=file_hash,
+        original_path=track_path,
+        target_path=track_path,
+    )
+
+    request = RestoreRequest(
+        source_root=library_dir,
+        destination_root=None,
+        dry_run=False,
+        collision_policy=CollisionPolicy.ABORT,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+    )
+
+    results = service.run(request)
+
+    assert results and results[0].moved is False
+    assert results[0].message == "already_restored"
+    assert track_path.exists()
+    assert track_path.read_bytes() == b"data"

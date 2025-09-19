@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import final
+from typing import Final, final
 from rich.console import Console
 
 from omym.domain.restoration import RestoreResult
+
+
+SKIPPED_MESSAGES: Final[set[str]] = {"dry_run", "destination_exists", "already_restored"}
 
 
 @final
@@ -26,7 +29,7 @@ class RestoreResultDisplay:
         skipped = sum(
             1
             for result in results
-            if not result.moved and (result.message in {"dry_run", "destination_exists"})
+            if not result.moved and (result.message in SKIPPED_MESSAGES)
         )
         failed = total - restored - skipped
 
@@ -40,7 +43,7 @@ class RestoreResultDisplay:
             for result in results:
                 if result.moved:
                     continue
-                if result.message in {"dry_run", "destination_exists"}:
+                if result.message in SKIPPED_MESSAGES:
                     continue
                 detail = result.message or "unknown error"
                 self.console.print(

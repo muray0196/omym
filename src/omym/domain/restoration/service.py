@@ -125,6 +125,22 @@ class RestorationService:
             )
             return RestoreResult(plan=item, moved=False, message=message)
 
+        if self._paths_match(item.source_path, item.destination_path):
+            relative_destination = self._relative_destination(
+                item.destination_path,
+                request,
+                ctx,
+            )
+            _ = logger.info(
+                "Skipping restore because source already matches destination: %s",
+                relative_destination,
+            )
+            return RestoreResult(
+                plan=item,
+                moved=False,
+                message="already_restored",
+            )
+
         if not request.dry_run:
             _ = ensure_parent_directory(item.destination_path)
 
@@ -448,6 +464,17 @@ class RestorationService:
             self._relative_destination(artwork_target, request, ctx),
         )
         return warnings
+
+    @staticmethod
+    def _paths_match(source: Path, destination: Path) -> bool:
+        """Return True when source and destination refer to the same filesystem entry."""
+
+        if source == destination:
+            return True
+        try:
+            return source.resolve() == destination.resolve()
+        except OSError:
+            return False
 
     def _relative_source(self, path: Path, request: RestoreRequest) -> Path | str:
         return self._relative(path, request.source_root)
