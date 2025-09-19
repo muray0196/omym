@@ -4,12 +4,16 @@ This layer centralizes orchestration and construction of domain/infra objects
 so that multiple UIs (CLI, GUI) can reuse the same use cases.
 """
 
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import final, Callable
+from typing import Callable, final
 
 from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
 from omym.infra.db.daos.maintenance_dao import MaintenanceDAO
+from omym.infra.logger.logger import logger
+
+CACHE_CLEAR_EXCEPTIONS: tuple[type[Exception], ...] = (sqlite3.Error,)
 
 
 @dataclass(frozen=True)
@@ -48,24 +52,47 @@ class OrganizeMusicService:
         """
         processor = MusicProcessor(base_path=request.base_path, dry_run=request.dry_run)
 
-        # Optionally clear artist cache
+        # Optionally clear artist cache; continue on recognized transient errors.
         if request.clear_artist_cache and hasattr(processor, "artist_dao"):
-            try:
-                _ = processor.artist_dao.clear_cache()
-            except Exception:
-                # Best-effort: cache clearing failures must not block processing
-                pass
+            artist_dao = getattr(processor, "artist_dao")
+            if artist_dao is not None:
+                try:
+                    _ = artist_dao.clear_cache()
+                except Exception as exc:
+                    if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
+                        logger.warning(
+                            (
+                                "build_processor: clear_artist_cache requested but "
+                                "artist_dao.clear_cache() failed; continuing without "
+                                "flushing the persistent artist cache. error=%s"
+                            ),
+                            exc,
+                        )
+                    else:
+                        raise
 
-        # Optionally clear all caches and processing state
+        # Optionally clear all caches and processing state when requested.
         if request.clear_cache:
+            db_manager = getattr(processor, "db_manager", None)
+            conn: sqlite3.Connection | None = None
             try:
-                db_manager = getattr(processor, "db_manager", None)
                 conn = db_manager.conn if db_manager is not None else None
                 if conn is not None:
                     _ = MaintenanceDAO(conn).clear_all()
-            except Exception:
-                # Best-effort clean; non-fatal if unsupported
-                pass
+            except Exception as exc:
+                if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
+                    logger.warning(
+                        (
+                            "build_processor: clear_cache requested but "
+                            "MaintenanceDAO.clear_all() failed for connection %r; "
+                            "continuing without clearing persistent processing state. "
+                            "error=%s"
+                        ),
+                        conn,
+                        exc,
+                    )
+                else:
+                    raise
 
         return processor
 
