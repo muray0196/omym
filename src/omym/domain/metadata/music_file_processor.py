@@ -49,6 +49,7 @@ class ProcessingEvent(StrEnum):
     DIRECTORY_START = "processing.directory.start"
     DIRECTORY_COMPLETE = "processing.directory.complete"
     DIRECTORY_ERROR = "processing.directory.error"
+    DIRECTORY_ROLLBACK_ERROR = "processing.directory.rollback_error"
     DIRECTORY_NO_FILES = "processing.directory.no_files"
     FILE_START = "processing.file.start"
     FILE_SKIP_DUPLICATE = "processing.file.skip.duplicate"
@@ -115,6 +116,20 @@ class ProcessingLogContext:
             "dry_run": self.dry_run,
             "duration_seconds": round(self.duration_seconds(), 4),
         }
+
+
+class DirectoryRollbackError(RuntimeError):
+    """Raised when rolling back a directory processing transaction fails."""
+
+    def __init__(self, process_id: str, directory: Path, rollback_error: sqlite3.Error) -> None:
+        message = (
+            "Database rollback failed for directory processing "
+            f"(process_id={process_id}, directory={directory}): {rollback_error}"
+        )
+        super().__init__(message)
+        self.process_id: str = process_id
+        self.directory: Path = directory
+        self.rollback_error: sqlite3.Error = rollback_error
 
 @dataclass
 class ProcessResult:
@@ -513,8 +528,34 @@ class MusicProcessor:
             if not self.dry_run:
                 try:
                     conn.rollback()
-                except sqlite3.Error:
-                    pass
+                except sqlite3.Error as rollback_error:
+                    rollback_message = (
+                        str(rollback_error)
+                        if str(rollback_error)
+                        else type(rollback_error).__name__
+                    )
+                    rollback_extra = stats.summary_extra()
+                    rollback_extra.update(
+                        {
+                            "error_message": error_message,
+                            "rollback_error": rollback_message,
+                        }
+                    )
+                    self._log_processing(
+                        logging.ERROR,
+                        ProcessingEvent.DIRECTORY_ROLLBACK_ERROR,
+                        "Database rollback failed after directory error [id=%s, path=%s, rollback_error=%s]",
+                        process_id,
+                        directory,
+                        rollback_message,
+                        **rollback_extra,
+                        source_base_path=directory,
+                    )
+                    raise DirectoryRollbackError(
+                        process_id=process_id,
+                        directory=directory,
+                        rollback_error=rollback_error,
+                    ) from rollback_error
 
         return results
 

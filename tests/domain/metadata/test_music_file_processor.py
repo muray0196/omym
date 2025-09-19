@@ -1,6 +1,7 @@
 """Tests for music file processing functionality."""
 
 import logging
+import sqlite3
 from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
@@ -10,7 +11,12 @@ from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
 from omym.domain.metadata.track_metadata import TrackMetadata
-from omym.domain.metadata.music_file_processor import MusicProcessor
+from omym.domain.metadata.music_file_processor import (
+    DirectoryRollbackError,
+    MusicProcessor,
+    ProcessingEvent,
+    ProcessResult,
+)
 
 
 @pytest.fixture
@@ -507,6 +513,65 @@ class TestMusicProcessor:
         }
         process_ids.discard(None)
         assert len(process_ids) == 1
+
+    def test_process_directory_rollback_failure_logs_and_raises(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Rollback failures must be logged with context and raised to callers."""
+
+        source_dir = tmp_path / "rollback"
+        source_dir.mkdir()
+        (source_dir / "track.mp3").touch()
+
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+        _ = mocker.patch(
+            "omym.domain.metadata.music_file_processor.remove_empty_directories",
+            autospec=True,
+        )
+
+        conn_mock = cast(MagicMock, processor.db_manager.conn)
+        conn_mock.execute.return_value = None
+        conn_mock.commit.side_effect = sqlite3.Error("commit failure")
+        conn_mock.rollback.side_effect = sqlite3.Error("rollback failure")
+
+        def fake_process(file_path: Path, **_: object) -> ProcessResult:
+            return ProcessResult(source_path=file_path, success=True)
+
+        _ = mocker.patch.object(processor, "process_file", side_effect=fake_process)
+
+        caplog.set_level(logging.ERROR, logger="omym")
+
+        with pytest.raises(DirectoryRollbackError) as exc_info:
+            _ = processor.process_directory(source_dir)
+
+        conn_mock.rollback.assert_called_once()
+        message = str(exc_info.value)
+        assert "process_id=" in message
+        assert str(source_dir) in message
+        assert "rollback failure" in message
+
+        rollback_records = [
+            record
+            for record in caplog.records
+            if getattr(record, "processing_event", "")
+            == ProcessingEvent.DIRECTORY_ROLLBACK_ERROR.value
+        ]
+        assert rollback_records
+        rollback_record = rollback_records[0]
+        process_id_value = getattr(rollback_record, "process_id", "")
+        directory_value = getattr(rollback_record, "directory", "")
+        rollback_error_value = getattr(rollback_record, "rollback_error", "")
+        assert process_id_value
+        assert directory_value == str(source_dir)
+        assert rollback_error_value == "rollback failure"
 
     def test_process_file_duplicate_logs_skip(
         self,

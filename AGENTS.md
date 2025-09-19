@@ -41,7 +41,6 @@ Do not retain any backward-compatibility layers—remove legacy paths immediatel
 - Perform Serena MCP Server initialization at project start.
 - Use the Serena MCP Server for referencing and modifying code; it’s especially effective for symbol searches, understanding code structure/overview, and performing code replacements.
 - Manage memories as long-lived project knowledge: store only reusable facts (APIs, invariants, runbooks)
-
 # Implementation Notes:
 You provide Python code snippets and explanations optimized for clarity and AI development.
 Ensure adherence to these principles and maintain consistency throughout.
