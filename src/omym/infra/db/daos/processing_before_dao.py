@@ -93,14 +93,14 @@ class ProcessingBeforeDAO:
             logger.error("Database error: %s", e)
             return False
 
-    def get_source_path(self, file_hash: str) -> Path | None:
-        """Get source path for a file.
+    def _select_processing_before_path(self, file_hash: str) -> Path | None:
+        """Fetch file path from processing_before for the given hash.
 
         Args:
             file_hash: File hash.
 
         Returns:
-            Source path if found, None otherwise.
+            File path if found, None otherwise.
         """
         try:
             cursor = self.conn.cursor()
@@ -113,6 +113,17 @@ class ProcessingBeforeDAO:
         except sqlite3.Error as e:
             logger.error("Database error: %s", e)
             return None
+
+    def get_source_path(self, file_hash: str) -> Path | None:
+        """Get source path for a file.
+
+        Args:
+            file_hash: File hash.
+
+        Returns:
+            Source path if found, None otherwise.
+        """
+        return self._select_processing_before_path(file_hash)
 
     def get_target_path(self, file_hash: str) -> Path | None:
         """Get target path for a file.
@@ -149,14 +160,4 @@ class ProcessingBeforeDAO:
         Returns:
             File path if found, None otherwise.
         """
-        try:
-            cursor = self.conn.cursor()
-            _ = cursor.execute(
-                "SELECT file_path FROM processing_before WHERE file_hash = ?",
-                (file_hash,),
-            )
-            result = cursor.fetchone()
-            return Path(result[0]) if result else None
-        except sqlite3.Error as e:
-            logger.error("Database error: %s", e)
-            return None
+        return self._select_processing_before_path(file_hash)

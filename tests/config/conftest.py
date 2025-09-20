@@ -27,11 +27,13 @@ def portable_repo_root(
 
 @pytest.fixture
 def config_runtime_env(
-    _portable_repo_root: Path
+    portable_repo_root: Path
 ) -> Iterator[None]:
     """Reset configuration singletons around a test run."""
 
     import omym.config.config as config_module
+
+    _ = portable_repo_root
 
     original_instance = config_module.Config._instance  # pyright: ignore[reportPrivateUsage]
     original_loaded_from = config_module.Config._loaded_from  # pyright: ignore[reportPrivateUsage]
@@ -47,4 +49,3 @@ def config_runtime_env(
         config_module.Config._instance = original_instance  # pyright: ignore[reportPrivateUsage]
         config_module.Config._loaded_from = original_loaded_from  # pyright: ignore[reportPrivateUsage]
         config_module.config = original_config
-

@@ -5,6 +5,7 @@ from rich.console import Console
 
 from omym.domain.metadata.music_file_processor import ProcessResult
 
+from .summary import render_processing_summary
 
 @final
 class ResultDisplay:
@@ -26,12 +27,11 @@ class ResultDisplay:
         if quiet:
             return
 
-        self.console.print("\n[bold]Processing Summary:[/bold]")
-        self.console.print(f"Total files processed: {len(results)}")
-        self.console.print(f"[green]Successful: {sum(1 for r in results if r.success)}[/green]")
-        failed_count = sum(1 for r in results if not r.success)
-        if failed_count > 0:
-            self.console.print(f"[red]Failed: {failed_count}[/red]")
-            for result in results:
-                if not result.success:
-                    self.console.print(f"[red]  • {result.source_path}: {result.error_message}[/red]")
+        render_processing_summary(
+            console=self.console,
+            results=results,
+            header_label="Processing Summary",
+            total_label="Total files processed",
+            success_label="Successful",
+            failure_label="Failed",
+        )

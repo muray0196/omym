@@ -7,6 +7,7 @@ from rich.tree import Tree
 
 from omym.domain.metadata.music_file_processor import ProcessResult
 
+from .summary import render_processing_summary
 
 @final
 class PreviewDisplay:
@@ -203,16 +204,11 @@ class PreviewDisplay:
         Args:
             results: List of processing results.
         """
-        success_count = sum(1 for r in results if r.success)
-        total_count = len(results)
-        failed_count = total_count - success_count
-
-        self.console.print("\n[bold]Summary:[/bold]")
-        self.console.print(f"Total files to process: {total_count}")
-        if total_count > 0:
-            self.console.print(f"[green]Will succeed: {success_count}[/green]")
-            if failed_count > 0:
-                self.console.print(f"[red]Will fail: {failed_count}[/red]")
-                for result in results:
-                    if not result.success:
-                        self.console.print(f"[red]  • {result.source_path}: {result.error_message}[/red]")
+        render_processing_summary(
+            console=self.console,
+            results=results,
+            header_label="Summary",
+            total_label="Total files to process",
+            success_label="Will succeed",
+            failure_label="Will fail",
+        )

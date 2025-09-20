@@ -178,3 +178,22 @@ def test_show_preview_with_errors(mocker: MockerFixture) -> None:
     mock_console.return_value.print.assert_any_call("[green]Will succeed: 0[/green]")
     mock_console.return_value.print.assert_any_call("[red]Will fail: 1[/red]")
     mock_console.return_value.print.assert_any_call("[red]  • test1.mp3: Test error[/red]")
+
+
+def test_preview_summary_uses_helper(mocker: MockerFixture) -> None:
+    """Ensure preview summary delegates to the shared helper."""
+    mock_console = mocker.patch("omym.ui.cli.display.preview.Console")
+    render_mock = mocker.patch("omym.ui.cli.display.preview.render_processing_summary")
+    display = PreviewDisplay()
+    results: list[ProcessResult] = []
+
+    display.show_preview(results, Path("library"))
+
+    render_mock.assert_called_once_with(
+        console=mock_console.return_value,
+        results=results,
+        header_label="Summary",
+        total_label="Total files to process",
+        success_label="Will succeed",
+        failure_label="Will fail",
+    )

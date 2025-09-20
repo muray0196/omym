@@ -160,13 +160,31 @@ def test_show_results_with_failures(mocker: MockerFixture) -> None:
     mock_console.return_value.print.assert_any_call("[red]  • test2.mp3: Test error 2[/red]")
 
 
+def test_result_summary_uses_helper(mocker: MockerFixture) -> None:
+    """Ensure result display delegates to the shared helper with live labels."""
+    mock_console = mocker.patch("omym.ui.cli.display.result.Console")
+    render_mock = mocker.patch("omym.ui.cli.display.result.render_processing_summary")
+    display = ResultDisplay()
+    results: list[ProcessResult] = []
+
+    display.show_results(results)
+
+    render_mock.assert_called_once_with(
+        console=mock_console.return_value,
+        results=results,
+        header_label="Processing Summary",
+        total_label="Total files processed",
+        success_label="Successful",
+        failure_label="Failed",
+    )
+
+
 def test_show_results_quiet_mode(mocker: MockerFixture) -> None:
     """Test showing results in quiet mode."""
-    # Mock console
     mock_console = mocker.patch("omym.ui.cli.display.result.Console")
+    render_mock = mocker.patch("omym.ui.cli.display.result.render_processing_summary")
     display = ResultDisplay()
 
-    # Create test results
     results = [
         ProcessResult(
             source_path=Path("test.mp3"),
@@ -178,8 +196,7 @@ def test_show_results_quiet_mode(mocker: MockerFixture) -> None:
         ),
     ]
 
-    # Show results in quiet mode
     display.show_results(results, quiet=True)
 
-    # Verify no console output
     mock_console.return_value.print.assert_not_called()
+    render_mock.assert_not_called()
