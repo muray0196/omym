@@ -93,9 +93,23 @@ def default_data_dir() -> Path:
     )
 
 
+def default_log_dir() -> Path:
+    """Get the default directory for log files."""
+
+    return (_detect_repo_root() / "logs").resolve()
+
+
+def default_log_file() -> Path:
+    """Get the default log file path."""
+
+    return (default_log_dir() / "omym.log").resolve()
+
+
 __all__ = [
     "default_config_path",
     "default_artist_name_preferences_path",
     "default_data_dir",
+    "default_log_dir",
+    "default_log_file",
     "resolve_overridable_path",
 ]

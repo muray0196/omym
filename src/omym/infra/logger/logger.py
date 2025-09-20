@@ -10,6 +10,8 @@ from rich.logging import RichHandler
 from rich.style import Style
 from rich.text import Text
 
+from omym.config.paths import default_log_file
+
 
 class WhitePathRichHandler(RichHandler):
     """Custom Rich handler that displays file paths in white."""
@@ -295,6 +297,9 @@ class WhitePathRichHandler(RichHandler):
         return super().render_message(record, message)
 
 
+DEFAULT_LOG_FILE: Path = default_log_file()
+
+
 def setup_logger(
     log_file: Path | None = None,
     console_level: int = logging.INFO,
@@ -313,7 +318,9 @@ def setup_logger(
     logger = logging.getLogger("omym")
     logger.setLevel(logging.DEBUG)
 
-    # Remove any existing handlers
+    # Remove any existing handlers cleanly
+    for handler in list(logger.handlers):
+        handler.close()
     logger.handlers.clear()
 
     # Create formatters
@@ -328,10 +335,11 @@ def setup_logger(
     # File handler (if log_file is specified)
     if log_file is not None:
         # Ensure the log directory exists
-        os.makedirs(log_file.parent, exist_ok=True)
+        resolved_log_file = Path(log_file).expanduser().resolve()
+        os.makedirs(resolved_log_file.parent, exist_ok=True)
 
         file_handler = logging.handlers.RotatingFileHandler(
-            log_file,
+            resolved_log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5,
             encoding="utf-8",
@@ -344,4 +352,4 @@ def setup_logger(
 
 
 # Global logger instance
-logger = setup_logger()
+logger = setup_logger(log_file=DEFAULT_LOG_FILE)

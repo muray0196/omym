@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import final
 
 from omym.core.filesystem import ensure_directory
-from omym.infra.logger.logger import logger, setup_logger
+from omym.infra.logger.logger import DEFAULT_LOG_FILE, logger, setup_logger
 from omym.config.config import Config
 from omym.domain.restoration import CollisionPolicy
 from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, RestoreArgs
@@ -174,7 +174,10 @@ class ArgumentParser:
             log_level = logging.DEBUG
         else:
             log_level = logging.INFO
-        _ = setup_logger(console_level=log_level)
+
+        configuration = Config.load()
+        log_file_path = configuration.log_file or DEFAULT_LOG_FILE
+        _ = setup_logger(log_file=log_file_path, console_level=log_level)
 
         command: str = parsed_args.command
 
@@ -199,8 +202,6 @@ class ArgumentParser:
             _ = ensure_directory(target_path)
         else:
             target_path = music_path.parent if music_path.is_file() else music_path
-
-        _ = Config.load()
 
         return OrganizeArgs(
             command="organize",
@@ -228,8 +229,6 @@ class ArgumentParser:
             if parsed_args.destination_root
             else None
         )
-
-        _ = Config.load()
 
         collision_policy = CollisionPolicy.from_user_input(parsed_args.collision_policy)
 

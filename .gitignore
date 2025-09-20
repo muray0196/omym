@@ -3,6 +3,7 @@ config/
 !src/omym/config/
 !tests/config/
 .data/
+logs/
 # Editor
 .vscode/
 # Python

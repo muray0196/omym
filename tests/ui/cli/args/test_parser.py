@@ -10,6 +10,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from omym.ui.cli.args import ArgumentParser, OrganizeArgs, RestoreArgs
+from omym.infra.logger.logger import DEFAULT_LOG_FILE
 
 
 @pytest.fixture()
@@ -63,15 +64,19 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
     mock_config = mocker.patch("omym.ui.cli.args.parser.Config")
     mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
 
+    mock_config.load.return_value.log_file = None
+
     args = ArgumentParser.process_args(["organize", str(test_dir)])
     assert isinstance(args, OrganizeArgs)
     assert args.music_path == test_dir
     assert args.target_path == test_dir
     assert not args.dry_run
-    mock_setup_logger.assert_called_with(console_level=logging.INFO)
+    assert mock_setup_logger.call_args.kwargs["console_level"] == logging.INFO
+    assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
     mock_config.load.assert_called_once()
 
     target_path = test_dir / "target"
+    mock_setup_logger.reset_mock()
     args = ArgumentParser.process_args(
         [
             "organize",
@@ -91,7 +96,8 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
     assert args.target_path == target_path
     assert args.dry_run and args.verbose and args.force and args.interactive
     assert args.show_db and args.clear_artist_cache and args.clear_cache
-    mock_setup_logger.assert_called_with(console_level=logging.DEBUG)
+    assert mock_setup_logger.call_args.kwargs["console_level"] == logging.DEBUG
+    assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
 
 
 def test_process_args_restore(test_dir: Path, mocker: MockerFixture) -> None:
@@ -99,6 +105,8 @@ def test_process_args_restore(test_dir: Path, mocker: MockerFixture) -> None:
 
     mock_config = mocker.patch("omym.ui.cli.args.parser.Config")
     mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
+    custom_log_path = Path("/tmp/custom.log")
+    mock_config.load.return_value.log_file = custom_log_path
 
     dest = test_dir / "restore_dest"
     args = ArgumentParser.process_args(
@@ -127,7 +135,8 @@ def test_process_args_restore(test_dir: Path, mocker: MockerFixture) -> None:
     assert args.limit == 5
     assert args.continue_on_error
     assert args.dry_run and args.quiet and args.purge_state
-    mock_setup_logger.assert_called_with(console_level=logging.ERROR)
+    assert mock_setup_logger.call_args.kwargs["console_level"] == logging.ERROR
+    assert mock_setup_logger.call_args.kwargs["log_file"] == custom_log_path
     mock_config.load.assert_called_once()
 
 
