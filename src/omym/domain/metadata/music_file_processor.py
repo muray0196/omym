@@ -15,10 +15,10 @@ from pathlib import Path
 from collections.abc import Iterable
 from typing import Any, Callable, ClassVar, final
 
-from omym.config.artist_overrides import (
-    ArtistOverrideRepository,
-    ArtistOverridesError,
-    load_artist_overrides,
+from omym.config.artist_name_preferences import (
+    ArtistNamePreferenceError,
+    ArtistNamePreferenceRepository,
+    load_artist_name_preferences,
 )
 
 from omym.core.filesystem import ensure_parent_directory, remove_empty_directories
@@ -245,7 +245,7 @@ class MusicProcessor:
     before_dao: ProcessingBeforeDAO
     after_dao: ProcessingAfterDAO
     artist_dao: ArtistCacheDAO | _DryRunArtistCacheAdapter
-    artist_overrides: ArtistOverrideRepository
+    artist_name_preferences: ArtistNamePreferenceRepository
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
     file_name_generator: FileNameGenerator
@@ -264,10 +264,10 @@ class MusicProcessor:
         self.dry_run = dry_run
 
         try:
-            self.artist_overrides = load_artist_overrides()
-        except ArtistOverridesError as exc:
+            self.artist_name_preferences = load_artist_name_preferences()
+        except ArtistNamePreferenceError as exc:
             raise RuntimeError(
-                f"Failed to load artist override configuration: {exc}"
+                f"Failed to load artist name preference configuration: {exc}"
             ) from exc
 
         # Initialize database connection.
@@ -289,17 +289,21 @@ class MusicProcessor:
             if not trimmed:
                 return None
 
-            self.artist_overrides.ensure_placeholder(trimmed)
-            override = self.artist_overrides.resolve(trimmed)
-            if override is not None:
+            self.artist_name_preferences.ensure_placeholder(trimmed)
+            preferred = self.artist_name_preferences.resolve(trimmed)
+            if preferred is not None:
                 if hasattr(self, "_romanizer"):
                     self._romanizer.record_fetch_context(
-                        source="user_override",
+                        source="user_preference",
                         original=trimmed,
-                        value=override,
+                        value=preferred,
                     )
-                logger.info("Using user-defined override for '%s' -> '%s'", trimmed, override)
-                return override
+                logger.info(
+                    "Using user-defined name preference for '%s' -> '%s'",
+                    trimmed,
+                    preferred,
+                )
+                return preferred
 
             try:
                 cached = self.artist_dao.get_romanized_name(trimmed)
@@ -1378,12 +1382,14 @@ class MusicProcessor:
         if trimmed in self._romanize_futures:
             return
 
-        override = self.artist_overrides.resolve(trimmed)
-        if override is not None:
-            override_future: Future[str] = Future()
-            override_future.set_result(override)
-            self._romanize_futures[trimmed] = override_future
-            logger.debug("Using artist override for '%s' during scheduling", trimmed)
+        preferred = self.artist_name_preferences.resolve(trimmed)
+        if preferred is not None:
+            preferred_future: Future[str] = Future()
+            preferred_future.set_result(preferred)
+            self._romanize_futures[trimmed] = preferred_future
+            logger.debug(
+                "Using artist name preference for '%s' during scheduling", trimmed
+            )
             return
 
         cached_value: str | None = None

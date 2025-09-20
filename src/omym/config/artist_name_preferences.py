@@ -1,4 +1,4 @@
-"""Artist override configuration loader using TOML."""
+"""Artist name preference configuration loader using TOML."""
 
 from __future__ import annotations
 
@@ -10,17 +10,20 @@ from pathlib import Path
 from typing import Any, cast
 
 from omym.config.file_ops import ensure_file_with_template, write_text_file
-from omym.config.paths import default_artist_overrides_path, resolve_overridable_path
+from omym.config.paths import (
+    default_artist_name_preferences_path,
+    resolve_overridable_path,
+)
 from omym.infra.logger.logger import logger
 
-_ARTIST_OVERRIDES_ENV = "OMYM_ARTIST_OVERRIDES_PATH"
+_ARTIST_NAME_PREFERENCES_ENV = "OMYM_ARTIST_NAME_PREFERENCES_PATH"
 _DEFAULT_METADATA_VERSION = 1
 
 _TEMPLATE = textwrap.dedent(
     """
-    # Artist override configuration (TOML)
+    # Artist name preference configuration (TOML)
     #
-    # Values remain empty until you provide a preferred romanised name.
+    # Populate values with your preferred romanised names.
     # Entries are appended automatically after romanisation runs during dry-run or organise.
 
     metadata_version = 1
@@ -28,35 +31,35 @@ _TEMPLATE = textwrap.dedent(
     [defaults]
     # Example: locale = "en_US"
 
-    [overrides]
+    [preferences]
     # Automatically populated artist entries will appear here.
     """
 ).strip() + "\n"
 
 
-class ArtistOverridesError(Exception):
-    """Base exception for artist override configuration errors."""
+class ArtistNamePreferenceError(Exception):
+    """Base exception for artist name preference configuration errors."""
 
 
-class ArtistOverridesParseError(ArtistOverridesError):
+class ArtistNamePreferenceParseError(ArtistNamePreferenceError):
     """Raised when the TOML document cannot be parsed."""
 
 
-class ArtistOverridesValidationError(ArtistOverridesError):
+class ArtistNamePreferenceValidationError(ArtistNamePreferenceError):
     """Raised when the parsed document is semantically invalid."""
 
 
 @dataclass(slots=True)
-class ArtistOverrideStore:
-    """In-memory representation of configured artist overrides."""
+class ArtistNamePreferenceStore:
+    """In-memory representation of configured artist name preferences."""
 
     metadata_version: int = _DEFAULT_METADATA_VERSION
-    overrides: dict[str, str] = field(default_factory=dict)
+    preferences: dict[str, str] = field(default_factory=dict)
     defaults: dict[str, str] = field(default_factory=dict)
     _normalized: dict[str, str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Normalize overrides for case-insensitive lookups."""
+        """Normalize preferences for case-insensitive lookups."""
 
         self.metadata_version = max(int(self.metadata_version), _DEFAULT_METADATA_VERSION)
         self.defaults = {
@@ -66,16 +69,18 @@ class ArtistOverrideStore:
         normalized: dict[str, str] = {}
         cleaned: dict[str, str] = {}
 
-        for key, value in self.overrides.items():
+        for key, value in self.preferences.items():
             trimmed_key = key.strip()
             trimmed_value = value.strip()
             if not trimmed_key:
-                raise ArtistOverridesValidationError("Override keys must not be empty")
+                raise ArtistNamePreferenceValidationError(
+                    "Preference keys must not be empty"
+                )
 
             lowered = trimmed_key.casefold()
             if lowered in normalized:
-                raise ArtistOverridesValidationError(
-                    f"Duplicate override detected for '{trimmed_key}'"
+                raise ArtistNamePreferenceValidationError(
+                    f"Duplicate preference detected for '{trimmed_key}'"
                 )
 
             if trimmed_value:
@@ -84,11 +89,11 @@ class ArtistOverrideStore:
             else:
                 cleaned[trimmed_key] = ""
 
-        self.overrides = cleaned
+        self.preferences = cleaned
         self._normalized = normalized
 
     def resolve(self, raw_artist: str | None) -> str | None:
-        """Return the canonical override for ``raw_artist`` if configured."""
+        """Return the preferred name for ``raw_artist`` if configured."""
 
         if raw_artist is None:
             return None
@@ -101,17 +106,17 @@ class ArtistOverrideStore:
         return value or None
 
     def is_empty(self) -> bool:
-        """Return whether no overrides are configured."""
+        """Return whether no preferences are configured."""
 
         return not self._normalized
 
     def snapshot(self) -> dict[str, str]:
-        """Return a copy of the overrides for inspection or testing."""
+        """Return a copy of the preferences for inspection or testing."""
 
-        return dict(self.overrides)
+        return dict(self.preferences)
 
     def add_placeholder(self, raw_artist: str) -> bool:
-        """Ensure an override entry exists for the given artist with an empty value."""
+        """Ensure a preference entry exists for the given artist with an empty value."""
 
         trimmed = raw_artist.strip()
         if not trimmed:
@@ -121,17 +126,17 @@ class ArtistOverrideStore:
         if lowered in self._normalized:
             return False
 
-        self.overrides[trimmed] = ""
+        self.preferences[trimmed] = ""
         self._normalized[lowered] = ""
         return True
 
 
 @dataclass(slots=True)
-class ArtistOverrideRepository:
-    """Repository wrapper that persists artist override entries."""
+class ArtistNamePreferenceRepository:
+    """Repository wrapper that persists artist name preference entries."""
 
     path: Path
-    store: ArtistOverrideStore
+    store: ArtistNamePreferenceStore
 
     def resolve(self, raw_artist: str | None) -> str | None:
         return self.store.resolve(raw_artist)
@@ -145,9 +150,9 @@ class ArtistOverrideRepository:
 
     def _persist(self) -> None:
         lines: list[str] = [
-            "# Artist override configuration (TOML)",
+            "# Artist name preference configuration (TOML)",
             "#",
-            "# Values remain empty until you provide a preferred romanised name.",
+            "# Populate values with your preferred romanised names.",
             "# Entries are appended automatically after romanisation runs during dry-run or organise.",
             "",
             f"metadata_version = {self.store.metadata_version}",
@@ -163,11 +168,11 @@ class ArtistOverrideRepository:
             lines.append("# Example: locale = \"en_US\"")
 
         lines.append("")
-        lines.append("[overrides]")
+        lines.append("[preferences]")
 
-        if self.store.overrides:
-            for key in sorted(self.store.overrides, key=str.casefold):
-                value = self._quote(self.store.overrides[key])
+        if self.store.preferences:
+            for key in sorted(self.store.preferences, key=str.casefold):
+                value = self._quote(self.store.preferences[key])
                 quoted_key = self._quote(key)
                 lines.append(f"{quoted_key} = {value}")
         else:
@@ -184,63 +189,68 @@ class ArtistOverrideRepository:
         return f'"{escaped}"'
 
 
-def load_artist_overrides(
+def load_artist_name_preferences(
     *, path: Path | None = None, env: Mapping[str, str] | None = None
-) -> ArtistOverrideRepository:
-    """Load artist overrides from configuration.
+) -> ArtistNamePreferenceRepository:
+    """Load artist name preferences from configuration.
 
     Args:
-        path: Optional explicit path to the overrides file.
+        path: Optional explicit path to the preferences file.
         env: Optional environment mapping to read configuration from.
 
     Returns:
-        ArtistOverrideRepository: Loaded overrides (possibly empty).
+        ArtistNamePreferenceRepository: Loaded preferences (possibly empty).
     """
 
     resolved_path = resolve_overridable_path(
         explicit_path=path,
         env=env,
-        env_var=_ARTIST_OVERRIDES_ENV,
-        default_factory=default_artist_overrides_path,
+        env_var=_ARTIST_NAME_PREFERENCES_ENV,
+        default_factory=default_artist_name_preferences_path,
     )
     if ensure_file_with_template(
         resolved_path, template_provider=lambda: _TEMPLATE
     ):
-        logger.info("Created artist override template at %s", resolved_path)
-        return ArtistOverrideRepository(
+        logger.info("Created artist name preference template at %s", resolved_path)
+        return ArtistNamePreferenceRepository(
             path=resolved_path,
-            store=ArtistOverrideStore(),
+            store=ArtistNamePreferenceStore(),
         )
 
     try:
         with resolved_path.open("rb") as handle:
             document = tomllib.load(handle)
     except tomllib.TOMLDecodeError as exc:
-        raise ArtistOverridesParseError(
-            f"Invalid TOML in artist override file: {resolved_path}"
+        raise ArtistNamePreferenceParseError(
+            f"Invalid TOML in artist name preference file: {resolved_path}"
         ) from exc
     except OSError as exc:  # pragma: no cover - rare filesystem failure
-        raise ArtistOverridesError(
-            f"Failed to read artist override file: {resolved_path}"
+        raise ArtistNamePreferenceError(
+            f"Failed to read artist name preference file: {resolved_path}"
         ) from exc
 
     metadata_version = _extract_metadata_version(document)
     defaults = _extract_string_table(document.get("defaults", {}), section="defaults")
-    overrides = _extract_string_table(document.get("overrides", {}), section="overrides")
-
-    store = ArtistOverrideStore(
-        metadata_version=metadata_version,
-        defaults=defaults,
-        overrides=overrides,
+    preferences = _extract_string_table(
+        document.get("preferences", {}), section="preferences"
     )
 
-    repository = ArtistOverrideRepository(path=resolved_path, store=store)
+    store = ArtistNamePreferenceStore(
+        metadata_version=metadata_version,
+        defaults=defaults,
+        preferences=preferences,
+    )
+
+    repository = ArtistNamePreferenceRepository(path=resolved_path, store=store)
 
     if store.is_empty():
-        logger.info("Artist override file loaded but no entries defined: %s", resolved_path)
+        logger.info(
+            "Artist name preference file loaded but no entries defined: %s",
+            resolved_path,
+        )
     else:
         logger.info(
-            "Loaded %d artist override entries from %s",
+            "Loaded %d artist name preference entries from %s",
             len(store.snapshot()),
             resolved_path,
         )
@@ -251,7 +261,9 @@ def load_artist_overrides(
 def _extract_metadata_version(document: Mapping[str, Any]) -> int:
     value = document.get("metadata_version", _DEFAULT_METADATA_VERSION)
     if not isinstance(value, int) or value < 1:
-        raise ArtistOverridesValidationError("metadata_version must be a positive integer")
+        raise ArtistNamePreferenceValidationError(
+            "metadata_version must be a positive integer"
+        )
     return value
 
 
@@ -259,16 +271,16 @@ def _extract_string_table(table: Any, *, section: str) -> dict[str, str]:
     if table is None:
         return {}
     if not isinstance(table, dict):
-        raise ArtistOverridesValidationError(f"{section} section must be a table")
+        raise ArtistNamePreferenceValidationError(f"{section} section must be a table")
 
     table_dict = cast(dict[object, Any], table)
     result: dict[str, str] = {}
     for key_obj, value in table_dict.items():
         if not isinstance(key_obj, str):
-            raise ArtistOverridesValidationError(f"{section} keys must be strings")
+            raise ArtistNamePreferenceValidationError(f"{section} keys must be strings")
         key = key_obj
         if not isinstance(value, str):
-            raise ArtistOverridesValidationError(
+            raise ArtistNamePreferenceValidationError(
                 f"{section} value for '{key}' must be a string"
             )
         result[key] = value
@@ -276,10 +288,10 @@ def _extract_string_table(table: Any, *, section: str) -> dict[str, str]:
 
 
 __all__ = [
-    "ArtistOverrideStore",
-    "ArtistOverrideRepository",
-    "ArtistOverridesError",
-    "ArtistOverridesParseError",
-    "ArtistOverridesValidationError",
-    "load_artist_overrides",
+    "ArtistNamePreferenceStore",
+    "ArtistNamePreferenceRepository",
+    "ArtistNamePreferenceError",
+    "ArtistNamePreferenceParseError",
+    "ArtistNamePreferenceValidationError",
+    "load_artist_name_preferences",
 ]

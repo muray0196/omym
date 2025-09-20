@@ -6,35 +6,35 @@ import textwrap
 
 import pytest
 
-from omym.config.artist_overrides import (
-    ArtistOverrideRepository,
-    ArtistOverridesParseError,
-    ArtistOverridesValidationError,
-    load_artist_overrides,
+from omym.config.artist_name_preferences import (
+    ArtistNamePreferenceRepository,
+    ArtistNamePreferenceParseError,
+    ArtistNamePreferenceValidationError,
+    load_artist_name_preferences,
 )
 
 
-class TestArtistOverridesLoader:
-    """Unit tests for the TOML-based artist override loader."""
+class TestArtistNamePreferencesLoader:
+    """Unit tests for the TOML-based artist name preference loader."""
 
     def test_template_created_when_file_missing(self, tmp_path: Path) -> None:
         """Missing configuration produces a template and an empty store."""
 
-        destination = tmp_path / "artist_overrides.toml"
+        destination = tmp_path / "artist_name_preferences.toml"
 
-        repository = load_artist_overrides(path=destination)
+        repository = load_artist_name_preferences(path=destination)
 
         assert destination.exists()
         template_text = destination.read_text(encoding="utf-8")
-        assert "[overrides]" in template_text
+        assert "[preferences]" in template_text
         assert "宇多田ヒカル" not in template_text
-        assert isinstance(repository, ArtistOverrideRepository)
+        assert isinstance(repository, ArtistNamePreferenceRepository)
         assert repository.store.is_empty()
 
     def test_loads_overrides_and_resolves(self, tmp_path: Path) -> None:
-        """Parse TOML overrides and resolve case-insensitive matches."""
+        """Parse TOML preferences and resolve case-insensitive matches."""
 
-        config_path = tmp_path / "artist_overrides.toml"
+        config_path = tmp_path / "artist_name_preferences.toml"
         _ = config_path.write_text(
             textwrap.dedent(
                 """
@@ -43,7 +43,7 @@ class TestArtistOverridesLoader:
                 [defaults]
                 locale = "en_GB"
 
-                [overrides]
+                [preferences]
                 "宇多田ヒカル" = "Utada Hikaru"
                 perfume = "Perfume"
                 "米津玄師" = "Kenshi Yonezu"
@@ -53,7 +53,7 @@ class TestArtistOverridesLoader:
             encoding="utf-8",
         )
 
-        repository = load_artist_overrides(path=config_path)
+        repository = load_artist_name_preferences(path=config_path)
 
         assert repository.store.metadata_version == 2
         assert repository.resolve("宇多田ヒカル") == "Utada Hikaru"
@@ -66,20 +66,20 @@ class TestArtistOverridesLoader:
 
         repository.ensure_placeholder("初星学園")
         repository.ensure_placeholder("宇多田ヒカル")
-        overrides = repository.snapshot()
-        assert "初星学園" in overrides
+        preferences = repository.snapshot()
+        assert "初星学園" in preferences
         persisted = config_path.read_text(encoding="utf-8")
         assert '"初星学園" = ""' in persisted
         assert "Monogatari Series" not in persisted
 
     def test_duplicate_keys_raise_validation_error(self, tmp_path: Path) -> None:
-        """Reject overrides whose keys collide after case normalisation."""
+        """Reject preferences whose keys collide after case normalisation."""
 
-        config_path = tmp_path / "artist_overrides.toml"
+        config_path = tmp_path / "artist_name_preferences.toml"
         _ = config_path.write_text(
             textwrap.dedent(
                 """
-                [overrides]
+                [preferences]
                 Perfume = "Perfume"
                 perfume = "Duplicate"
                 """
@@ -88,27 +88,27 @@ class TestArtistOverridesLoader:
             encoding="utf-8",
         )
 
-        with pytest.raises(ArtistOverridesValidationError):
-            _ = load_artist_overrides(path=config_path)
+        with pytest.raises(ArtistNamePreferenceValidationError):
+            _ = load_artist_name_preferences(path=config_path)
 
     def test_invalid_toml_raises_parse_error(self, tmp_path: Path) -> None:
         """Surface parse errors when TOML cannot be decoded."""
 
-        config_path = tmp_path / "artist_overrides.toml"
+        config_path = tmp_path / "artist_name_preferences.toml"
         _ = config_path.write_text("not = [valid", encoding="utf-8")
 
-        with pytest.raises(ArtistOverridesParseError):
-            _ = load_artist_overrides(path=config_path)
+        with pytest.raises(ArtistNamePreferenceParseError):
+            _ = load_artist_name_preferences(path=config_path)
 
     def test_invalid_structure_raises_validation_error(self, tmp_path: Path) -> None:
-        """Reject documents with non-table defaults/overrides sections."""
+        """Reject documents with non-table defaults/preferences sections."""
 
-        config_path = tmp_path / "artist_overrides.toml"
+        config_path = tmp_path / "artist_name_preferences.toml"
         _ = config_path.write_text(
             textwrap.dedent(
                 """
                 defaults = "not-a-table"
-                [overrides]
+                [preferences]
                 "宇多田ヒカル" = "Utada Hikaru"
                 """
             ).strip()
@@ -116,5 +116,5 @@ class TestArtistOverridesLoader:
             encoding="utf-8",
         )
 
-        with pytest.raises(ArtistOverridesValidationError):
-            _ = load_artist_overrides(path=config_path)
+        with pytest.raises(ArtistNamePreferenceValidationError):
+            _ = load_artist_name_preferences(path=config_path)

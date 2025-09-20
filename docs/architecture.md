@@ -17,7 +17,7 @@ review_cadence: quarterly
   - `db` exposes the SQLite connection manager, DAO classes for processing metadata, album grouping, maintenance, and artist romanisation cache.
   - `musicbrainz` implements the WS2 HTTP client with rate limiting and optional `requests` usage, plus pluggable cache registration.
   - `logger` configures module-level loggers.
-- **Configuration (`omym.config`)** centralises config file discovery (`config/omym/config.toml`), environment overrides (`OMYM_DATA_DIR`, `MUSICBRAINZ_USER_AGENT`), and runtime switches (`USE_MB_ROMANIZATION`).
+- **Configuration (`omym.config`)** centralises config file discovery (`config/config.toml`), environment overrides (`OMYM_DATA_DIR`, `MUSICBRAINZ_USER_AGENT`), and runtime switches (`USE_MB_ROMANIZATION`).
 
 ## Data Model and Schemas
 - SQLite schema lives in [`src/omym/infra/db/migrations/schema.sql`](../src/omym/infra/db/migrations/schema.sql) and is applied via `DatabaseManager` during processor initialisation.
@@ -35,7 +35,7 @@ review_cadence: quarterly
 - Standard library `shutil`, `hashlib`, and `pathlib` underpin file operations and hashing; no other network services are contacted.
 
 ## Configuration and Secrets
-- Configuration is stored in TOML at `config/omym/config.toml`; the file is created with comments on first run if absent.
+- Configuration is stored in TOML at `config/config.toml`; the file is created with comments on first run if absent.
 - `OMYM_DATA_DIR` overrides the default `.data/` directory for the SQLite database and cache files.
 - `MUSICBRAINZ_USER_AGENT` allows operators to supply a custom UA; otherwise values fall back to the TOML-configured app identity.
 - No secrets are persisted. Users must ensure the configured contact information complies with MusicBrainz etiquette.

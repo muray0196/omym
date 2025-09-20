@@ -4,7 +4,8 @@ This module centralizes how the application discovers locations for
 config and data files.
 
 Policy (portable by default):
-- Config: repository-root ``<repo_root>/config/omym/config.toml``
+- Config: repository-root ``<repo_root>/config/config.toml``
+- Artist name preferences: repository-root ``<repo_root>/config/artist_name_preferences.toml``
 - Data: repository-root ``<repo_root>/.data`` unless overridden by
   ``OMYM_DATA_DIR``.
 """
@@ -66,19 +67,19 @@ def _detect_repo_root(start: Path | None = None) -> Path:
 def default_config_path() -> Path:
     """Get the default path to the main TOML config file.
 
-    Portable layout: ``<repo_root>/config/omym/config.toml``.
+    Portable layout: ``<repo_root>/config/config.toml``.
     """
     repo_root = _detect_repo_root()
-    return (repo_root / "config" / "omym" / "config.toml").resolve()
+    return (repo_root / "config" / "config.toml").resolve()
 
 
-def default_artist_overrides_path() -> Path:
-    """Get the default path to the artist overrides file.
+def default_artist_name_preferences_path() -> Path:
+    """Get the default path to the artist name preferences file.
 
-    Portable layout: ``<repo_root>/config/artist_overrides.toml``.
+    Portable layout: ``<repo_root>/config/artist_name_preferences.toml``.
     """
     repo_root = _detect_repo_root()
-    return (repo_root / "config" / "artist_overrides.toml").resolve()
+    return (repo_root / "config" / "artist_name_preferences.toml").resolve()
 
 
 def default_data_dir() -> Path:
@@ -94,7 +95,7 @@ def default_data_dir() -> Path:
 
 __all__ = [
     "default_config_path",
-    "default_artist_overrides_path",
+    "default_artist_name_preferences_path",
     "default_data_dir",
     "resolve_overridable_path",
 ]

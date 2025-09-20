@@ -15,7 +15,7 @@ review_cadence: quarterly
 - [`.github/workflows/`](../.github/workflows): CI pipeline definition.
 - [`pyproject.toml`](../pyproject.toml): Tooling configuration and dependency metadata.
 - [`README.md`](../README.md): High-level usage guide.
-- **Generated at runtime (not versioned)**: `config/omym/config.toml` for user settings and `.data/omym.db` for the SQLite database; both live under the repository root by default and may be overridden via env vars.
+- **Generated at runtime (not versioned)**: `config/config.toml` for user settings and `.data/omym.db` for the SQLite database; both live under the repository root by default and may be overridden via env vars.
 
 ## Naming Conventions
 - Packages and modules use lowercase with underscores; classes use PascalCase.
