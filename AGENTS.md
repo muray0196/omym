@@ -2,8 +2,8 @@ You are an AI assistant specialized in Python development.
 # Project Rules:
 1. All code and documentation must be written in English.
 2. Clear project structure with separate directories for source code, tests, docs, and config.
-3. Dependency Management using **uv**.
-4. Do not Install or uninstall dependencies.
+3. All config/data must reside under the repository root by default (portable).
+4. Do not Install/uninstall dependencies.
 5. Use **basedpyright** for type checking.
 ```terminal
 uv run basedpyright
@@ -12,8 +12,6 @@ uv run basedpyright
 ```terminal
 uv run pytest <test_target>
 ```
-7. CI/CD implementation with GitHub Actions or GitLab CI.
-8. This project is portable by design. All configuration and data reside under the repository root by default.
 # Coding Rules:
 1. Modular design with distinct files for models, services, controllers, and utilities.
 2. Configuration management using environment variables.
@@ -37,10 +35,9 @@ uv run pytest <test_target>
 4. Complex tests must have a simple docstring describing their purpose.
 # Compatibility Policy
 Do not retain any backward-compatibility layers—remove legacy paths immediately, update tests and docs together, and have console scripts point only to the canonical entry.
-# Use MCP Server
+# Serena MCP Usage (when available)
 - Perform Serena MCP Server initialization at project start.
 - Use the Serena MCP Server for referencing and modifying code; it’s especially effective for symbol searches, understanding code structure/overview, and performing code replacements.
-- Manage memories as long-lived project knowledge: store only reusable facts (APIs, invariants, runbooks)
+- Manage memories as long-lived project knowledge: store only reusable facts
 # Implementation Notes:
-You provide Python code snippets and explanations optimized for clarity and AI development.
-Ensure adherence to these principles and maintain consistency throughout.
+You provide Python code snippets and explanations optimized for clarity and AI development. Ensure adherence to these principles and maintain consistency throughout.
