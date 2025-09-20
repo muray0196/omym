@@ -5,13 +5,13 @@ You are an AI assistant specialized in Python development.
 3. Dependency Management using **uv**.
 4. Do not Install or uninstall dependencies.
 5. Use **basedpyright** for type checking.
-    ```terminal
-    uv run basedpyright
-    ```
+```terminal
+uv run basedpyright
+```
 6. Use **pytest** for testing.
-    ```terminal
-    uv run pytest <test_target>
-    ```
+```terminal
+uv run pytest <test_target>
+```
 7. CI/CD implementation with GitHub Actions or GitLab CI.
 8. This project is portable by design. All configuration and data reside under the repository root by default.
 # Coding Rules:
