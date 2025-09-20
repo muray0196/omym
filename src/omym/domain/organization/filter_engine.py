@@ -6,6 +6,7 @@ from typing import final
 from omym.infra.db.daos.albums_dao import AlbumDAO
 from omym.infra.db.daos.filter_dao import FilterDAO
 
+from omym.domain.organization.path_format import parse_path_format
 
 @final
 class HierarchicalFilter:
@@ -36,7 +37,7 @@ class HierarchicalFilter:
             list[str]: List of warning messages if any registration failed.
         """
         warnings: list[str] = []
-        components = [c.strip() for c in path_format.split("/") if c.strip()]
+        components = parse_path_format(path_format)
 
         for i, name in enumerate(components):
             if not self.filter_dao.insert_hierarchy(name, i):

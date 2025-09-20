@@ -6,6 +6,7 @@ from typing import ClassVar
 from omym.domain.metadata.track_metadata_extractor import MetadataExtractor
 from omym.infra.logger.logger import logger
 
+from omym.domain.organization.path_format import parse_path_format
 
 class MusicGrouper:
     """Group music files based on path format."""
@@ -24,7 +25,7 @@ class MusicGrouper:
                 The metadata dictionary contains optional string values for each metadata field.
         """
         result: dict[str, dict[str, str | None]] = {}
-        components = [c.strip() for c in path_format.split("/") if c.strip()]
+        components = parse_path_format(path_format)
 
         # Validate components
         invalid_components = [c for c in components if c not in self.SUPPORTED_COMPONENTS]

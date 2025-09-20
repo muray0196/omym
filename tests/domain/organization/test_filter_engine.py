@@ -129,3 +129,15 @@ def test_process_file_unknown_hierarchy(filter_engine: HierarchicalFilter) -> No
     warnings = filter_engine.process_file(file_hash, metadata)
     assert isinstance(warnings, list)
     assert len(warnings) == 0
+
+def test_register_hierarchies_normalizes_path_format(filter_engine: HierarchicalFilter) -> None:
+    """Ensure path format parsing drops empty segments and trims whitespace."""
+    path_format = " AlbumArtist // Album / Year/ "
+
+    warnings = filter_engine.register_hierarchies(path_format)
+
+    assert warnings == []
+
+    hierarchies = filter_engine.filter_dao.get_hierarchies()
+    assert [hierarchy.name for hierarchy in hierarchies] == ["AlbumArtist", "Album", "Year"]
+    assert [hierarchy.priority for hierarchy in hierarchies] == [0, 1, 2]
