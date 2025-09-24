@@ -1,21 +1,27 @@
 owner: Maintainers
 status: active
-last_updated: 2025-09-17
+last_updated: 2025-09-24
 review_cadence: quarterly
 
 ## Top-level Structure
-- [`src/`](../src): Application source using the `src` layout.
-  - [`omym/ui/cli`](../src/omym/ui/cli): Argument parsing, command dispatch, and Rich-based output.
-  - [`omym/application/services`](../src/omym/application/services): Organise/restore façades shared by all UIs.
-  - [`omym/domain`](../src/omym/domain): Core business logic split into `metadata`, `path`, `organization`, `restoration`, and `common` helpers.
-  - [`omym/infra`](../src/omym/infra): SQLite DAOs, MusicBrainz client, and logging utilities.
-  - [`omym/config`](../src/omym/config): Config file loading, environment overrides, and runtime flags.
-- [`tests/`](../tests): Pytest suite mirroring the source tree (UI, application, domain, config).
-- [`docs/`](./): Living design docs ([spec](spec.md), [architecture](architecture.md), [glossary](glossary.md)); diagrams belong under [`docs/diagrams/`](diagrams/).
+- [`src/`](../src): Python source root.
+  - [`omym/features/`](../src/omym/features): Feature-oriented packages combining domain, use case, and adapter slices. Current features: `metadata`, `organization`, `path`, `restoration`.
+    - `domain/`: pure business rules for the feature.
+    - `usecases/`: application services, commands, queries, and port protocols.
+    - `adapters/`: infrastructure implementations (DB, filesystem, external APIs) that fulfil ports.
+  - [`omym/platform/`](../src/omym/platform): Cross-cutting technical services—database manager, filesystem primitives, logging bootstrap, configuration providers, MusicBrainz HTTP client.
+  - [`omym/shared/`](../src/omym/shared): Feature-agnostic value objects, typed results, error types, functional helpers.
+  - [`omym/ui/`](../src/omym/ui): CLI and experimental GUI adapters that call feature use cases only.
+  - [`omym/config/`](../src/omym/config): Typed configuration loading (environment + TOML defaults) fed into `platform` and feature factories.
+- [`tests/`](../tests): Pytest suite organised by layer.
+  - `tests/features/<feature>/` for domain and use case tests (ports mocked).
+  - `tests/platform/` for shared infrastructure tests.
+  - `tests/integration/` for adapter + platform wiring.
+- [`docs/`](./): Living design docs ([spec](spec.md), [architecture](architecture.md), [glossary](glossary.md)); diagrams live under [`docs/diagrams/`](diagrams/).
 - [`.github/workflows/`](../.github/workflows): CI pipeline definition.
 - [`pyproject.toml`](../pyproject.toml): Tooling configuration and dependency metadata.
-- [`README.md`](../README.md): High-level usage guide.
-- **Generated at runtime (not versioned)**: `config/config.toml` for user settings and `.data/omym.db` for the SQLite database; both live under the repository root by default and may be overridden via env vars.
+- [`README.md`](../README.md): High-level usage guide and quick-start instructions.
+- **Generated at runtime (not versioned)**: `config/config.toml` for user settings and `.data/omym.db` for the SQLite database; both default to repository-relative paths and may be overridden via env vars.
 
 ## Naming Conventions
 - Packages and modules use lowercase with underscores; classes use PascalCase.

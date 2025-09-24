@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, final
 
-from omym.domain.restoration import CollisionPolicy
+from omym.features.restoration.domain.models import CollisionPolicy
 
 
 @final

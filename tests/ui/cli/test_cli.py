@@ -8,9 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.domain.metadata.music_file_processor import ProcessResult
-from omym.domain.metadata.track_metadata import TrackMetadata
-from omym.domain.restoration import CollisionPolicy, RestorePlanItem, RestoreResult
+from omym.features.metadata import ProcessResult
+from omym.features.metadata import TrackMetadata
+from omym.features.restoration.domain.models import (
+    CollisionPolicy,
+    RestorePlanItem,
+    RestoreResult,
+)
 from omym.ui.cli import CommandProcessor
 from omym.ui.cli.args.options import RestoreArgs
 

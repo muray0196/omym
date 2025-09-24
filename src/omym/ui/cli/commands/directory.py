@@ -2,7 +2,7 @@
 
 from typing import override
 
-from omym.domain.metadata.music_file_processor import ProcessResult
+from omym.features.metadata import ProcessResult
 from omym.ui.cli.commands.executor import CommandExecutor
 
 

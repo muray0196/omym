@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
+from omym.features.metadata import MusicProcessor, ProcessResult
 from omym.application.services.organize_service import OrganizeMusicService, OrganizeRequest
 from omym.ui.cli.args.options import OrganizeArgs
 from omym.ui.cli.display.preview import PreviewDisplay

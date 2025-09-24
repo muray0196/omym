@@ -14,7 +14,7 @@ from omym.config.paths import (
     default_artist_name_preferences_path,
     resolve_overridable_path,
 )
-from omym.infra.logger.logger import logger
+from omym.platform.logging.logger import logger
 
 _ARTIST_NAME_PREFERENCES_ENV = "OMYM_ARTIST_NAME_PREFERENCES_PATH"
 _DEFAULT_METADATA_VERSION = 1

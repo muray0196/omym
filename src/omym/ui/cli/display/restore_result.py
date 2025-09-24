@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final, final
 from rich.console import Console
 
-from omym.domain.restoration import RestoreResult
+from omym.features.restoration.domain.models import RestoreResult
 
 
 SKIPPED_MESSAGES: Final[set[str]] = {"dry_run", "destination_exists", "already_restored"}

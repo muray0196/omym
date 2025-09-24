@@ -10,7 +10,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from omym.ui.cli.args import ArgumentParser, OrganizeArgs, RestoreArgs
-from omym.infra.logger.logger import DEFAULT_LOG_FILE
+from omym.platform.logging.logger import DEFAULT_LOG_FILE
 
 
 @pytest.fixture()

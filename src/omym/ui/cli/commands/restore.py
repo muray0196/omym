@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import final
 
 from omym.application.services.restore_service import RestoreMusicService, RestoreServiceRequest
-from omym.domain.restoration import RestoreResult
+from omym.features.restoration.domain.models import RestoreResult
 from omym.ui.cli.args.options import RestoreArgs
 from omym.ui.cli.display.restore_result import RestoreResultDisplay
 

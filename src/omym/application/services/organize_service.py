@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, final
 
-from omym.domain.metadata.music_file_processor import MusicProcessor, ProcessResult
-from omym.infra.db.daos.maintenance_dao import MaintenanceDAO
-from omym.infra.logger.logger import logger
+from omym.features.metadata import MusicProcessor, ProcessResult
+from omym.platform.db.daos.maintenance_dao import MaintenanceDAO
+from omym.platform.logging.logger import logger
 
 CACHE_CLEAR_EXCEPTIONS: tuple[type[Exception], ...] = (sqlite3.Error,)
 

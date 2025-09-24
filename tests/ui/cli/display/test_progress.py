@@ -7,11 +7,11 @@ import pytest
 from pytest_mock import MockerFixture
 
 from typing import Callable
-from omym.domain.metadata.track_metadata import TrackMetadata
-from omym.domain.metadata.music_file_processor import ProcessResult
+from omym.features.metadata import TrackMetadata
+from omym.features.metadata import ProcessResult
 from omym.ui.cli.display.progress import ProgressDisplay
 from omym.application.services.organize_service import OrganizeRequest
-from omym.infra.logger.logger import logger
+from omym.platform.logging.logger import logger
 
 
 @pytest.fixture

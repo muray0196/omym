@@ -1,57 +1,72 @@
 owner: Maintainers
 status: active
-last_updated: 2025-09-17
+last_updated: 2025-09-24
 review_cadence: quarterly
 
-## System and Module Boundaries
-- **Entry points**: `python -m omym` invokes `omym.ui.cli.main`, which delegates to the CLI command processor. A thin GUI facade exists under `ui/gui` but currently re-exports the CLI services.
-- **UI layer (`omym.ui`)**: `ui.cli` owns argument parsing, Rich-powered console feedback, and progress reporting. It calls into application services and never touches infra types directly.
-- **Application layer (`omym.application.services`)**: Facades that construct domain services (`OrganizeMusicService`, `RestoreMusicService`), apply cache maintenance semantics, and translate CLI arguments into domain requests.
-- **Domain layer (`omym.domain`)**: Encapsulates core behaviour.
-  - `metadata` handles tag extraction (Mutagen), romanisation, hashing, duplicate detection, and orchestration through `MusicProcessor` with a bounded `ThreadPoolExecutor` for IO tasks.
-  - `path` computes sanitised directory/file layouts and manages artist/album identifiers.
-  - `organization` groups tracks into albums, discs, and filter hierarchies backed by SQLite metadata.
-  - `restoration` builds and executes restore plans with collision-policy aware file operations.
-  - `common` contains cross-cutting helpers such as directory cleanup.
-- **Infrastructure layer (`omym.infra`)**:
-  - `db` exposes the SQLite connection manager, DAO classes for processing metadata, album grouping, maintenance, and artist romanisation cache.
-  - `musicbrainz` implements the WS2 HTTP client with rate limiting and optional `requests` usage, plus pluggable cache registration.
-  - `logger` configures module-level loggers.
-- **Configuration (`omym.config`)** centralises config file discovery (`config/config.toml`), environment overrides (`OMYM_DATA_DIR`, `MUSICBRAINZ_USER_AGENT`), and runtime switches (`USE_MB_ROMANIZATION`).
+## Architectural Overview
+- **Entry points**: `python -m omym` and the packaged console script delegate to `omym.ui.cli.main`. GUI experiments remain thin adapters that re-use the CLI feature orchestration.
+- **Feature-oriented hexagonal layout**: Business logic is grouped by capability under `src/omym/features/<feature>`. Each feature owns:
+  - `domain/`: entities, value objects, and pure domain services scoped to the feature (no outbound dependencies except `shared/`).
+  - `usecases/`: application services, commands/queries, and port definitions that orchestrate domain behaviour.
+  - `adapters/`: infrastructure-facing implementations (DB, filesystem, MusicBrainz, logging) bound to ports.
+- **Cross-cutting layers**:
+  - `platform/`: shared technical services (SQLite manager, filesystem primitives, logging bootstrap, configuration providers). Modules here may depend on the standard library and third-party integrations but never on feature packages.
+  - `shared/`: reusable domain primitives (value objects, error types, functional helpers) that remain framework-free and immutable where possible.
+  - `config/`: boot-time configuration surface that instantiates typed settings via environment variables and TOML defaults. Feature packages receive settings through dependency injection.
+
+## Feature Catalog and Flows
+- **Ingestion**: prepares raw audio inputs, validates checksum manifests, and registers files for downstream organisation.
+- **Organization**: arranges tracks into album/disc hierarchies, maintains ordering metadata, and delegates to the path feature for filesystem-safe locations.
+- **Path**: generates canonical directory/filename structures, handles artist ID generation, and sanitises user-provided metadata for filesystem compatibility.
+- **Restoration**: plans and executes file restores with collision policies and rollback support.
+- **Metadata enrichment**: augments tags, resolves duplicates, and integrates with MusicBrainz for romanisation and artist profiles.
+- Features communicate solely through ports exposed at their `usecases` boundary; direct cross-feature imports are forbidden.
+
+### Dependency Rules
+- `features/*/domain` → `shared` only.
+- `features/*/usecases` → same feature `domain`, `shared`, and port protocols.
+- `features/*/adapters` → `platform`, same feature `usecases`, and standard library / third-party clients.
+- `platform` and `shared` never depend on feature packages or each other (only standard library / approved libraries).
+- UI adapters (`ui/cli`, future HTTP/gRPC) call `features/<feature>/usecases` services exclusively.
+
+### Execution Flow Example
+1. CLI parses arguments and resolves a feature-specific use case (e.g., `features/restoration/usecases/execute_restore.py`).
+2. The use case instantiates domain services and requests backing ports (repositories, filesystem gateways) from dependency injection helpers.
+3. Ports are fulfilled by adapters that wrap `platform` helpers (SQLite, MusicBrainz client, file IO).
+4. Results propagate back to the UI layer with structured status events for logging and telemetry.
 
 ## Data Model and Schemas
-- SQLite schema lives in [`src/omym/infra/db/migrations/schema.sql`](../src/omym/infra/db/migrations/schema.sql) and is applied via `DatabaseManager` during processor initialisation.
+- SQLite schema resides in [`src/omym/platform/db/migrations/schema.sql`](../src/omym/platform/db/migrations/schema.sql) and is applied via the shared `DatabaseManager` during platform bootstrapping.
 - Key tables:
-  - `processing_before` and `processing_after` record file hashes, source paths, derived metadata, and targets for auditing and restore planning.
-  - `albums` and `track_positions` persist album/disc relationships and track ordering.
-  - `filter_hierarchies` and `filter_values` support configurable directory filters.
+  - `processing_before` and `processing_after` capture file hashes, source paths, derived metadata, and restore targets for auditability.
+  - `albums` and `track_positions` persist album/disc relationships and track ordering semantics.
+  - `filter_hierarchies` and `filter_values` track user-defined organisation filters.
   - `artist_cache` stores romanised artist names and aliases sourced from MusicBrainz.
-- Indices optimise lookups by hash and hierarchy. The database file resides under `.data/omym.db` by default.
+- Indices optimise hash and hierarchy lookups. The database file defaults to `.data/omym.db`, overridable via `OMYM_DATA_DIR`.
 
 ## External Integrations
-- **Mutagen** for reading audio metadata across MP3, FLAC, AAC/M4A, DSF, ALAC, and Opus formats.
-- **MusicBrainz WS2 API** for optional artist romanisation (guarded by rate limiting and fallback logic).
-- **Rich** for CLI presentation (tables, colours, progress).
-- Standard library `shutil`, `hashlib`, and `pathlib` underpin file operations and hashing; no other network services are contacted.
+- **Mutagen**: audio metadata extraction across MP3, FLAC, AAC/M4A, DSF, ALAC, and Opus.
+- **MusicBrainz WS2 API**: optional artist romanisation with rate limiting and caching adapters.
+- **Rich**: CLI presentation (tables, colours, progress feedback).
+- Standard library `shutil`, `hashlib`, `pathlib`, and `concurrent.futures` underpin file IO, hashing, and parallel work units.
 
 ## Configuration and Secrets
-- Configuration is stored in TOML at `config/config.toml`; the file is created with comments on first run if absent.
-- `OMYM_DATA_DIR` overrides the default `.data/` directory for the SQLite database and cache files.
-- `MUSICBRAINZ_USER_AGENT` allows operators to supply a custom UA; otherwise values fall back to the TOML-configured app identity.
-- No secrets are persisted. Users must ensure the configured contact information complies with MusicBrainz etiquette.
+- Boot configuration loads typed settings from `config/config.toml`, overridden by environment variables such as `OMYM_DATA_DIR` and `MUSICBRAINZ_USER_AGENT`.
+- Settings are materialised in `platform/config` and passed explicitly to feature use cases or adapters.
+- No secrets are stored; operators must configure MusicBrainz credentials externally when needed.
 
 ## Observability
-- Logging is emitted through `omym.infra.logger.logger` with structured event identifiers defined in `ProcessingEvent`. Messages are console-friendly yet machine-parseable.
-- CLI summaries highlight processed/skipped/failed counts and propagate error reasons for actionable follow-up.
-- MusicBrainz warnings capture rate-limiting and JSON parsing failures without aborting processing.
+- Logging is initialised in `platform/logging` to emit structured events consumed by feature adapters.
+- Use cases surface progress and error details via typed result objects enabling CLI and future UI adapters to provide consistent reporting.
+- MusicBrainz integration captures rate-limit and parsing warnings without failing the pipeline.
 
 ## Runtime, Build, and Deploy
-- Runtime: Python ≥3.13 on POSIX or Windows. File moves respect cross-device constraints by performing copy + fsync + remove when necessary.
-- Dependency management: `uv` (see [`pyproject.toml`](../pyproject.toml)) with optional extras resolved at sync time.
-- Quality gates: `uv run basedpyright` for static typing and `uv run pytest` for tests. CI mirrors these checks in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
-- Packaging: standard Python package (`src/` layout) consumable via `pip install .` after `uv build`.
+- Runtime: Python ≥3.13 on POSIX or Windows. File moves handle cross-device scenarios by fallback copy + fsync + remove semantics.
+- Dependency management: `uv` (see [`pyproject.toml`](../pyproject.toml)).
+- Quality gates: `uv run basedpyright` and `uv run pytest`. CI mirrors these checks; layers use pytest markers to isolate feature, integration, and smoke suites.
+- Packaging: standard `src/` layout. Console entry points invoke feature use cases through adapters only.
 
 ## Compatibility / Support Policy
-- Supported platforms: modern Windows, macOS, and Linux distributions with UTF-8 filesystems.
-- Backward compatibility: schema migrations run automatically; obsolete paths are removed rather than maintained. Restore operations rely on recorded hashes, so deleting the SQLite database invalidates recovery ability.
-- Designed for single-user, single-process execution. For concurrent runners, users must provision separate data directories to avoid locking conflicts.
+- Supported platforms: modern Windows, macOS, Linux with UTF-8 filesystems.
+- Backward compatibility: schema migrations apply automatically; deprecated flows are removed rather than wrapped. Restore capability depends on persisted hashes—deleting the SQLite database invalidates historical recovery plans.
+- Designed for single-user, single-process execution. Concurrent runs require separate data directories to avoid SQLite locking.
