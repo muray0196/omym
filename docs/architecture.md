@@ -1,39 +1,38 @@
 owner: Maintainers
 status: active
-last_updated: 2025-09-24
+last_updated: 2025-09-25
 review_cadence: quarterly
 
 ## Architectural Overview
-- **Entry points**: `python -m omym` and the packaged console script delegate to `omym.ui.cli.main`. GUI experiments remain thin adapters that re-use the CLI feature orchestration.
-- **Feature-oriented hexagonal layout**: Business logic is grouped by capability under `src/omym/features/<feature>`. Each feature owns:
-  - `domain/`: entities, value objects, and pure domain services scoped to the feature (no outbound dependencies except `shared/`).
-  - `usecases/`: application services, commands/queries, and port definitions that orchestrate domain behaviour.
-  - `adapters/`: infrastructure-facing implementations (DB, filesystem, MusicBrainz, logging) bound to ports.
+- **Entry points**: `python -m omym` and the console script invoke `omym.ui.cli.main`, which resolves an application service in `src/omym/application/services`. UI surfaces never construct feature adapters directly.
+- **Feature-oriented hexagonal layout**: Business logic is grouped under `src/omym/features/<feature>`, and every feature contains:
+  - `domain/`: entities, value objects, and pure domain services scoped to the capability (only depends on `shared/`).
+  - `usecases/`: application services plus port protocols that orchestrate the feature's domain logic.
+  - `adapters/`: infrastructure-facing implementations (SQLite repositories, filesystem gateways, external API clients) bound to the declared ports.
 - **Cross-cutting layers**:
-  - `platform/`: shared technical services (SQLite manager, filesystem primitives, logging bootstrap, configuration providers). Modules here may depend on the standard library and third-party integrations but never on feature packages.
-  - `shared/`: reusable domain primitives (value objects, error types, functional helpers) that remain framework-free and immutable where possible.
-  - `config/`: boot-time configuration surface that instantiates typed settings via environment variables and TOML defaults. Feature packages receive settings through dependency injection.
+  - `platform/`: shared technical services (database manager, filesystem primitives, logging bootstrap, MusicBrainz HTTP client). Modules here depend on standard libraries or vetted third-party packages and never import feature code.
+  - `shared/`: feature-agnostic domain primitives, typed results, and error hierarchies that remain framework-free and immutable where possible.
+  - `config/`: typed configuration loaders that hydrate settings from environment variables and repository-relative TOML defaults; features receive settings via dependency injection helpers.
 
 ## Feature Catalog and Flows
-- **Ingestion**: prepares raw audio inputs, validates checksum manifests, and registers files for downstream organisation.
-- **Organization**: arranges tracks into album/disc hierarchies, maintains ordering metadata, and delegates to the path feature for filesystem-safe locations.
-- **Path**: generates canonical directory/filename structures, handles artist ID generation, and sanitises user-provided metadata for filesystem compatibility.
-- **Restoration**: plans and executes file restores with collision policies and rollback support.
-- **Metadata enrichment**: augments tags, resolves duplicates, and integrates with MusicBrainz for romanisation and artist profiles.
-- Features communicate solely through ports exposed at their `usecases` boundary; direct cross-feature imports are forbidden.
+- **Metadata** (`src/omym/features/metadata`): extracts and enriches tags via `MusicProcessor`, coordinates optional MusicBrainz lookups, and emits processing events consumed by organisation flows.
+- **Organization** (`src/omym/features/organization`): groups tracks into album/disc hierarchies, evaluates user-defined filters, and composes metadata and path services to derive final layouts.
+- **Path** (`src/omym/features/path`): generates filesystem-safe directory and filename structures, sanitises inputs, and exposes helpers that organisation and restoration use to resolve canonical targets.
+- **Restoration** (`src/omym/features/restoration`): reconstructs original locations from persisted processing plans, applies collision policies, and coordinates filesystem/database adapters for rollback.
+- Features collaborate exclusively through ports defined in their `usecases` modules. For example, the organisation use cases consume `MetadataExtractor` and path generation ports rather than importing foreign domains directly.
 
 ### Dependency Rules
 - `features/*/domain` → `shared` only.
-- `features/*/usecases` → same feature `domain`, `shared`, and port protocols.
-- `features/*/adapters` → `platform`, same feature `usecases`, and standard library / third-party clients.
-- `platform` and `shared` never depend on feature packages or each other (only standard library / approved libraries).
-- UI adapters (`ui/cli`, future HTTP/gRPC) call `features/<feature>/usecases` services exclusively.
+- `features/*/usecases` → same-feature `domain`, `shared`, and declared port protocols.
+- `features/*/adapters` → `platform`, same-feature `usecases`, and approved third-party clients.
+- `platform` and `shared` never depend on feature packages or on each other.
+- UI adapters (`ui/cli`, future HTTP/gRPC) call into application services which, in turn, delegate to feature use cases.
 
 ### Execution Flow Example
-1. CLI parses arguments and resolves a feature-specific use case (e.g., `features/restoration/usecases/execute_restore.py`).
-2. The use case instantiates domain services and requests backing ports (repositories, filesystem gateways) from dependency injection helpers.
-3. Ports are fulfilled by adapters that wrap `platform` helpers (SQLite, MusicBrainz client, file IO).
-4. Results propagate back to the UI layer with structured status events for logging and telemetry.
+1. CLI parses arguments and resolves an application service (for example, `OrganizeMusicService`).
+2. The application service instantiates the required feature use case (`MusicProcessor`, `MusicGrouper`, etc.) with injected ports.
+3. Ports are fulfilled by adapters that wrap `platform` helpers (SQLite repositories, filesystem abstractions, MusicBrainz client).
+4. Results propagate back to the UI layer via structured status events for logging and telemetry.
 
 ## Data Model and Schemas
 - SQLite schema resides in [`src/omym/platform/db/migrations/schema.sql`](../src/omym/platform/db/migrations/schema.sql) and is applied via the shared `DatabaseManager` during platform bootstrapping.
@@ -51,9 +50,9 @@ review_cadence: quarterly
 - Standard library `shutil`, `hashlib`, `pathlib`, and `concurrent.futures` underpin file IO, hashing, and parallel work units.
 
 ## Configuration and Secrets
-- Boot configuration loads typed settings from `config/config.toml`, overridden by environment variables such as `OMYM_DATA_DIR` and `MUSICBRAINZ_USER_AGENT`.
-- Settings are materialised in `platform/config` and passed explicitly to feature use cases or adapters.
-- No secrets are stored; operators must configure MusicBrainz credentials externally when needed.
+- Boot configuration loads typed settings from `src/omym/config/settings.py`, which hydrates defaults from `config/config.toml` and overrides via environment variables (e.g., `OMYM_DATA_DIR`, `MUSICBRAINZ_USER_AGENT`).
+- Settings objects are passed into application services and adapters explicitly; features never read environment variables directly.
+- No secrets are stored; operators configure MusicBrainz credentials externally when needed.
 
 ## Observability
 - Logging is initialised in `platform/logging` to emit structured events consumed by feature adapters.

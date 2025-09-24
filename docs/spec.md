@@ -1,6 +1,6 @@
 owner: Maintainers
 status: active
-last_updated: 2025-09-17
+last_updated: 2025-09-25
 review_cadence: quarterly
 
 ## Goals and Success Metrics
@@ -21,7 +21,7 @@ review_cadence: quarterly
 - **Maintain caches**: Supplying `--clear-cache` removes cached artist romanisation and processing state prior to organisation; operations continue even if cache eviction encounters recoverable errors.
 
 ## Flows
-- **Primary organise flow**: CLI parsing → configuration load → construct `OrganizeMusicService` → instantiate `MusicProcessor` → enumerate files with hash-based duplicate detection → extract metadata (Mutagen) → optional artist romanisation (MusicBrainz) → compute target paths → move audio/lyrics/artwork via shutil → persist `processing_before/after` rows → emit Rich console summary.
+- **Primary organise flow**: CLI parsing → configuration load → construct `OrganizeMusicService` → compose metadata (`features.metadata.MusicProcessor`), grouping (`features.organization.MusicGrouper`), and path generation (`features.path.PathGenerator`) use cases → enumerate files with hash-based duplicate detection → extract metadata (Mutagen) with optional MusicBrainz romanisation → compute target paths → move audio/lyrics/artwork via filesystem adapters → persist `processing_before/after` rows → emit Rich console summary.
 - **Restore flow**: CLI parsing → build `RestoreMusicService` request → load persisted plan from SQLite (`processing_after` + path elements) → evaluate collision policy (abort/skip/backup) → move or copy files back to origin/destination → optionally purge state.
 - **Error and retry handling**: Metadata extraction or IO failures mark the result unsuccessful, skip the file, and continue processing. Rate-limited MusicBrainz lookups obey 1 req/s with a single retry on 429/5xx and downgrade to local naming when network calls fail. Keyboard interrupts exit with code 130 after logging.
 - **Dry-run flow**: All filesystem operations short-circuit to planning only, but metadata extraction, hashing, and logging still execute for parity with real runs.

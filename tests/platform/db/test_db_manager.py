@@ -97,12 +97,19 @@ def test_database_connection() -> None:
         manager.close()
 
 
-def test_database_error_handling() -> None:
-    """Test database error handling."""
-    # Try to connect with invalid path
+def test_database_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test error propagation when the filesystem rejects the database path."""
+
+    def _raise_permission(_: Path) -> None:
+        raise PermissionError("forced permission failure")
+
+    monkeypatch.setattr(
+        "omym.platform.db.db_manager.ensure_parent_directory", _raise_permission
+    )
+
     with pytest.raises(PermissionError):
-        with DatabaseManager(Path("/invalid")):
-            pass
+        manager = DatabaseManager(Path("/unwritable/location.db"))
+        manager.connect()
 
 
 def test_database_migration(tmp_path: Path) -> None:
