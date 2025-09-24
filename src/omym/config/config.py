@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from omym.config.file_ops import write_text_file
-from omym.infra.logger.logger import logger
+from omym.platform.logging.logger import logger
 from omym.config.paths import default_config_path
 
 

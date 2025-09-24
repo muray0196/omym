@@ -15,7 +15,7 @@ from omym.application.services.organize_service import (
     OrganizeMusicService,
     OrganizeRequest,
 )
-from omym.domain.metadata.music_file_processor import ProcessResult
+from omym.features.metadata import ProcessResult
 
 
 def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> None:

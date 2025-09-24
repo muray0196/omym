@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import ClassVar
 from pytest_mock import MockerFixture
 
-from omym.domain.metadata.track_metadata import TrackMetadata
-from omym.domain.metadata.music_file_processor import LyricsProcessingResult, ProcessResult
+from omym.features.metadata import TrackMetadata
+from omym.features.metadata import LyricsProcessingResult, ProcessResult
 from omym.ui.cli.display.preview import PreviewDisplay
 
 

@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from logging import Logger, getLogger
 from pathlib import Path
 from typing import final
 
-from omym.domain.restoration import (
+from omym.features.restoration import (
     CollisionPolicy,
+    RestorationService,
     RestoreRequest,
     RestoreResult,
-    RestorationService,
 )
+from omym.features.restoration.adapters.db.sqlite_repository import SqliteRestoreRepository
+from omym.features.restoration.adapters.filesystem.local import LocalFileSystemGateway
+from omym.features.restoration.usecases.ports import (
+    FileSystemGateway,
+    MaintenanceGateway,
+    RestorePlanReader,
+)
+from omym.platform.db.db_manager import DatabaseManager
 
 
 @dataclass(slots=True)
@@ -30,10 +39,45 @@ class RestoreServiceRequest:
 
 @final
 class RestoreMusicService:
-    """Application layer façade for the restoration domain service."""
+    """Application façade wiring adapters into the restoration use case."""
 
-    def __init__(self) -> None:
-        self._service = RestorationService()
+    _service: RestorationService
+    _plan_reader: RestorePlanReader
+    _maintenance: MaintenanceGateway
+    _filesystem: FileSystemGateway
+
+    def __init__(
+        self,
+        *,
+        db_path: Path | str | None = None,
+        plan_reader: RestorePlanReader | None = None,
+        maintenance: MaintenanceGateway | None = None,
+        filesystem: FileSystemGateway | None = None,
+        logger: Logger | None = None,
+    ) -> None:
+        if (plan_reader is None) != (maintenance is None):
+            raise ValueError("plan_reader and maintenance must be provided together")
+
+        if plan_reader is None:
+            manager = DatabaseManager(db_path)
+            sqlite_repository = SqliteRestoreRepository(manager)
+            self._plan_reader = sqlite_repository
+            self._maintenance = sqlite_repository
+        else:
+            assert maintenance is not None
+            self._plan_reader = plan_reader
+            self._maintenance = maintenance
+
+        fs_gateway = filesystem or LocalFileSystemGateway()
+        service_logger = logger or getLogger(__name__)
+
+        self._filesystem = fs_gateway
+        self._service = RestorationService(
+            plan_reader=self._plan_reader,
+            filesystem=self._filesystem,
+            maintenance=self._maintenance,
+            logger=service_logger,
+        )
 
     def run(self, request: RestoreServiceRequest) -> list[RestoreResult]:
         """Execute restoration and optionally purge persistent state."""

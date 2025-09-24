@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from rich.console import Console
 
-from omym.domain.metadata.music_file_processor import ProcessResult
+from omym.features.metadata import ProcessResult
 
 
 def render_processing_summary(

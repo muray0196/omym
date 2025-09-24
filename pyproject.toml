@@ -51,3 +51,6 @@ reportMissingImports = false
 reportAny = false
 reportExplicitAny = false
 reportImplicitOverride = false
+reportImportCycles = "error"
+reportPrivateUsage = "error"
+reportImplicitRelativeImport = "error"

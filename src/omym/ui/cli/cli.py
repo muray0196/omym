@@ -3,11 +3,11 @@
 import sys
 from typing import final
 
-from omym.domain.restoration import RestoreResult
+from omym.features.restoration.domain.models import RestoreResult
 from omym.ui.cli.args import ArgumentParser
 from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, RestoreArgs
 from omym.ui.cli.commands import DirectoryCommand, FileCommand, RestoreCommand
-from omym.infra.logger.logger import logger
+from omym.platform.logging.logger import logger
 
 
 @final

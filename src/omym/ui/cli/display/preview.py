@@ -5,7 +5,7 @@ from typing import Literal, final
 from rich.console import Console
 from rich.tree import Tree
 
-from omym.domain.metadata.music_file_processor import ProcessResult
+from omym.features.metadata import ProcessResult
 
 from .summary import render_processing_summary
 
