@@ -7,11 +7,9 @@ Why: Expose a port-driven service so adapters can back persistence lookups.
 
 from dataclasses import dataclass
 from pathlib import Path
-from sqlite3 import Connection
 from typing import final
 
-from omym.platform.db.daos.filter_dao import FilterDAO
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 from .ports import FilterHierarchyRecord, FilterQueryPort, FilterValueRecord
 
@@ -38,27 +36,11 @@ class PathGenerator:
     base_path: Path
     _filters: FilterQueryPort
 
-    def __init__(
-        self,
-        conn: Connection | None,
-        base_path: Path,
-        *,
-        filter_gateway: FilterQueryPort | None = None,
-    ) -> None:
-        """Initialize path generator.
+    def __init__(self, base_path: Path, filter_gateway: FilterQueryPort) -> None:
+        """Initialize path generator with a filter port."""
 
-        Args:
-            conn: Legacy SQLite database connection used when no port is supplied.
-            base_path: Base path for organizing files.
-            filter_gateway: Port that exposes filter hierarchy queries.
-        """
         self.base_path = base_path
-        if filter_gateway is not None:
-            self._filters = filter_gateway
-        elif conn is not None:
-            self._filters = _FilterDaoAdapter(conn)
-        else:
-            raise ValueError("PathGenerator requires filter_gateway or conn")
+        self._filters = filter_gateway
 
     def generate_paths(self, grouped_files: dict[str, dict[str, str | None]] | None = None) -> list[PathInfo]:
         """Generate paths for all files.
@@ -206,17 +188,6 @@ class PathGenerator:
 
         return groups
 
-    def _find_value_for_file(self, hierarchy_id: int, file_hash: str, values: list[FilterValueRecord]) -> str | None:  # pyright: ignore[reportUnusedFunction] - kept for external callers if any
-        """(Deprecated) Linear search for a file's hierarchy value.
-
-        Kept for compatibility with any external callers; internal code now
-        uses an indexed lookup in ``_group_files_by_hierarchies`` for O(1) access.
-        """
-        for value in values:
-            if value.hierarchy_id == hierarchy_id and value.file_hash == file_hash:
-                return value.value
-        return None
-
     def _generate_group_paths(
         self,
         hierarchies: list[FilterHierarchyRecord],
@@ -271,27 +242,3 @@ class PathGenerator:
                     logger.debug("Using hierarchy %s with value %s", hierarchies[i].name, component)
         # Use the Path constructor to join components.
         return Path(*components)
-
-
-@final
-class _FilterDaoAdapter(FilterQueryPort):
-    """Adapter that projects FilterDAO results onto port records."""
-
-    def __init__(self, conn: Connection) -> None:
-        self._dao = FilterDAO(conn)
-
-    def get_hierarchies(self) -> list[FilterHierarchyRecord]:
-        return [
-            FilterHierarchyRecord(id=item.id, name=item.name, priority=item.priority)
-            for item in self._dao.get_hierarchies()
-        ]
-
-    def get_values(self, hierarchy_id: int) -> list[FilterValueRecord]:
-        return [
-            FilterValueRecord(
-                hierarchy_id=value.hierarchy_id,
-                file_hash=value.file_hash,
-                value=value.value,
-            )
-            for value in self._dao.get_values(hierarchy_id)
-        ]

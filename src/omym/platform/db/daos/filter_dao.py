@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from sqlite3 import Connection
 from typing import final
 
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 
 @dataclass

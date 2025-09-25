@@ -23,7 +23,7 @@ from omym.config.artist_name_preferences import (
 )
 
 from omym.platform.filesystem import ensure_parent_directory, remove_empty_directories
-from omym.features.path.usecases.music_file_renamer import (
+from omym.features.path.usecases.renamer import (
     DirectoryGenerator,
     FileNameGenerator,
     CachedArtistIdGenerator,
@@ -32,7 +32,7 @@ from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
 from omym.platform.db.db_manager import DatabaseManager
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import (
     configure_romanization_cache,
     fetch_romanized_name,

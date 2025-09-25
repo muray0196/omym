@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import final, ClassVar
 import unicodedata
 
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 
 @final

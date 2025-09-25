@@ -30,7 +30,7 @@ from email.utils import parsedate_to_datetime
 from collections.abc import Iterable
 from typing import Any, Final, Protocol, cast
 
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 from omym.config.settings import MB_APP_NAME, MB_APP_VERSION, MB_CONTACT
 
 

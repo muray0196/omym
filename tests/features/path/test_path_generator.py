@@ -129,17 +129,41 @@ def filter_dao(conn: sqlite3.Connection) -> FilterDAO:
     return FilterDAO(conn)
 
 
+class _FilterDaoPort(FilterQueryPort):
+    """Expose ``FilterDAO`` through the query port for tests."""
+
+    def __init__(self, dao: FilterDAO) -> None:
+        self._dao: FilterDAO = dao
+
+    def get_hierarchies(self) -> list[FilterHierarchyRecord]:
+        return [
+            FilterHierarchyRecord(id=item.id, name=item.name, priority=item.priority)
+            for item in self._dao.get_hierarchies()
+        ]
+
+    def get_values(self, hierarchy_id: int) -> list[FilterValueRecord]:
+        return [
+            FilterValueRecord(
+                hierarchy_id=value.hierarchy_id,
+                file_hash=value.file_hash,
+                value=value.value,
+            )
+            for value in self._dao.get_values(hierarchy_id)
+        ]
+
+
 @pytest.fixture
-def path_generator(conn: sqlite3.Connection) -> PathGenerator:
-    """Create a test path generator.
+def filter_port(filter_dao: FilterDAO) -> FilterQueryPort:
+    """Project the DAO onto the filter query port."""
 
-    Args:
-        conn: A test database connection.
+    return _FilterDaoPort(filter_dao)
 
-    Returns:
-        PathGenerator: A test path generator.
-    """
-    return PathGenerator(conn, Path("/test/music"))
+
+@pytest.fixture
+def path_generator(filter_port: FilterQueryPort) -> PathGenerator:
+    """Create a test path generator."""
+
+    return PathGenerator(Path("/test/music"), filter_port)
 
 
 def test_generate_paths_single_file(path_generator: PathGenerator, filter_dao: FilterDAO) -> None:
@@ -285,11 +309,7 @@ def test_generate_paths_with_injected_port(tmp_path: Path) -> None:
         def get_values(self, hierarchy_id: int) -> list[FilterValueRecord]:
             return list(self._values.get(hierarchy_id, []))
 
-    generator = PathGenerator(
-        None,
-        tmp_path,
-        filter_gateway=StubFilterPort(),
-    )
+    generator = PathGenerator(tmp_path, StubFilterPort())
 
     results = generator.generate_paths()
     assert len(results) == 1

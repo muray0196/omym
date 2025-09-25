@@ -11,7 +11,7 @@ from omym.features.metadata import TrackMetadata
 from omym.features.metadata import ProcessResult
 from omym.ui.cli.display.progress import ProgressDisplay
 from omym.application.services.organize_service import OrganizeRequest
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 
 @pytest.fixture

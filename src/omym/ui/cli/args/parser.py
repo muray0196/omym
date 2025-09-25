@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import final
 
 from omym.platform.filesystem import ensure_directory
-from omym.platform.logging.logger import DEFAULT_LOG_FILE, logger, setup_logger
+from omym.platform.logging import DEFAULT_LOG_FILE, logger, setup_logger
 from omym.config.config import Config
 from omym.features.restoration.domain.models import CollisionPolicy
 from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, RestoreArgs

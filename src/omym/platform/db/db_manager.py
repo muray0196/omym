@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import final, Any
 
 from omym.platform.filesystem import ensure_directory, ensure_parent_directory
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 from omym.config.paths import default_data_dir
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from omym.features.path.usecases.music_file_renamer import ArtistIdGenerator
+from omym.features.path.usecases.renamer import ArtistIdGenerator
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.db_manager import DatabaseManager
 

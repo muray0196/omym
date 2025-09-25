@@ -11,7 +11,7 @@ from mutagen.id3 import ID3
 from mutagen.oggopus import OggOpus
 from mutagen.dsf import DSF
 from mutagen._util import MutagenError
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 from .artist_romanizer import ArtistRomanizer
 from ..domain.track_metadata import TrackMetadata

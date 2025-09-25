@@ -4,7 +4,7 @@ import sqlite3
 import threading
 from typing import final
 
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 _DEFAULT_ARTIST_ID = "NOART"
 _DEFAULT_ROMANIZATION_SOURCE = "musicbrainz"

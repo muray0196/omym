@@ -1,16 +1,20 @@
-"""Centralized logging configuration for OMYM."""
+"""Rich logging handlers.
+
+Where: platform/logging/handlers.py
+What: Provide custom Rich logging handlers for CLI and structured event rendering.
+Why: Keep handler formatting logic isolated so logger configuration stays lean.
+"""
+
+from __future__ import annotations
 
 import logging
-import logging.handlers
-import os
-from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
+from pathlib import PurePath, PurePosixPath, PureWindowsPath
 from typing import Any, ClassVar, override
-from rich.console import Console, ConsoleRenderable
+
+from rich.console import ConsoleRenderable
 from rich.logging import RichHandler
 from rich.style import Style
 from rich.text import Text
-
-from omym.config.paths import default_log_file
 
 
 class WhitePathRichHandler(RichHandler):
@@ -30,12 +34,8 @@ class WhitePathRichHandler(RichHandler):
     _PATH_SEGMENT_LIMIT: ClassVar[int] = 4
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the handler with custom settings.
+        """Initialize the handler with custom settings."""
 
-        Args:
-            *args: Positional arguments to pass to RichHandler.
-            **kwargs: Keyword arguments to pass to RichHandler.
-        """
         kwargs["show_time"] = False
         kwargs["show_path"] = False
         kwargs["show_level"] = False  # We'll handle level display ourselves
@@ -46,15 +46,8 @@ class WhitePathRichHandler(RichHandler):
         super().__init__(*args, **kwargs)
 
     def _format_path(self, path: str, base: str | None = None) -> Text:
-        """Format a path with colored separators and compact rendering.
+        """Format a path with colored separators and compact rendering."""
 
-        Args:
-            path: Absolute or relative path string to format.
-            base: Optional base path used to relativize ``path`` when possible.
-
-        Returns:
-            Text: Formatted path with colored separators and ellipsis truncation.
-        """
         pure_path = self._to_pure_path(path)
         base_path = self._to_pure_path(base) if base else None
 
@@ -297,59 +290,4 @@ class WhitePathRichHandler(RichHandler):
         return super().render_message(record, message)
 
 
-DEFAULT_LOG_FILE: Path = default_log_file()
-
-
-def setup_logger(
-    log_file: Path | None = None,
-    console_level: int = logging.INFO,
-    file_level: int = logging.DEBUG,
-) -> logging.Logger:
-    """Set up and configure the application logger.
-
-    Args:
-        log_file: Path to the log file. If None, only console logging is enabled.
-        console_level: Logging level for console output. Defaults to INFO.
-        file_level: Logging level for file output. Defaults to DEBUG.
-
-    Returns:
-        logging.Logger: Configured logger instance.
-    """
-    logger = logging.getLogger("omym")
-    logger.setLevel(logging.DEBUG)
-
-    # Remove any existing handlers cleanly
-    for handler in list(logger.handlers):
-        handler.close()
-    logger.handlers.clear()
-
-    # Create formatters
-    file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-    # Console handler using Rich
-    console = Console(force_terminal=True, soft_wrap=True)
-    console_handler = WhitePathRichHandler(console=console)
-    console_handler.setLevel(console_level)
-    logger.addHandler(console_handler)
-
-    # File handler (if log_file is specified)
-    if log_file is not None:
-        # Ensure the log directory exists
-        resolved_log_file = Path(log_file).expanduser().resolve()
-        os.makedirs(resolved_log_file.parent, exist_ok=True)
-
-        file_handler = logging.handlers.RotatingFileHandler(
-            resolved_log_file,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5,
-            encoding="utf-8",
-        )
-        file_handler.setLevel(file_level)
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
-
-    return logger
-
-
-# Global logger instance
-logger = setup_logger(log_file=DEFAULT_LOG_FILE)
+__all__ = ["WhitePathRichHandler"]

@@ -8,11 +8,11 @@ from .domain.path_elements import (
     AlbumArtistComponent,
     AlbumComponent,
 )
-from .usecases.music_file_renamer import (
+from .usecases.renamer import (
     ArtistIdGenerator,
     CachedArtistIdGenerator,
-    FileNameGenerator,
     DirectoryGenerator,
+    FileNameGenerator,
 )
 from .usecases.ports import (
     ArtistCacheWriter,

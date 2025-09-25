@@ -9,7 +9,7 @@ import langid
 import pykakasi
 
 from omym.config.settings import USE_MB_ROMANIZATION
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import fetch_romanized_name
 
 from ..domain.track_metadata import TrackMetadata

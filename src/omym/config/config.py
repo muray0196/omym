@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from omym.config.file_ops import write_text_file
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 from omym.config.paths import default_config_path
 
 
@@ -164,20 +164,6 @@ class Config:
                         config_dict = tomllib.load(f)
                 except Exception:
                     raise
-
-                # Ensure new fields have defaults if absent (backward compatibility)
-                _ = config_dict.setdefault("use_mb_romanization", True)
-                _ = config_dict.setdefault("mb_app_name", None)
-                _ = config_dict.setdefault("mb_app_version", None)
-                _ = config_dict.setdefault("mb_contact", None)
-
-                # Convert string paths back to Path objects and handle empty strings
-                for key, value in config_dict.items():
-                    if key.endswith("_path") or key.endswith("_dir"):
-                        if value and value.strip() != "":  # Convert only non-empty strings
-                            config_dict[key] = str(value)  # Keep as string, let __post_init__ handle conversion
-                        else:
-                            config_dict[key] = None
 
                 logger.info("Configuration loaded from %s", config_file)
                 instance = cls(**config_dict)

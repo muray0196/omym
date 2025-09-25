@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from omym.features.metadata import MetadataExtractor
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 from ..domain.path_format import parse_path_format
 

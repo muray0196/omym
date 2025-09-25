@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, final
 
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 
 @final

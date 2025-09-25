@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from omym.features.path.usecases.music_file_renamer import (
+from omym.features.path.usecases.renamer import (
     ArtistIdGenerator,
     CachedArtistIdGenerator,
     DirectoryGenerator,

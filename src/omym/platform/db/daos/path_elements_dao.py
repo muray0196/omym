@@ -4,7 +4,7 @@ from sqlite3 import Connection
 from typing import final
 
 from omym.features.path.domain.path_elements import ComponentValue
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 
 @final

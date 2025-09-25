@@ -9,7 +9,7 @@ from typing import Any
 from rich.console import Console
 from rich.text import Text
 
-from omym.platform.logging.logger import WhitePathRichHandler
+from omym.platform.logging import WhitePathRichHandler
 
 
 def _make_handler() -> WhitePathRichHandler:

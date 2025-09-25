@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from omym.features.metadata.domain.track_metadata import TrackMetadata
 from omym.features.path.domain.sanitizer import Sanitizer
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 
 @dataclass

@@ -11,7 +11,7 @@ from typing import Callable, final
 
 from omym.features.metadata import MusicProcessor, ProcessResult
 from omym.platform.db.daos.maintenance_dao import MaintenanceDAO
-from omym.platform.logging.logger import logger
+from omym.platform.logging import logger
 
 CACHE_CLEAR_EXCEPTIONS: tuple[type[Exception], ...] = (sqlite3.Error,)
 

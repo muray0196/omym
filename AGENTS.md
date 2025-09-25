@@ -7,7 +7,7 @@
 ## Configuration & Policies
 - Config via environment variables (validate at startup).
 - All config/data paths live under repo root (portable).
-- No backward-compatibility layers—remove legacy paths immediately.
+- Do not retain any backward-compatibility layers—remove legacy paths immediately.
 
 ## Code Quality
 - Logging via stdlib.

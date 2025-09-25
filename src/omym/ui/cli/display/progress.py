@@ -8,7 +8,7 @@ from rich.prompt import Prompt
 
 from omym.application.services.organize_service import OrganizeRequest
 from omym.features.metadata import ProcessResult
-from omym.platform.logging.logger import WhitePathRichHandler, logger
+from omym.platform.logging import WhitePathRichHandler, logger
 
 @runtime_checkable
 class OrganizeServiceLike(Protocol):
