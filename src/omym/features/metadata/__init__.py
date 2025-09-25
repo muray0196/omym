@@ -12,6 +12,12 @@ from .usecases.music_file_processor import (
     MusicProcessor,
 )
 from .usecases.track_metadata_extractor import MetadataExtractor
+from .usecases.ports import (
+    ArtistCachePort,
+    DatabaseManagerPort,
+    ProcessingAfterPort,
+    ProcessingBeforePort,
+)
 
 __all__ = [
     "TrackMetadata",
@@ -24,4 +30,8 @@ __all__ = [
     "ProcessingLogContext",
     "LyricsProcessingResult",
     "ArtworkProcessingResult",
+    "DatabaseManagerPort",
+    "ProcessingBeforePort",
+    "ProcessingAfterPort",
+    "ArtistCachePort",
 ]

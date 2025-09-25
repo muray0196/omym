@@ -7,6 +7,11 @@ from collections.abc import Generator
 import pytest
 
 from omym.features.path.usecases.path_generator import PathGenerator
+from omym.features.path.usecases.ports import (
+    FilterHierarchyRecord,
+    FilterQueryPort,
+    FilterValueRecord,
+)
 from omym.platform.db.daos.filter_dao import FilterDAO
 
 
@@ -258,3 +263,37 @@ def test_generate_paths_no_hierarchies(path_generator: PathGenerator) -> None:
     """
     paths = path_generator.generate_paths()
     assert len(paths) == 0
+
+
+def test_generate_paths_with_injected_port(tmp_path: Path) -> None:
+    """PathGenerator should operate with an injected filter port."""
+
+    class StubFilterPort(FilterQueryPort):
+        def __init__(self) -> None:
+            self._hierarchies: list[FilterHierarchyRecord] = [
+                FilterHierarchyRecord(id=1, name="AlbumArtist", priority=0),
+                FilterHierarchyRecord(id=2, name="Album", priority=1),
+            ]
+            self._values: dict[int, list[FilterValueRecord]] = {
+                1: [FilterValueRecord(hierarchy_id=1, file_hash="hash", value="Artist")],
+                2: [FilterValueRecord(hierarchy_id=2, file_hash="hash", value="Album")],
+            }
+
+        def get_hierarchies(self) -> list[FilterHierarchyRecord]:
+            return list(self._hierarchies)
+
+        def get_values(self, hierarchy_id: int) -> list[FilterValueRecord]:
+            return list(self._values.get(hierarchy_id, []))
+
+    generator = PathGenerator(
+        None,
+        tmp_path,
+        filter_gateway=StubFilterPort(),
+    )
+
+    results = generator.generate_paths()
+    assert len(results) == 1
+    first = results[0]
+    assert first.file_hash == "hash"
+    assert first.relative_path == Path("Artist/Album")
+    assert first.warnings == []

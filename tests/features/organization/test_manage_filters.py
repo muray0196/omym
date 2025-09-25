@@ -5,6 +5,10 @@ import sqlite3
 import pytest
 
 from omym.features.organization import HierarchicalFilter
+from omym.features.organization.usecases.ports import (
+    FilterHierarchyRecord,
+    FilterRegistryPort,
+)
 from omym.platform.db.daos.filter_dao import FilterDAO
 
 
@@ -130,7 +134,10 @@ def test_process_file_unknown_hierarchy(filter_engine: HierarchicalFilter) -> No
     assert isinstance(warnings, list)
     assert len(warnings) == 0
 
-def test_register_hierarchies_normalizes_path_format(filter_engine: HierarchicalFilter) -> None:
+def test_register_hierarchies_normalizes_path_format(
+    filter_engine: HierarchicalFilter,
+    filter_dao: FilterDAO,
+) -> None:
     """Ensure path format parsing drops empty segments and trims whitespace."""
     path_format = " AlbumArtist // Album / Year/ "
 
@@ -138,6 +145,43 @@ def test_register_hierarchies_normalizes_path_format(filter_engine: Hierarchical
 
     assert warnings == []
 
-    hierarchies = filter_engine.filter_dao.get_hierarchies()
+    hierarchies = filter_dao.get_hierarchies()
     assert [hierarchy.name for hierarchy in hierarchies] == ["AlbumArtist", "Album", "Year"]
     assert [hierarchy.priority for hierarchy in hierarchies] == [0, 1, 2]
+
+
+def test_filter_engine_accepts_port_injection() -> None:
+    """HierarchicalFilter should rely on the provided filter port when supplied."""
+
+    class StubFilterPort(FilterRegistryPort):
+        def __init__(self) -> None:
+            self.hierarchies: list[FilterHierarchyRecord] = []
+            self.values: dict[int, list[tuple[str, str]]] = {}
+
+        def insert_hierarchy(self, name: str, priority: int) -> int | None:
+            identifier = len(self.hierarchies) + 1
+            self.hierarchies.append(FilterHierarchyRecord(id=identifier, name=name, priority=priority))
+            return identifier
+
+        def get_hierarchies(self) -> list[FilterHierarchyRecord]:
+            return list(self.hierarchies)
+
+        def insert_value(self, hierarchy_id: int, file_hash: str, value: str) -> bool:
+            self.values.setdefault(hierarchy_id, []).append((file_hash, value))
+            return True
+
+    port = StubFilterPort()
+    engine = HierarchicalFilter(filter_port=port)
+
+    assert engine.register_hierarchies("AlbumArtist/Album") == []
+    warnings = engine.process_file(
+        "hash",
+        {
+            "albumartist": "Artist",
+            "album": "Album",
+        },
+    )
+
+    assert warnings == []
+    assert len(port.hierarchies) == 2
+    assert port.values == {1: [("hash", "Artist")], 2: [("hash", "Album")]}

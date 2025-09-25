@@ -10,9 +10,10 @@
 - No backward-compatibility layers—remove legacy paths immediately.
 
 ## Code Quality
-- Typing with `basedpyright`; avoid `Any`.
 - Logging via stdlib.
+- Typing with `basedpyright`; avoid `Any`.
 - Use `# pyright: ignore[...]` sparingly, with justification.
+- After completing all implementation, run `basedpyright`.
 
 ## Testing
 - `pytest` + `pytest-mock` only.

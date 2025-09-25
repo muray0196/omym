@@ -15,9 +15,9 @@ review_cadence: quarterly
   - `config/`: typed configuration loaders that hydrate settings from environment variables and repository-relative TOML defaults; features receive settings via dependency injection helpers.
 
 ## Feature Catalog and Flows
-- **Metadata** (`src/omym/features/metadata`): extracts and enriches tags via `MusicProcessor`, coordinates optional MusicBrainz lookups, and emits processing events consumed by organisation flows.
-- **Organization** (`src/omym/features/organization`): groups tracks into album/disc hierarchies, evaluates user-defined filters, and composes metadata and path services to derive final layouts.
-- **Path** (`src/omym/features/path`): generates filesystem-safe directory and filename structures, sanitises inputs, and exposes helpers that organisation and restoration use to resolve canonical targets.
+- **Metadata** (`src/omym/features/metadata`): extracts and enriches tags via `MusicProcessor`, coordinates optional MusicBrainz lookups, emits processing events consumed by organisation flows, and surfaces database/cache ports in `usecases/ports.py` so adapters remain swappable.
+- **Organization** (`src/omym/features/organization`): groups tracks into album/disc hierarchies, evaluates user-defined filters, composes metadata and path services to derive final layouts, and exposes album/filter repository ports in `usecases/ports.py` for adapter injection.
+- **Path** (`src/omym/features/path`): generates filesystem-safe directory and filename structures, sanitises inputs, exposes helpers that organisation and restoration use to resolve canonical targets, and now publishes filter access ports in `usecases/ports.py`.
 - **Restoration** (`src/omym/features/restoration`): reconstructs original locations from persisted processing plans, applies collision policies, and coordinates filesystem/database adapters for rollback.
 - Features collaborate exclusively through ports defined in their `usecases` modules. For example, the organisation use cases consume `MetadataExtractor` and path generation ports rather than importing foreign domains directly.
 

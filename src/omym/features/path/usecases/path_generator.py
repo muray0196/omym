@@ -1,13 +1,19 @@
-"""Path generation system for organizing music files."""
+"""Path generation use cases.
 
+Where: features/path/usecases.
+What: Assemble relative library paths from filter hierarchies or grouped metadata.
+Why: Expose a port-driven service so adapters can back persistence lookups.
+"""
+
+from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection
 from typing import final
-from dataclasses import dataclass
 
+from omym.platform.db.daos.filter_dao import FilterDAO
 from omym.platform.logging.logger import logger
-from omym.platform.db.daos.filter_dao import FilterDAO, FilterHierarchy, FilterValue
-from omym.platform.db.daos.albums_dao import AlbumDAO
+
+from .ports import FilterHierarchyRecord, FilterQueryPort, FilterValueRecord
 
 
 @dataclass
@@ -29,22 +35,30 @@ class PathInfo:
 class PathGenerator:
     """Path generator for organizing music files."""
 
-    conn: Connection
     base_path: Path
-    filter_dao: FilterDAO
-    album_dao: AlbumDAO
+    _filters: FilterQueryPort
 
-    def __init__(self, conn: Connection, base_path: Path):
+    def __init__(
+        self,
+        conn: Connection | None,
+        base_path: Path,
+        *,
+        filter_gateway: FilterQueryPort | None = None,
+    ) -> None:
         """Initialize path generator.
 
         Args:
-            conn: SQLite database connection.
+            conn: Legacy SQLite database connection used when no port is supplied.
             base_path: Base path for organizing files.
+            filter_gateway: Port that exposes filter hierarchy queries.
         """
-        self.conn = conn
         self.base_path = base_path
-        self.filter_dao = FilterDAO(conn)
-        self.album_dao = AlbumDAO(conn)
+        if filter_gateway is not None:
+            self._filters = filter_gateway
+        elif conn is not None:
+            self._filters = _FilterDaoAdapter(conn)
+        else:
+            raise ValueError("PathGenerator requires filter_gateway or conn")
 
     def generate_paths(self, grouped_files: dict[str, dict[str, str | None]] | None = None) -> list[PathInfo]:
         """Generate paths for all files.
@@ -128,15 +142,15 @@ class PathGenerator:
             list[PathInfo]: List of path information for each file.
         """
         paths: list[PathInfo] = []
-        hierarchies = self.filter_dao.get_hierarchies()
+        hierarchies = self._filters.get_hierarchies()
         if not hierarchies:
             logger.error("No hierarchies found")
             return paths
 
         # Get all values for each hierarchy.
-        hierarchy_values: dict[int, list[FilterValue]] = {}
+        hierarchy_values: dict[int, list[FilterValueRecord]] = {}
         for hierarchy in hierarchies:
-            values = self.filter_dao.get_values(hierarchy.id)
+            values = self._filters.get_values(hierarchy.id)
             hierarchy_values[hierarchy.id] = values
 
         # Group files by hierarchy values.
@@ -151,8 +165,8 @@ class PathGenerator:
 
     def _group_files_by_hierarchies(
         self,
-        hierarchies: list[FilterHierarchy],
-        hierarchy_values: dict[int, list[FilterValue]],
+        hierarchies: list[FilterHierarchyRecord],
+        hierarchy_values: dict[int, list[FilterValueRecord]],
     ) -> dict[tuple[str, ...], set[str]]:
         """Group files by hierarchy values.
 
@@ -192,7 +206,7 @@ class PathGenerator:
 
         return groups
 
-    def _find_value_for_file(self, hierarchy_id: int, file_hash: str, values: list[FilterValue]) -> str | None:  # pyright: ignore[reportUnusedFunction] - kept for external callers if any
+    def _find_value_for_file(self, hierarchy_id: int, file_hash: str, values: list[FilterValueRecord]) -> str | None:  # pyright: ignore[reportUnusedFunction] - kept for external callers if any
         """(Deprecated) Linear search for a file's hierarchy value.
 
         Kept for compatibility with any external callers; internal code now
@@ -205,7 +219,7 @@ class PathGenerator:
 
     def _generate_group_paths(
         self,
-        hierarchies: list[FilterHierarchy],
+        hierarchies: list[FilterHierarchyRecord],
         group_values: tuple[str, ...],
         file_hashes: set[str],
     ) -> list[PathInfo]:
@@ -235,7 +249,11 @@ class PathGenerator:
 
         return paths
 
-    def _assemble_relative_path(self, components: list[str], hierarchies: list[FilterHierarchy] | None = None) -> Path:
+    def _assemble_relative_path(
+        self,
+        components: list[str],
+        hierarchies: list[FilterHierarchyRecord] | None = None,
+    ) -> Path:
         """Assemble a relative path from a list of components.
 
         If hierarchies are provided, logs each component with the corresponding hierarchy name.
@@ -253,3 +271,27 @@ class PathGenerator:
                     logger.debug("Using hierarchy %s with value %s", hierarchies[i].name, component)
         # Use the Path constructor to join components.
         return Path(*components)
+
+
+@final
+class _FilterDaoAdapter(FilterQueryPort):
+    """Adapter that projects FilterDAO results onto port records."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._dao = FilterDAO(conn)
+
+    def get_hierarchies(self) -> list[FilterHierarchyRecord]:
+        return [
+            FilterHierarchyRecord(id=item.id, name=item.name, priority=item.priority)
+            for item in self._dao.get_hierarchies()
+        ]
+
+    def get_values(self, hierarchy_id: int) -> list[FilterValueRecord]:
+        return [
+            FilterValueRecord(
+                hierarchy_id=value.hierarchy_id,
+                file_hash=value.file_hash,
+                value=value.value,
+            )
+            for value in self._dao.get_values(hierarchy_id)
+        ]

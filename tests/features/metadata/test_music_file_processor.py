@@ -816,6 +816,110 @@ class TestMusicProcessor:
         assert "Failed to move file" in str(result.error_message)
         assert source_file.exists()  # Original file should still exist
 
+    def test_init_accepts_injected_ports(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """MusicProcessor should honour injected database and DAO ports."""
+
+        class StubDatabaseManager:
+            def __init__(self) -> None:
+                self.conn: sqlite3.Connection | None = None
+                self.connect_called: bool = False
+                self.close_called: bool = False
+
+            def connect(self) -> None:
+                self.connect_called = True
+                self.conn = sqlite3.connect(":memory:")
+
+            def close(self) -> None:
+                self.close_called = True
+                if self.conn is not None:
+                    self.conn.close()
+                    self.conn = None
+
+        class StubProcessingBefore:
+            def __init__(self) -> None:
+                self.hashes: list[str] = []
+
+            def check_file_exists(self, file_hash: str) -> bool:
+                del file_hash
+                return False
+
+            def get_target_path(self, file_hash: str) -> Path | None:  # pragma: no cover - interface compliance
+                del file_hash
+                return None
+
+            def insert_file(self, file_hash: str, file_path: Path) -> bool:
+                del file_path
+                self.hashes.append(file_hash)
+                return True
+
+        class StubProcessingAfter:
+            def __init__(self) -> None:
+                self.records: list[tuple[str, Path, Path]] = []
+
+            def insert_file(self, file_hash: str, file_path: Path, target_path: Path) -> bool:
+                self.records.append((file_hash, file_path, target_path))
+                return True
+
+        class StubArtistCache:
+            def __init__(self) -> None:
+                self.ids: dict[str, str] = {}
+                self.romanized: dict[str, str] = {}
+
+            def insert_artist_id(self, artist_name: str, artist_id: str) -> bool:
+                self.ids[artist_name] = artist_id
+                return True
+
+            def get_artist_id(self, artist_name: str) -> str | None:
+                return self.ids.get(artist_name)
+
+            def get_romanized_name(self, artist_name: str) -> str | None:
+                return self.romanized.get(artist_name)
+
+            def upsert_romanized_name(
+                self,
+                artist_name: str,
+                romanized_name: str,
+                source: str | None = None,
+            ) -> bool:
+                del source
+                self.romanized[artist_name] = romanized_name
+                return True
+
+            def clear_cache(self) -> bool:  # pragma: no cover - interface compliance
+                self.ids.clear()
+                self.romanized.clear()
+                return True
+
+        stub_db = StubDatabaseManager()
+        stub_before = StubProcessingBefore()
+        stub_after = StubProcessingAfter()
+        stub_artist = StubArtistCache()
+
+        configure_mock = mocker.patch(
+            "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
+        )
+
+        processor = MusicProcessor(
+            base_path=tmp_path,
+            db_manager=stub_db,
+            before_gateway=stub_before,
+            after_gateway=stub_after,
+            artist_cache=stub_artist,
+        )
+
+        assert processor.db_manager is stub_db
+        assert processor.before_dao is stub_before
+        assert processor.after_dao is stub_after
+        assert processor.artist_dao is stub_artist
+        assert stub_db.connect_called is True
+        configure_mock.assert_called_once_with(stub_artist)
+
+        processor.db_manager.close()
+
 
 def test_dry_run_skips_persistent_state(
     tmp_path: Path,

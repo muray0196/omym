@@ -5,7 +5,10 @@ import sqlite3
 import pytest
 
 from omym.features.organization import AlbumManager, AlbumGroup
-from omym.platform.db.daos.albums_dao import AlbumInfo
+from omym.features.organization.usecases.ports import (
+    AlbumRecord,
+    AlbumRepositoryPort,
+)
 
 
 @pytest.fixture
@@ -87,7 +90,7 @@ def test_process_files_single_album(album_manager: AlbumManager) -> None:
 
     group = album_groups[0]
     assert isinstance(group, AlbumGroup)
-    assert isinstance(group.album_info, AlbumInfo)
+    assert isinstance(group.album_info, AlbumRecord)
     assert group.album_info.album_name == "Test Album"
     assert group.album_info.album_artist == "Test Artist"
     assert group.album_info.year == 2020
@@ -130,7 +133,7 @@ def test_process_files_multiple_albums(album_manager: AlbumManager) -> None:
     # Check first album
     group1 = next(g for g in album_groups if g.album_info.album_name == "Album 1")
     assert isinstance(group1, AlbumGroup)
-    assert isinstance(group1.album_info, AlbumInfo)
+    assert isinstance(group1.album_info, AlbumRecord)
     assert group1.album_info.album_artist == "Artist 1"
     assert group1.album_info.year == 2020
     assert group1.album_info.total_tracks == 1
@@ -143,7 +146,7 @@ def test_process_files_multiple_albums(album_manager: AlbumManager) -> None:
     # Check second album
     group2 = next(g for g in album_groups if g.album_info.album_name == "Album 2")
     assert isinstance(group2, AlbumGroup)
-    assert isinstance(group2.album_info, AlbumInfo)
+    assert isinstance(group2.album_info, AlbumRecord)
     assert group2.album_info.album_artist == "Artist 2"
     assert group2.album_info.year == 2021
     assert group2.album_info.total_tracks == 1
@@ -182,7 +185,7 @@ def test_process_files_missing_metadata(album_manager: AlbumManager) -> None:
 
     group = album_groups[0]
     assert isinstance(group, AlbumGroup)
-    assert isinstance(group.album_info, AlbumInfo)
+    assert isinstance(group.album_info, AlbumRecord)
     assert group.album_info.album_name == "Test Album"
     assert group.album_info.album_artist == "Test Artist"
     assert isinstance(group.file_hashes, set)
@@ -220,7 +223,7 @@ def test_process_files_track_continuity(album_manager: AlbumManager) -> None:
 
     group = album_groups[0]
     assert isinstance(group, AlbumGroup)
-    assert isinstance(group.album_info, AlbumInfo)
+    assert isinstance(group.album_info, AlbumRecord)
     assert isinstance(group.warnings, list)
     assert len(group.warnings) == 1
     assert "Missing tracks in disc 1: [2]" == group.warnings[0]
@@ -243,3 +246,75 @@ def test_get_earliest_year(album_manager: AlbumManager) -> None:
 
     year = album_manager._get_earliest_year(file_hashes, files)  # pyright: ignore[reportPrivateUsage]
     assert year == 2020
+
+
+def test_album_manager_accepts_port_injection() -> None:
+    """AlbumManager should delegate persistence to an injected repository port."""
+
+    class StubAlbumPort(AlbumRepositoryPort):
+        def __init__(self) -> None:
+            self.records: dict[tuple[str, str], AlbumRecord] = {}
+            self.track_positions: dict[int, list[tuple[int, int, str]]] = {}
+            self.next_id: int = 1
+            self.continuity_calls: list[int] = []
+
+        def get_album(self, album_name: str, album_artist: str) -> AlbumRecord | None:
+            return self.records.get((album_name, album_artist))
+
+        def insert_album(
+            self,
+            album_name: str,
+            album_artist: str,
+            year: int | None = None,
+            total_tracks: int | None = None,
+            total_discs: int | None = None,
+        ) -> int | None:
+            identifier = self.next_id
+            self.next_id += 1
+            self.records[(album_name, album_artist)] = AlbumRecord(
+                id=identifier,
+                album_name=album_name,
+                album_artist=album_artist,
+                year=year,
+                total_tracks=total_tracks,
+                total_discs=total_discs,
+            )
+            return identifier
+
+        def insert_track_position(
+            self,
+            album_id: int,
+            disc_number: int,
+            track_number: int,
+            file_hash: str,
+        ) -> bool:
+            self.track_positions.setdefault(album_id, []).append((disc_number, track_number, file_hash))
+            return True
+
+        def check_track_continuity(self, album_id: int) -> tuple[bool, list[str]]:
+            self.continuity_calls.append(album_id)
+            return True, []
+
+    port = StubAlbumPort()
+    manager = AlbumManager(album_port=port)
+
+    files: dict[str, dict[str, str | None]] = {
+        "hash": {
+            "album": "Injection",
+            "album_artist": "Artist",
+            "year": "2022",
+            "disc_number": "1",
+            "track_number": "1",
+            "total_tracks": "1",
+            "total_discs": "1",
+        }
+    }
+
+    groups, warnings = manager.process_files(files)
+
+    assert warnings == []
+    assert len(groups) == 1
+    stored_album = port.records[("Injection", "Artist")]
+    assert stored_album.year == 2022
+    assert port.track_positions[stored_album.id] == [(1, 1, "hash")]
+    assert port.continuity_calls == [stored_album.id]

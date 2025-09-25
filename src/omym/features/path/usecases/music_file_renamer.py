@@ -1,29 +1,23 @@
-"""Renaming logic functionality."""
+"""Renaming logic use cases.
+
+Where: features/path/usecases.
+What: Generate canonical artist IDs, directories, and filenames from track metadata.
+Why: Keep renaming rules adapter-free so infrastructure can be swapped independently.
+"""
 
 import re
-from typing import ClassVar, Protocol, final, runtime_checkable
 from pathlib import Path
-from unidecode import unidecode
-import pykakasi
+from typing import ClassVar, final
+
 import langid
-from omym.features.path.domain.sanitizer import Sanitizer
+import pykakasi
+from unidecode import unidecode
+
 from omym.features.metadata.domain.track_metadata import TrackMetadata
+from omym.features.path.domain.sanitizer import Sanitizer
 from omym.platform.logging.logger import logger
 
-
-@runtime_checkable
-class ArtistCacheWriter(Protocol):
-    """Protocol for artist cache interactions used by ID generation."""
-
-    def get_artist_id(self, artist_name: str) -> str | None:
-        """Return a cached artist ID if present."""
-
-        ...
-
-    def insert_artist_id(self, artist_name: str, artist_id: str) -> bool:
-        """Persist a generated artist ID; returns True on success."""
-
-        ...
+from .ports import ArtistCacheWriter
 
 
 @final

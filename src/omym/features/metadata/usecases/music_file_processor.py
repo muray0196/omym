@@ -41,6 +41,12 @@ from omym.platform.musicbrainz.client import (
 from .artist_romanizer import ArtistRomanizer
 from ..domain.track_metadata import TrackMetadata
 from .track_metadata_extractor import MetadataExtractor
+from .ports import (
+    ArtistCachePort,
+    DatabaseManagerPort,
+    ProcessingAfterPort,
+    ProcessingBeforePort,
+)
 
 
 
@@ -243,10 +249,10 @@ class MusicProcessor:
 
     base_path: Path
     dry_run: bool
-    db_manager: DatabaseManager
-    before_dao: ProcessingBeforeDAO
-    after_dao: ProcessingAfterDAO
-    artist_dao: ArtistCacheDAO | _DryRunArtistCacheAdapter
+    db_manager: DatabaseManagerPort
+    before_dao: ProcessingBeforePort
+    after_dao: ProcessingAfterPort
+    artist_dao: ArtistCachePort
     artist_name_preferences: ArtistNamePreferenceRepository
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
@@ -255,12 +261,25 @@ class MusicProcessor:
     _romanizer_executor: ThreadPoolExecutor
     _romanize_futures: dict[str, Future[str]]
 
-    def __init__(self, base_path: Path, dry_run: bool = False) -> None:
+    def __init__(
+        self,
+        base_path: Path,
+        *,
+        dry_run: bool = False,
+        db_manager: DatabaseManagerPort | None = None,
+        before_gateway: ProcessingBeforePort | None = None,
+        after_gateway: ProcessingAfterPort | None = None,
+        artist_cache: ArtistCachePort | None = None,
+    ) -> None:
         """Initialize music processor.
 
         Args:
             base_path: Base path for organizing music files.
             dry_run: Whether to perform a dry run (no actual file operations).
+            db_manager: Optional database manager port for dependency injection.
+            before_gateway: Optional port handling pre-processing persistence.
+            after_gateway: Optional port handling post-processing persistence.
+            artist_cache: Optional port for artist cache persistence.
         """
         self.base_path = base_path
         self.dry_run = dry_run
@@ -273,17 +292,24 @@ class MusicProcessor:
             ) from exc
 
         # Initialize database connection.
-        self.db_manager = DatabaseManager()
-        self.db_manager.connect()
+        self.db_manager = db_manager or DatabaseManager()
+        if self.db_manager.conn is None:
+            self.db_manager.connect()
         conn = self.db_manager.conn
         if conn is None:
             raise RuntimeError("Failed to connect to database")
 
         # Initialize DAOs.
-        self.before_dao = ProcessingBeforeDAO(conn)
-        self.after_dao = ProcessingAfterDAO(conn)
-        base_artist_dao = ArtistCacheDAO(conn)
-        self.artist_dao = _DryRunArtistCacheAdapter(base_artist_dao) if self.dry_run else base_artist_dao
+        self.before_dao = before_gateway or ProcessingBeforeDAO(conn)
+        self.after_dao = after_gateway or ProcessingAfterDAO(conn)
+        if artist_cache is not None:
+            self.artist_dao = artist_cache
+        else:
+            base_artist_dao = ArtistCacheDAO(conn)
+            if self.dry_run:
+                self.artist_dao = _DryRunArtistCacheAdapter(base_artist_dao)
+            else:
+                self.artist_dao = base_artist_dao
         configure_romanization_cache(self.artist_dao)
 
         def _fetch_with_persistent_cache(name: str) -> str | None:

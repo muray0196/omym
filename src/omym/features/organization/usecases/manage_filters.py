@@ -1,30 +1,42 @@
-"""Filtering engine for organizing music files."""
+"""Filtering engine use cases.
+
+Where: features/organization/usecases.
+What: Manage hierarchy registration and per-file filter values via injected ports.
+Why: Keep database specifics outside the use case for easier testing and adapter swaps.
+"""
 
 from sqlite3 import Connection
 from typing import final
 
-from omym.platform.db.daos.albums_dao import AlbumDAO
 from omym.platform.db.daos.filter_dao import FilterDAO
 
 from ..domain.path_format import parse_path_format
+from .ports import FilterHierarchyRecord, FilterRegistryPort
 
 @final
 class HierarchicalFilter:
     """Filter engine for organizing music files."""
 
-    conn: Connection
-    filter_dao: FilterDAO
-    album_dao: AlbumDAO
+    _filters: FilterRegistryPort
 
-    def __init__(self, conn: Connection):
+    def __init__(
+        self,
+        conn: Connection | None = None,
+        *,
+        filter_port: FilterRegistryPort | None = None,
+    ) -> None:
         """Initialize filter engine.
 
         Args:
-            conn: SQLite database connection.
+            conn: Legacy SQLite connection used when ``filter_port`` is omitted.
+            filter_port: Port implementation providing hierarchy persistence.
         """
-        self.conn = conn
-        self.filter_dao = FilterDAO(conn)
-        self.album_dao = AlbumDAO(conn)
+        if filter_port is not None:
+            self._filters = filter_port
+        elif conn is not None:
+            self._filters = _FilterDaoAdapter(conn)
+        else:
+            raise ValueError("HierarchicalFilter requires filter_port or conn")
 
     def register_hierarchies(self, path_format: str) -> list[str]:
         """Register filter hierarchies from path format.
@@ -40,7 +52,7 @@ class HierarchicalFilter:
         components = parse_path_format(path_format)
 
         for i, name in enumerate(components):
-            if not self.filter_dao.insert_hierarchy(name, i):
+            if not self._filters.insert_hierarchy(name, i):
                 warnings.append(f"Failed to register hierarchy: {name}")
 
         return warnings
@@ -56,7 +68,7 @@ class HierarchicalFilter:
             list[str]: List of warning messages if any processing failed.
         """
         warnings: list[str] = []
-        hierarchies = self.filter_dao.get_hierarchies()
+        hierarchies = self._filters.get_hierarchies()
 
         for hierarchy in hierarchies:
             value = metadata.get(hierarchy.name.lower())
@@ -64,7 +76,27 @@ class HierarchicalFilter:
                 warnings.append(f"Missing value for hierarchy '{hierarchy.name}' in file {file_hash}")
                 continue
 
-            if not self.filter_dao.insert_value(hierarchy.id, file_hash, value):
+            if not self._filters.insert_value(hierarchy.id, file_hash, value):
                 warnings.append(f"Failed to register value for hierarchy '{hierarchy.name}' in file {file_hash}")
 
         return warnings
+
+
+@final
+class _FilterDaoAdapter(FilterRegistryPort):
+    """Adapter projecting FilterDAO into the filter registry port."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._dao = FilterDAO(conn)
+
+    def insert_hierarchy(self, name: str, priority: int) -> int | None:
+        return self._dao.insert_hierarchy(name, priority)
+
+    def get_hierarchies(self) -> list[FilterHierarchyRecord]:
+        return [
+            FilterHierarchyRecord(id=item.id, name=item.name, priority=item.priority)
+            for item in self._dao.get_hierarchies()
+        ]
+
+    def insert_value(self, hierarchy_id: int, file_hash: str, value: str) -> bool:
+        return self._dao.insert_value(hierarchy_id, file_hash, value)

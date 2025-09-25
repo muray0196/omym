@@ -9,11 +9,16 @@ from .domain.path_elements import (
     AlbumComponent,
 )
 from .usecases.music_file_renamer import (
-    ArtistCacheWriter,
     ArtistIdGenerator,
     CachedArtistIdGenerator,
     FileNameGenerator,
     DirectoryGenerator,
+)
+from .usecases.ports import (
+    ArtistCacheWriter,
+    FilterHierarchyRecord,
+    FilterQueryPort,
+    FilterValueRecord,
 )
 from .usecases.path_generator import PathGenerator, PathInfo
 
@@ -29,6 +34,9 @@ __all__ = [
     "CachedArtistIdGenerator",
     "FileNameGenerator",
     "DirectoryGenerator",
+    "FilterQueryPort",
+    "FilterHierarchyRecord",
+    "FilterValueRecord",
     "PathGenerator",
     "PathInfo",
 ]

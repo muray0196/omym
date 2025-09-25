@@ -1,17 +1,24 @@
-"""Album management system for organizing music files."""
+"""Album management use cases.
 
-from sqlite3 import Connection
+Where: features/organization/usecases.
+What: Group processed files into albums using persistence ports.
+Why: Keep SQLite-specific behaviour inside adapters for better testability.
+"""
+
 from dataclasses import dataclass
+from sqlite3 import Connection
 from typing import final
 
-from omym.platform.db.daos.albums_dao import AlbumDAO, AlbumInfo
+from omym.platform.db.daos.albums_dao import AlbumDAO
+
+from .ports import AlbumRecord, AlbumRepositoryPort
 
 
 @dataclass
 class AlbumGroup:
     """Album group information."""
 
-    album_info: AlbumInfo
+    album_info: AlbumRecord
     file_hashes: set[str]
     warnings: list[str]
 
@@ -20,17 +27,26 @@ class AlbumGroup:
 class AlbumManager:
     """Album manager for organizing music files."""
 
-    conn: Connection
-    album_dao: AlbumDAO
+    _albums: AlbumRepositoryPort
 
-    def __init__(self, conn: Connection):
+    def __init__(
+        self,
+        conn: Connection | None = None,
+        *,
+        album_port: AlbumRepositoryPort | None = None,
+    ) -> None:
         """Initialize album manager.
 
         Args:
-            conn: SQLite database connection.
+            conn: Legacy SQLite connection used when ``album_port`` is omitted.
+            album_port: Port that manages album persistence.
         """
-        self.conn = conn
-        self.album_dao = AlbumDAO(conn)
+        if album_port is not None:
+            self._albums = album_port
+        elif conn is not None:
+            self._albums = _AlbumDaoAdapter(conn)
+        else:
+            raise ValueError("AlbumManager requires album_port or conn")
 
     def process_files(self, files: dict[str, dict[str, str | None]]) -> tuple[list[AlbumGroup], list[str]]:
         """Process files and group them into albums.
@@ -107,7 +123,7 @@ class AlbumManager:
             try:
                 disc_number = int(metadata["disc_number"] or "0")
                 track_number = int(metadata["track_number"] or "0")
-                if not self.album_dao.insert_track_position(album_info.id, disc_number, track_number, file_hash):
+                if not self._albums.insert_track_position(album_info.id, disc_number, track_number, file_hash):
                     warnings.append(f"Failed to register track position for file {file_hash}")
             except ValueError:
                 disc_info = metadata.get("disc_number")
@@ -115,7 +131,7 @@ class AlbumManager:
                 warnings.append(f"Invalid track position for file {file_hash}: disc={disc_info}, track={track_info}")
 
         # Check track continuity.
-        is_continuous, continuity_warnings = self.album_dao.check_track_continuity(album_info.id)
+        is_continuous, continuity_warnings = self._albums.check_track_continuity(album_info.id)
         if not is_continuous:
             warnings.extend(continuity_warnings)
 
@@ -132,7 +148,7 @@ class AlbumManager:
         file_hashes: set[str],
         files: dict[str, dict[str, str | None]],
         warnings: list[str],
-    ) -> AlbumInfo:
+    ) -> AlbumRecord:
         """Retrieve an existing album or create a new one if not found.
 
         Args:
@@ -143,9 +159,9 @@ class AlbumManager:
             warnings: List to which warning messages are appended.
 
         Returns:
-            AlbumInfo: Retrieved or newly created album information.
+            AlbumRecord: Retrieved or newly created album information.
         """
-        album_info = self.album_dao.get_album(album_name, album_artist)
+        album_info = self._albums.get_album(album_name, album_artist)
         if album_info:
             return album_info
 
@@ -155,7 +171,7 @@ class AlbumManager:
         total_tracks, total_discs = self._calculate_album_totals(file_hashes, files, warnings)
 
         # Attempt to create new album.
-        album_id = self.album_dao.insert_album(
+        album_id = self._albums.insert_album(
             album_name=album_name,
             album_artist=album_artist,
             year=year,
@@ -164,7 +180,7 @@ class AlbumManager:
         )
         if not album_id:
             warnings.append(f"Failed to create album: {album_name}")
-            return AlbumInfo(
+            return AlbumRecord(
                 id=-1,
                 album_name=album_name,
                 album_artist=album_artist,
@@ -173,10 +189,10 @@ class AlbumManager:
                 total_discs=total_discs,
             )
 
-        album_info = self.album_dao.get_album(album_name, album_artist)
+        album_info = self._albums.get_album(album_name, album_artist)
         if not album_info:
             warnings.append(f"Failed to get album after creation: {album_name}")
-            return AlbumInfo(
+            return AlbumRecord(
                 id=-1,
                 album_name=album_name,
                 album_artist=album_artist,
@@ -252,3 +268,46 @@ class AlbumManager:
                 # Ignore unparsable values
                 continue
         return earliest_year
+
+
+@final
+class _AlbumDaoAdapter(AlbumRepositoryPort):
+    """Adapter projecting AlbumDAO behaviour through the album repository port."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._dao = AlbumDAO(conn)
+
+    def get_album(self, album_name: str, album_artist: str) -> AlbumRecord | None:
+        record = self._dao.get_album(album_name, album_artist)
+        if record is None:
+            return None
+        return AlbumRecord(
+            id=record.id,
+            album_name=record.album_name,
+            album_artist=record.album_artist,
+            year=record.year,
+            total_tracks=record.total_tracks,
+            total_discs=record.total_discs,
+        )
+
+    def insert_album(
+        self,
+        album_name: str,
+        album_artist: str,
+        year: int | None = None,
+        total_tracks: int | None = None,
+        total_discs: int | None = None,
+    ) -> int | None:
+        return self._dao.insert_album(album_name, album_artist, year, total_tracks, total_discs)
+
+    def insert_track_position(
+        self,
+        album_id: int,
+        disc_number: int,
+        track_number: int,
+        file_hash: str,
+    ) -> bool:
+        return self._dao.insert_track_position(album_id, disc_number, track_number, file_hash)
+
+    def check_track_continuity(self, album_id: int) -> tuple[bool, list[str]]:
+        return self._dao.check_track_continuity(album_id)
