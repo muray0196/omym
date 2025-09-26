@@ -1,6 +1,6 @@
 owner: Maintainers
 status: active
-last_updated: 2025-09-25
+last_updated: 2024-10-17
 review_cadence: quarterly
 
 ## Goals and Success Metrics
@@ -14,14 +14,14 @@ review_cadence: quarterly
 - **Out-of-scope**: mutating embedded tags, downloading remote assets, streaming playback, concurrent multi-host coordination, or automating configuration management beyond the local machine.
 
 ## User Stories and Acceptance Criteria
-- **Organise an entire library**: Given `uv run python -m omym organize <source> --target <dest>`, all supported tracks move under `<dest>/<Artist>/<Album>/` using sanitised folder and file names, and the command exits with status 0 when no failures are reported.
+- **Organise an entire library**: Given `uv run python -m omym organize <source> --target <dest>`, all supported tracks move under `<dest>/<Artist>/<YYYY_Album>/` using sanitised directory and file names, and the command exits with status 0 when no failures are reported.
 - **Preview without side effects**: When `--dry-run` is supplied, no filesystem changes occur, the console lists the plan, and the SQLite log persists the preview for later inspection.
-- **Handle multi-disc releases**: Tracks containing disc metadata are laid out as `<dest>/<Artist>/<Album>/Disc <n>/<track> - <title>.<ext>` and duplicate hashes are skipped with a warning rather than overwriting existing files.
+- **Handle multi-disc releases**: Tracks containing disc metadata are written as `<dest>/<Artist>/<YYYY_Album>/D<n>_<track>_<title>_<artistId>.<ext>` (adding the disc prefix only when required), and duplicate hashes are skipped with a warning rather than overwriting existing files.
 - **Restore previous runs**: Running `uv run python -m omym restore <dest>` replays the persisted plan back to the original paths (or an alternate `--destination`) honouring the selected collision policy (`abort`, `skip`, or `backup`).
-- **Maintain caches**: Supplying `--clear-cache` removes cached artist romanisation and processing state prior to organisation; operations continue even if cache eviction encounters recoverable errors.
+- **Maintain caches**: Supplying `--clear-cache` clears persisted processing state, while `--clear-artist-cache` flushes the artist romanisation cache; operations continue even if cache eviction encounters recoverable errors.
 
 ## Flows
-- **Primary organise flow**: CLI parsing → configuration load → construct `OrganizeMusicService` → compose metadata (`features.metadata.MusicProcessor`), grouping (`features.organization.MusicGrouper`), and path generation (`features.path.PathGenerator`) use cases → enumerate files with hash-based duplicate detection → extract metadata (Mutagen) with optional MusicBrainz romanisation → compute target paths → move audio/lyrics/artwork via filesystem adapters → persist `processing_before/after` rows → emit Rich console summary.
+- **Primary organise flow**: CLI parsing → configuration load → construct `OrganizeMusicService` → build a `MusicProcessor` that wires together metadata extraction, artist romanisation, duplicate detection, directory generation, and file-name generation (`DirectoryGenerator`, `FileNameGenerator`) → enumerate supported files and schedule romanisation lookups → extract metadata (Mutagen) with optional MusicBrainz romanisation → compute target paths → move audio/lyrics/artwork via filesystem adapters → persist `processing_before/after` rows → emit Rich console summary.
 - **Restore flow**: CLI parsing → build `RestoreMusicService` request → load persisted plan from SQLite (`processing_after` + path elements) → evaluate collision policy (abort/skip/backup) → move or copy files back to origin/destination → optionally purge state.
 - **Error and retry handling**: Metadata extraction or IO failures mark the result unsuccessful, skip the file, and continue processing. Rate-limited MusicBrainz lookups obey 1 req/s with a single retry on 429/5xx and downgrade to local naming when network calls fail. Keyboard interrupts exit with code 130 after logging.
 - **Dry-run flow**: All filesystem operations short-circuit to planning only, but metadata extraction, hashing, and logging still execute for parity with real runs.
@@ -34,20 +34,20 @@ review_cadence: quarterly
 - Supports Windows, macOS, and Linux path semantics by sanitising filenames and normalising Unicode.
 
 ## Artist Override Configuration
-- Override resolution now honours the precedence `user overrides → MusicBrainz → pykakasi transliteration`.
+- Override resolution honours the precedence `user preferences → persistent cache → MusicBrainz → pykakasi transliteration`.
 - Users can provide preferred artist names at `config/artist_name_preferences.toml`; set `OMYM_ARTIST_NAME_PREFERENCES_PATH` to point elsewhere.
-- The loader accepts a minimal YAML mapping:
+- The loader accepts a minimal TOML document:
   ```toml
   metadata_version = 1
 
   [defaults]
   locale = "en_US"
 
-  [overrides]
+  [preferences]
   "宇多田ヒカル" = "Utada Hikaru"
   Perfume = "Perfume"
   ```
-- Keep the document to simple key/value pairs. Duplicate keys after case normalisation are rejected to avoid ambiguity.
+- Keep the document to simple key/value pairs. Duplicate keys after case normalisation are rejected to avoid ambiguity, and blanks are retained as placeholders for later editing.
 - A starter file is created automatically on first run at `config/artist_name_preferences.toml`. As you run dry-run or organise commands, encountered artists are appended with empty values for quick editing.
 - Run targeted tests with `uv run pytest tests/config/test_artist_name_preferences.py` after editing preference logic.
 
