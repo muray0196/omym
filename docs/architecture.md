@@ -1,6 +1,6 @@
 owner: Maintainers
 status: active
-last_updated: 2025-09-25
+last_updated: 2025-09-26
 review_cadence: quarterly
 
 ## Architectural Overview
@@ -15,7 +15,7 @@ review_cadence: quarterly
   - `config/`: typed configuration loaders that hydrate settings from environment variables and repository-relative TOML defaults; features receive settings via dependency injection helpers.
 
 ## Feature Catalog and Flows
-- **Metadata** (`src/omym/features/metadata`): extracts and enriches tags via `MusicProcessor`, coordinates optional MusicBrainz lookups, emits processing events consumed by organisation flows, and surfaces database/cache ports in `usecases/ports.py` so adapters remain swappable.
+- **Metadata** (`src/omym/features/metadata`): extracts and enriches tags via `MusicProcessor`, coordinates optional MusicBrainz lookups, emits processing events consumed by organisation flows, and surfaces database/cache ports in `usecases/ports.py` so adapters remain swappable. The use case now composes dedicated helpers (`directory_runner.py`, `file_runner.py`, `lyrics_assets.py`, `artwork_assets.py`) to keep each module under 300 LOC while preserving the existing public API.
 - **Organization** (`src/omym/features/organization`): groups tracks into album/disc hierarchies, evaluates user-defined filters, composes metadata and path services to derive final layouts, and exposes album/filter repository ports in `usecases/ports.py` for adapter injection.
 - **Path** (`src/omym/features/path`): generates filesystem-safe directory and filename structures, sanitises inputs, exposes helpers that organisation and restoration use to resolve canonical targets, and now publishes filter access ports in `usecases/ports.py`.
 - **Restoration** (`src/omym/features/restoration`): reconstructs original locations from persisted processing plans, applies collision policies, and coordinates filesystem/database adapters for rollback.

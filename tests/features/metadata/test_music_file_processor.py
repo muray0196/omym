@@ -107,7 +107,7 @@ class TestMusicProcessor:
 
         # Mock metadata extraction
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -144,7 +144,7 @@ class TestMusicProcessor:
         _ = source_file.write_bytes(b"audio")
 
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -171,7 +171,7 @@ class TestMusicProcessor:
         _ = artwork_file.write_bytes(b"artwork")
 
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -203,7 +203,7 @@ class TestMusicProcessor:
         _ = artwork_file.write_bytes(b"artwork")
 
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -275,7 +275,7 @@ class TestMusicProcessor:
         _ = lyrics_file.write_text("[00:00.00]Existing\n")
 
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -315,7 +315,7 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction to fail
-        _ = mocker.patch("omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract", return_value=None)
+        _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=None)
 
         # Act
         result = processor.process_file(source_file)
@@ -343,7 +343,7 @@ class TestMusicProcessor:
 
         # Mock metadata extraction
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -393,7 +393,7 @@ class TestMusicProcessor:
             (source_dir / name).touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=metadata)
 
         # Mock file hash calculation to return different hashes
         def mock_hash(file_path: Path) -> str:
@@ -454,7 +454,7 @@ class TestMusicProcessor:
         new_file.touch()
 
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
 
@@ -529,11 +529,11 @@ class TestMusicProcessor:
         (source_dir / "track.mp3").touch()
 
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
         _ = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.remove_empty_directories",
+            "omym.features.metadata.usecases.directory_runner.remove_empty_directories",
             autospec=True,
         )
 
@@ -678,7 +678,7 @@ class TestMusicProcessor:
             (source_dir / name).touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=metadata)
 
         # Act
         results = processor.process_directory(source_dir)
@@ -719,7 +719,7 @@ class TestMusicProcessor:
         existing_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=metadata)
 
         # Mock file hash calculation
         _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
@@ -765,7 +765,7 @@ class TestMusicProcessor:
         existing_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=metadata)
 
         # Mock database check to indicate file exists
         mock_before_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingBeforeDAO").return_value
@@ -802,10 +802,10 @@ class TestMusicProcessor:
         source_file.touch()
 
         # Mock metadata extraction
-        _ = mocker.patch("omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract", return_value=metadata)
+        _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=metadata)
 
         # Mock shutil.move to raise an error
-        mock_move = mocker.patch("omym.features.metadata.usecases.music_file_processor.shutil.move")
+        mock_move = mocker.patch("omym.features.metadata.usecases.file_operations.shutil.move")
         mock_move.side_effect = OSError("Failed to move file: Test error")
 
         # Act
@@ -947,7 +947,7 @@ def test_dry_run_skips_persistent_state(
         file_extension=".mp3",
     )
     _ = mocker.patch(
-        "omym.features.metadata.usecases.music_file_processor.MetadataExtractor.extract",
+        "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
         return_value=metadata,
     )
 
