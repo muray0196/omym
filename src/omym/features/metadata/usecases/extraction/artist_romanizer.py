@@ -1,4 +1,9 @@
-"""Artist romanization helpers using MusicBrainz."""
+"""Artist romanization helpers using MusicBrainz.
+
+Where: src/omym/features/metadata/usecases/extraction/artist_romanizer.py
+What: Provide an artist romanization utility with caching and transliteration fallback.
+Why: Allow metadata extraction and pipeline components to reuse a single implementation.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +17,7 @@ from omym.config.settings import USE_MB_ROMANIZATION
 from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import fetch_romanized_name
 
-from ..domain.track_metadata import TrackMetadata
+from ...domain.track_metadata import TrackMetadata
 
 ArtistFetcher = Callable[[str], str | None]
 LanguageDetector = Callable[[str], str | None]

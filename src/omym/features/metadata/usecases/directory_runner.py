@@ -21,8 +21,8 @@ from .processing_types import (
     ProcessingEvent,
     ProcessingLogContext,
 )
-from .track_metadata_extractor import MetadataExtractor
-from .romanization import RomanizationCoordinator
+from .extraction.romanization import RomanizationCoordinator
+from .extraction.track_metadata_extractor import MetadataExtractor
 from .ports import DatabaseManagerPort
 
 

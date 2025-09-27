@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/artist_cache_adapter.py
+"""src/omym/features/metadata/usecases/extraction/artist_cache_adapter.py
 What: In-memory wrapper to make artist cache writes safe during dry runs.
 Why: Keep MusicProcessor focused on orchestration and reuse adapter elsewhere if needed.
 """

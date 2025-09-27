@@ -30,7 +30,6 @@ from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import configure_romanization_cache
 
 from ..domain.track_metadata import TrackMetadata
-from .artist_cache_adapter import DryRunArtistCacheAdapter
 from .directory_runner import run_directory_processing
 from .file_runner import run_file_processing
 from .file_operations import calculate_file_hash, generate_target_path, move_file
@@ -41,7 +40,8 @@ from .ports import (
     ProcessingBeforePort,
 )
 from .processing_types import ProcessingEvent
-from .romanization import RomanizationCoordinator
+from .extraction.artist_cache_adapter import DryRunArtistCacheAdapter
+from .extraction.romanization import RomanizationCoordinator
 
 if TYPE_CHECKING:
     from .processing_types import ProcessResult

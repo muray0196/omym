@@ -1,5 +1,7 @@
-"""src/omym/features/metadata/usecases/romanization.py
-What: Coordinates artist name romanization, blending preferences, cache, and remote fetches.
+"""Romanization coordination utilities.
+
+Where: src/omym/features/metadata/usecases/extraction/romanization.py
+What: Coordinate artist name romanization across preferences, cache, and remote fetches.
 Why: Isolate asynchronous romanization concerns away from the main processor logic.
 """
 
@@ -11,10 +13,10 @@ from typing import Callable
 from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import fetch_romanized_name
 
-from .artist_romanizer import ArtistRomanizer
-from .ports import ArtistCachePort
-from .track_metadata_extractor import MetadataExtractor
 from omym.config.artist_name_preferences import ArtistNamePreferenceRepository
+from ..ports import ArtistCachePort
+from .artist_romanizer import ArtistRomanizer
+from .track_metadata_extractor import MetadataExtractor
 
 
 class RomanizationCoordinator:

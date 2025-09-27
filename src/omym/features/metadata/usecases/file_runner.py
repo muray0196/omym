@@ -19,8 +19,8 @@ from .file_duplicate import handle_duplicate
 from .file_success import complete_success
 from .ports import ArtistCachePort, ProcessingAfterPort, ProcessingBeforePort
 from .processing_types import ProcessResult, ProcessingEvent
-from .romanization import RomanizationCoordinator
-from .track_metadata_extractor import MetadataExtractor
+from .extraction.romanization import RomanizationCoordinator
+from .extraction.track_metadata_extractor import MetadataExtractor
 from ..domain.track_metadata import TrackMetadata
 
 

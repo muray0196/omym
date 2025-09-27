@@ -1,4 +1,9 @@
-"""Tests for metadata extraction functionality."""
+"""Tests for metadata extraction functionality.
+
+Where: tests/features/metadata/test_metadata_extractor.py
+What: Exercise the track metadata extraction facade to pin dispatch behaviour.
+Why: Provide confidence before refactoring the extractor module into smaller units.
+"""
 
 from pathlib import Path
 from typing import TypeAlias
@@ -372,4 +377,26 @@ class TestMetadataExtractor:
             assert metadata.year is None
         finally:
             # Clean up
+            test_file.unlink()
+
+    def test_extract_propagates_extractor_error(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """Ensure per-format extractor failures bubble up unchanged."""
+
+        test_file = tmp_path / "broken.flac"
+        test_file.touch()
+
+        _ = mocker.patch.object(
+            MetadataExtractor,
+            "_extract_flac",
+            side_effect=RuntimeError("boom"),
+        )
+
+        try:
+            with pytest.raises(RuntimeError, match="boom"):
+                _ = MetadataExtractor.extract(test_file)
+        finally:
             test_file.unlink()
