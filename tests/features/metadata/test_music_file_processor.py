@@ -11,6 +11,7 @@ from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
 from omym.features.metadata import TrackMetadata
+from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.features.metadata import (
     DirectoryRollbackError,
     MusicProcessor,
@@ -430,11 +431,50 @@ class TestMusicProcessor:
         for image in image_files:
             assert not (source_dir / image).exists()
 
+        unprocessed_root = source_dir / UNPROCESSED_DIR_NAME
         for name in other_files:
-            assert (source_dir / name).exists()
+            assert not (source_dir / name).exists()
+            assert (unprocessed_root / name).exists()
 
         processed_files = {r.source_path.name for r in results}
         assert processed_files == set(music_files)
+
+    def test_unprocessed_nested_files_are_relocated(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """Unsupported nested files should move under the unprocessed folder."""
+
+        source_dir = tmp_path / "tree"
+        source_dir.mkdir()
+
+        supported_file = source_dir / "Album" / "song.mp3"
+        supported_file.parent.mkdir()
+        unsupported_file = source_dir / "Extras" / "notes" / "info.txt"
+        unsupported_file.parent.mkdir(parents=True, exist_ok=True)
+
+        supported_file.touch()
+        unsupported_file.touch()
+
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        _ = mocker.patch.object(
+            processor,
+            "_calculate_file_hash",
+            side_effect=["hash-supported"],
+        )
+
+        _ = processor.process_directory(source_dir)
+
+        unprocessed_root = source_dir / UNPROCESSED_DIR_NAME
+        assert (unprocessed_root / "Extras" / "notes" / "info.txt").exists()
+        assert not unsupported_file.exists()
 
     def test_process_directory_emits_structured_logs(
         self,
@@ -614,6 +654,62 @@ class TestMusicProcessor:
         assert skip_data["target_path"] == str(target_path)
         assert skip_data["source_path"] == str(source_file)
 
+    def test_process_file_duplicate_same_location_marks_processed(
+        self,
+        processor: MusicProcessor,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Duplicates already at target should be treated as organized."""
+
+        source_file = tmp_path / "Artist" / "Album" / "song.mp3"
+        source_file.parent.mkdir(parents=True, exist_ok=True)
+        source_file.touch()
+
+        before_dao_mock = cast(MagicMock, processor.before_dao)
+        before_dao_mock.check_file_exists.return_value = True
+        before_dao_mock.get_target_path.return_value = str(source_file)
+
+        caplog.set_level(logging.INFO, logger="omym")
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        assert result.skipped_duplicate is False
+        assert result.target_path == source_file
+        assert source_file.exists()
+
+        events = {getattr(record, "processing_event", "") for record in caplog.records}
+        assert "processing.file.already_organized" in events
+
+    def test_process_directory_preserves_already_organized_files(
+        self,
+        processor: MusicProcessor,
+        tmp_path: Path,
+    ) -> None:
+        """Directory processing should not relocate files already at target."""
+
+        source_dir = tmp_path / "organized"
+        organized_file = source_dir / "Artist" / "Album" / "song.mp3"
+        organized_file.parent.mkdir(parents=True, exist_ok=True)
+        organized_file.touch()
+
+        before_dao_mock = cast(MagicMock, processor.before_dao)
+        before_dao_mock.check_file_exists.return_value = True
+        before_dao_mock.get_target_path.return_value = str(organized_file)
+
+        results = processor.process_directory(source_dir)
+
+        assert len(results) == 1
+        processed = results[0]
+        assert processed.source_path == organized_file
+        assert processed.skipped_duplicate is False
+        assert processed.success is True
+
+        unprocessed_root = source_dir / UNPROCESSED_DIR_NAME
+        assert not unprocessed_root.exists()
+        assert organized_file.exists()
+
     def test_cached_romanization_bypasses_musicbrainz(
         self,
         mocker: MockerFixture,
@@ -688,10 +784,12 @@ class TestMusicProcessor:
         expected_files = {name for name, should_process in test_files.items() if should_process}
         assert processed_files == expected_files
 
-        # Verify that skipped files still exist
+        # Verify that skipped files relocate under the unprocessed folder
+        unprocessed_root = source_dir / UNPROCESSED_DIR_NAME
         for name, should_process in test_files.items():
             if not should_process:
-                assert (source_dir / name).exists()
+                assert not (source_dir / name).exists()
+                assert (unprocessed_root / name).exists()
 
     def test_duplicate_file_handling(
         self,

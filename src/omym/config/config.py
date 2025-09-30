@@ -31,6 +31,9 @@ class Config:
     # Log file path
     log_file: Path | None = _path_field()
 
+    # Folder name for files that could not be organized
+    unprocessed_dir_name: str = "!unprocessed"
+
     # MusicBrainz settings
     use_mb_romanization: bool = True
     mb_app_name: str | None = None
@@ -121,6 +124,13 @@ class Config:
             lines.append(f"mb_app_version = {self._format_toml_value(config['mb_app_version'])}")
         if config.get("mb_contact"):
             lines.append(f"mb_contact = {self._format_toml_value(config['mb_contact'])}")
+        lines.append("")
+
+        # Organization fallback folder
+        lines.append("# Folder name for files that could not be organized")
+        lines.append(
+            f"unprocessed_dir_name = {self._format_toml_value(config['unprocessed_dir_name'])}"
+        )
         lines.append("")
 
         return "\n".join(lines)

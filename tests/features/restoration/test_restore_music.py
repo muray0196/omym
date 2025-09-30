@@ -8,6 +8,7 @@ from typing import NamedTuple
 
 import pytest
 
+from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.features.restoration.adapters.db.sqlite_repository import SqliteRestoreRepository
 from omym.features.restoration.adapters.filesystem.local import LocalFileSystemGateway
 from omym.features.restoration.domain.models import CollisionPolicy, RestoreRequest
@@ -184,6 +185,70 @@ def test_restore_dry_run(tmp_path: Path, harness: RestoreHarness) -> None:
     assert not original_path.exists()
     assert results and results[0].moved is False
     assert results[0].message == "dry_run"
+
+
+def test_restore_unprocessed_files(tmp_path: Path, harness: RestoreHarness) -> None:
+    """Files parked under the unprocessed folder should move back on restore."""
+
+    organized_dir = tmp_path / "organized"
+    organized_dir.mkdir()
+
+    unprocessed_dir = organized_dir / UNPROCESSED_DIR_NAME / "Extras"
+    unprocessed_dir.mkdir(parents=True)
+    leftover = unprocessed_dir / "notes.txt"
+    _ = leftover.write_text("keep me")
+
+    request = RestoreRequest(
+        source_root=organized_dir,
+        destination_root=None,
+        dry_run=False,
+        collision_policy=CollisionPolicy.ABORT,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+    )
+
+    results = harness.service.run(request)
+
+    restored_path = organized_dir / "Extras" / "notes.txt"
+    assert restored_path.exists()
+    assert restored_path.read_text() == "keep me"
+    assert not leftover.exists()
+    assert not (organized_dir / UNPROCESSED_DIR_NAME).exists()
+    assert any(result.plan.file_hash.startswith("unprocessed::") for result in results)
+
+
+def test_restore_unprocessed_with_destination(tmp_path: Path, harness: RestoreHarness) -> None:
+    """Unprocessed files should honour an explicit destination root."""
+
+    organized_dir = tmp_path / "organized"
+    organized_dir.mkdir()
+
+    unprocessed_dir = organized_dir / UNPROCESSED_DIR_NAME
+    unprocessed_dir.mkdir()
+    leftover = unprocessed_dir / "misc.dat"
+    _ = leftover.write_bytes(b"data")
+
+    destination_root = tmp_path / "restored"
+    destination_root.mkdir()
+
+    request = RestoreRequest(
+        source_root=organized_dir,
+        destination_root=destination_root,
+        dry_run=False,
+        collision_policy=CollisionPolicy.ABORT,
+        backup_suffix=".bak",
+        continue_on_error=False,
+        limit=None,
+    )
+
+    results = harness.service.run(request)
+
+    restored_path = destination_root / "misc.dat"
+    assert restored_path.exists()
+    assert restored_path.read_bytes() == b"data"
+    assert not leftover.exists()
+    assert any(result.plan.file_hash.startswith("unprocessed::") for result in results)
 
 
 def test_restore_moves_lyrics_and_cleans_directories(tmp_path: Path, harness: RestoreHarness) -> None:

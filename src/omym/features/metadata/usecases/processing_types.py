@@ -25,6 +25,7 @@ class ProcessingEvent(StrEnum):
     DIRECTORY_NO_FILES = "processing.directory.no_files"
     FILE_START = "processing.file.start"
     FILE_SKIP_DUPLICATE = "processing.file.skip.duplicate"
+    FILE_ALREADY_ORGANIZED = "processing.file.already_organized"
     FILE_SUCCESS = "processing.file.success"
     FILE_ERROR = "processing.file.error"
     FILE_MOVE = "processing.file.move"

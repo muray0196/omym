@@ -29,7 +29,14 @@ def handle_duplicate(
     else:
         target_path = None
 
+    same_location = False
+
     if target_path and target_path.exists():
+        try:
+            same_location = target_path.samefile(ctx.file_path)
+        except (FileNotFoundError, OSError):
+            same_location = target_path.resolve() == ctx.file_path.resolve()
+
         if associated_lyrics is not None:
             ctx.lyrics_result = process_lyrics(
                 associated_lyrics,
@@ -73,10 +80,19 @@ def handle_duplicate(
         ctx.warnings.extend(summarize_artwork(artwork_plan))
 
     target_display: Path | str | None = target_path or "<unknown>"
+    event = ProcessingEvent.FILE_SKIP_DUPLICATE
+    message = "File already processed [id=%s, name=%s, target=%s]"
+    skipped_duplicate = True
+
+    if same_location:
+        event = ProcessingEvent.FILE_ALREADY_ORGANIZED
+        message = "File already organized at target location [id=%s, name=%s, target=%s]"
+        skipped_duplicate = False
+
     ctx.processor.log_processing(
         logging.INFO,
-        ProcessingEvent.FILE_SKIP_DUPLICATE,
-        "File already processed [id=%s, name=%s, target=%s]",
+        event,
+        message,
         ctx.process_id,
         ctx.file_path.name,
         target_display,
@@ -98,7 +114,7 @@ def handle_duplicate(
         lyrics_result=ctx.lyrics_result,
         artwork_results=ctx.artwork_results,
         warnings=ctx.warnings,
-        skipped_duplicate=True,
+        skipped_duplicate=skipped_duplicate,
     )
 
 

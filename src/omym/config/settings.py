@@ -20,10 +20,14 @@ MB_APP_NAME: str = app_config.mb_app_name or "omym"
 MB_APP_VERSION: str = app_config.mb_app_version or "0.1.0"
 MB_CONTACT: str = app_config.mb_contact or ""
 
+# Directory name for collecting unprocessed files under a source root.
+UNPROCESSED_DIR_NAME: str = app_config.unprocessed_dir_name or "!unprocessed"
+
 
 __all__ = [
     "USE_MB_ROMANIZATION",
     "MB_APP_NAME",
     "MB_APP_VERSION",
     "MB_CONTACT",
+    "UNPROCESSED_DIR_NAME",
 ]

@@ -8,6 +8,7 @@ from logging import Logger, getLogger
 from pathlib import Path
 
 from omym.features.metadata import MusicProcessor
+from omym.config.settings import UNPROCESSED_DIR_NAME
 
 from ..domain.models import (
     CollisionPolicy,
@@ -71,6 +72,7 @@ class RestorationService:
                     destination_path=destination,
                 )
             )
+        plan.extend(self._build_unprocessed_plan(request))
         return plan
 
     def execute(self, request: RestoreRequest, plan: Iterable[RestorePlanItem]) -> list[RestoreResult]:
@@ -454,6 +456,54 @@ class RestorationService:
         if source == destination:
             return True
         return self._filesystem.same_file(source, destination)
+
+    def _build_unprocessed_plan(self, request: RestoreRequest) -> list[RestorePlanItem]:
+        unprocessed_root = request.source_root / UNPROCESSED_DIR_NAME
+        if not self._filesystem.exists(unprocessed_root):
+            return []
+
+        files = self._gather_unprocessed_files(unprocessed_root)
+        plan_items: list[RestorePlanItem] = []
+        for file_path in files:
+            try:
+                relative = file_path.relative_to(unprocessed_root)
+            except ValueError:
+                continue
+
+            destination = self._resolve_unprocessed_destination(relative, request)
+            plan_items.append(
+                RestorePlanItem(
+                    file_hash=f"unprocessed::{relative.as_posix()}",
+                    source_path=file_path,
+                    destination_path=destination,
+                )
+            )
+
+        plan_items.sort(key=lambda item: item.source_path.as_posix())
+        return plan_items
+
+    def _gather_unprocessed_files(self, root: Path) -> list[Path]:
+        pending = [root]
+        files: list[Path] = []
+        visited: set[Path] = set()
+
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            for entry in self._filesystem.list_directory(current):
+                if self._filesystem.is_file(entry):
+                    files.append(entry)
+                elif self._filesystem.exists(entry):
+                    pending.append(entry)
+
+        files.sort(key=lambda path: path.as_posix())
+        return files
+
+    def _resolve_unprocessed_destination(self, relative: Path, request: RestoreRequest) -> Path:
+        base = request.destination_root or request.source_root
+        return base / relative
 
     def _relative_source(self, path: Path, request: RestoreRequest) -> Path | str:
         return self._relative(path, request.source_root)

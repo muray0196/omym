@@ -17,6 +17,7 @@ from omym.config.artist_name_preferences import (
     ArtistNamePreferenceRepository,
     load_artist_name_preferences,
 )
+from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.features.path.usecases.renamer import (
     CachedArtistIdGenerator,
     DirectoryGenerator,
@@ -33,6 +34,10 @@ from ..domain.track_metadata import TrackMetadata
 from .directory_runner import run_directory_processing
 from .file_runner import run_file_processing
 from .file_operations import calculate_file_hash, generate_target_path, move_file
+from .unprocessed_cleanup import (
+    relocate_unprocessed_files,
+    snapshot_unprocessed_candidates,
+)
 from .ports import (
     ArtistCachePort,
     DatabaseManagerPort,
@@ -255,7 +260,7 @@ class MusicProcessor:
         directory: Path,
         progress_callback: Callable[[int, int, Path], None] | None = None,
     ) -> list[ProcessResult]:
-        return run_directory_processing(self, directory, progress_callback)
+        return self._process_directory(directory, progress_callback)
 
     def process_file(
         self,
@@ -276,6 +281,38 @@ class MusicProcessor:
             source_root=source_root,
             target_root=target_root,
         )
+
+    def _process_directory(
+        self,
+        directory: Path,
+        progress_callback: Callable[[int, int, Path], None] | None = None,
+    ) -> list[ProcessResult]:
+        snapshot = snapshot_unprocessed_candidates(
+            directory,
+            unprocessed_dir_name=UNPROCESSED_DIR_NAME,
+        )
+        results = run_directory_processing(
+            self,
+            directory,
+            progress_callback,
+        )
+
+        processed_in_place = {
+            result.source_path
+            for result in results
+            if result.success and result.target_path is not None and result.target_path == result.source_path
+        }
+
+        remaining_candidates = snapshot - processed_in_place
+
+        _ = relocate_unprocessed_files(
+            directory,
+            remaining_candidates,
+            unprocessed_dir_name=UNPROCESSED_DIR_NAME,
+            dry_run=self.dry_run,
+        )
+
+        return results
 
 
 __all__ = ["MusicProcessor"]
