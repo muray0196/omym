@@ -239,15 +239,25 @@ class PreviewDisplay:
         # Collect unique artists and their IDs
         artists_seen: dict[str, str] = {}  # artist_name -> artist_id
         for result in results:
-            if result.metadata and result.metadata.artist:
-                artist = result.metadata.artist
-                # Extract artist ID from the target file name
-                if result.target_path:
-                    file_name = result.target_path.name
-                    # Artist ID is the last part before the extension
-                    artist_id = file_name.rsplit("_", 1)[-1].split(".")[0]
-                    if 1 <= len(artist_id) <= 5:  # Valid artist ID length (up to 5)
-                        artists_seen[artist] = artist_id
+            metadata = result.metadata
+            if not metadata or not metadata.artist:
+                continue
+
+            artist = metadata.artist
+            explicit_id = (result.artist_id or "").strip()
+            if explicit_id:
+                artists_seen[artist] = explicit_id
+                continue
+
+            if artist in artists_seen:
+                continue
+
+            if result.target_path:
+                file_name = result.target_path.name
+                # Artist ID is the last part before the extension
+                artist_id = file_name.rsplit("_", 1)[-1].split(".")[0]
+                if 1 <= len(artist_id) <= 5:  # Valid artist ID length (up to 5)
+                    artists_seen[artist] = artist_id
 
         # Add rows to artist table
         for artist, artist_id in sorted(artists_seen.items()):

@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from omym.features.path.usecases.renamer import CachedArtistIdGenerator
 
 from .processing_types import (
     ArtworkProcessingResult,
@@ -20,6 +23,7 @@ class ProcessorHooks(Protocol):
     """Minimal interface a processor must expose to helpers."""
 
     dry_run: bool
+    artist_id_generator: "CachedArtistIdGenerator"
 
     def log_processing(
         self,

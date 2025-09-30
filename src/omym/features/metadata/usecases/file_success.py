@@ -77,6 +77,12 @@ def complete_success(
         dry_run=ctx.processor.dry_run,
     )
 
+    artist_id: str | None = None
+    if metadata.artist:
+        # Reuse the cached generator so preview tables align with persisted IDs.
+        generated_id = ctx.processor.artist_id_generator.generate(metadata.artist)
+        artist_id = generated_id.strip() or None
+
     return ProcessResult(
         source_path=ctx.file_path,
         target_path=target_path,
@@ -84,6 +90,7 @@ def complete_success(
         dry_run=ctx.processor.dry_run,
         file_hash=ctx.file_hash,
         metadata=metadata,
+        artist_id=artist_id,
         lyrics_result=ctx.lyrics_result,
         artwork_results=ctx.artwork_results,
         warnings=ctx.warnings,

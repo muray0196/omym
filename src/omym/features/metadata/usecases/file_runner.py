@@ -11,7 +11,11 @@ import uuid
 from pathlib import Path
 from typing import Protocol
 
-from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
+from omym.features.path.usecases.renamer import (
+    CachedArtistIdGenerator,
+    DirectoryGenerator,
+    FileNameGenerator,
+)
 
 from .asset_detection import find_associated_lyrics, resolve_directory_artwork
 from .file_context import FileProcessingContext
@@ -32,6 +36,7 @@ class ProcessorLike(Protocol):
     before_dao: ProcessingBeforePort
     after_dao: ProcessingAfterPort
     artist_dao: ArtistCachePort
+    artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
     file_name_generator: FileNameGenerator
     SUPPORTED_EXTENSIONS: set[str]

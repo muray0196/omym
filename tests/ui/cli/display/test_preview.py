@@ -4,6 +4,8 @@ What: Validate tree rendering for process preview scenarios.
 Why: Guard against regressions in user-facing status cues.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import ClassVar
 from pytest_mock import MockerFixture
@@ -278,6 +280,137 @@ def test_show_preview_with_db(mocker: MockerFixture) -> None:
     mock_console.return_value.print.assert_any_call("\n[bold]Summary:[/bold]")
     mock_console.return_value.print.assert_any_call("Total files to process: 1")
     mock_console.return_value.print.assert_any_call("[green]Will succeed: 1[/green]")
+
+
+def test_db_preview_prefers_result_artist_id(mocker: MockerFixture) -> None:
+    """Explicit artist IDs from results override filename heuristics."""
+
+    _ = mocker.patch("omym.ui.cli.display.preview.Console")
+    tables: list[RecordingTable] = []
+
+    class RecordingTable:
+        """Capture Rich table interactions for assertions."""
+
+        title: str | None
+        columns: list[tuple[object, ...]]
+        rows: list[tuple[object, ...]]
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raw_title = kwargs.get("title")
+            if raw_title is None and args:
+                raw_title = args[0]
+            self.title = str(raw_title) if raw_title is not None else None
+            self.columns = []
+            self.rows = []
+            tables.append(self)
+
+        def add_column(self, *args: object, **kwargs: object) -> None:
+            if kwargs:
+                _ = kwargs
+            self.columns.append(tuple(args))
+
+        def add_row(self, *args: object, **kwargs: object) -> None:
+            if kwargs:
+                _ = kwargs
+            self.rows.append(tuple(args))
+
+    _ = mocker.patch("rich.table.Table", RecordingTable)
+
+    display = PreviewDisplay()
+    base_path = Path("base/path")
+    metadata = TrackMetadata(
+        title="Track",
+        artist="Artist",
+        album="Album",
+        genre="Genre",
+        year=2024,
+        track_number=1,
+        track_total=10,
+        disc_number=1,
+        disc_total=1,
+        file_extension=".mp3",
+    )
+
+    results = [
+        ProcessResult(
+            source_path=Path("track.mp3"),
+            target_path=base_path / "Artist/Album/01 - Track_WRONG.mp3",
+            success=True,
+            metadata=metadata,
+            artist_id="REAL1",
+        )
+    ]
+
+    display.show_preview(results, base_path, show_db=True)
+
+    artist_table = next(table for table in tables if table.title == "Artist Cache Updates")
+    assert ("Artist", "REAL1", "Cache Update") in artist_table.rows
+    assert all(row[1] != "WRONG" for row in artist_table.rows)
+
+
+def test_db_preview_falls_back_when_artist_id_missing(mocker: MockerFixture) -> None:
+    """Filename heuristic remains when ProcessResult lacks an artist ID."""
+
+    _ = mocker.patch("omym.ui.cli.display.preview.Console")
+    tables: list[RecordingTable] = []
+
+    class RecordingTable:
+        """Capture Rich table interactions for assertions."""
+
+        title: str | None
+        columns: list[tuple[object, ...]]
+        rows: list[tuple[object, ...]]
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raw_title = kwargs.get("title")
+            if raw_title is None and args:
+                raw_title = args[0]
+            self.title = str(raw_title) if raw_title is not None else None
+            self.columns = []
+            self.rows = []
+            tables.append(self)
+
+        def add_column(self, *args: object, **kwargs: object) -> None:
+            if kwargs:
+                _ = kwargs
+            self.columns.append(tuple(args))
+
+        def add_row(self, *args: object, **kwargs: object) -> None:
+            if kwargs:
+                _ = kwargs
+            self.rows.append(tuple(args))
+
+    _ = mocker.patch("rich.table.Table", RecordingTable)
+
+    display = PreviewDisplay()
+    base_path = Path("base/path")
+    metadata = TrackMetadata(
+        title="Track",
+        artist="Artist",
+        album="Album",
+        genre="Genre",
+        year=2024,
+        track_number=1,
+        track_total=10,
+        disc_number=1,
+        disc_total=1,
+        file_extension=".mp3",
+    )
+
+    results = [
+        ProcessResult(
+            source_path=Path("track.mp3"),
+            target_path=base_path / "Artist/Album/01 - Track_AA111.mp3",
+            success=True,
+            metadata=metadata,
+            artist_id=None,
+        )
+    ]
+
+    display.show_preview(results, base_path, show_db=True)
+
+    artist_table = next(table for table in tables if table.title == "Artist Cache Updates")
+    assert ("Artist", "AA111", "Cache Update") in artist_table.rows
 
 
 def test_show_preview_with_errors(mocker: MockerFixture) -> None:
