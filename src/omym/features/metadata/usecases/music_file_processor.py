@@ -35,6 +35,7 @@ from .directory_runner import run_directory_processing
 from .file_runner import run_file_processing
 from .file_operations import calculate_file_hash, generate_target_path, move_file
 from .unprocessed_cleanup import (
+    calculate_pending_unprocessed,
     relocate_unprocessed_files,
     snapshot_unprocessed_candidates,
 )
@@ -297,13 +298,7 @@ class MusicProcessor:
             progress_callback,
         )
 
-        processed_in_place = {
-            result.source_path
-            for result in results
-            if result.success and result.target_path is not None and result.target_path == result.source_path
-        }
-
-        remaining_candidates = snapshot - processed_in_place
+        remaining_candidates = calculate_pending_unprocessed(snapshot, results)
 
         _ = relocate_unprocessed_files(
             directory,

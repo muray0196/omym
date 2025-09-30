@@ -5,11 +5,13 @@ Why: Keep directory processors focused while centralising fallback clean-up logi
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from omym.platform.filesystem import ensure_parent_directory, remove_empty_directories
 from omym.platform.logging import logger
+
+from .processing_types import ProcessResult
 
 
 def snapshot_unprocessed_candidates(
@@ -94,6 +96,34 @@ def relocate_unprocessed_files(
     return moves
 
 
+def calculate_pending_unprocessed(
+    snapshot: Iterable[Path],
+    results: Sequence[ProcessResult],
+) -> set[Path]:
+    """Determine which snapshot entries remain unprocessed after a run."""
+
+    pending: set[Path] = {Path(candidate) for candidate in snapshot}
+
+    for result in results:
+        if not result.success:
+            continue
+
+        pending.discard(result.source_path)
+
+        lyrics_result = result.lyrics_result
+        if (
+            lyrics_result is not None
+            and lyrics_result.reason is None
+        ):
+            pending.discard(lyrics_result.source_path)
+
+        for artwork_result in result.artwork_results:
+            if artwork_result.reason is None:
+                pending.discard(artwork_result.source_path)
+
+    return {path for path in pending if path.exists()}
+
+
 def _is_within(path: Path, ancestor: Path) -> bool:
     try:
         _ = path.relative_to(ancestor)
@@ -121,4 +151,5 @@ def _next_available_destination(destination: Path) -> Path:
 __all__ = [
     "snapshot_unprocessed_candidates",
     "relocate_unprocessed_files",
+    "calculate_pending_unprocessed",
 ]
