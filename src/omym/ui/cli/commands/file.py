@@ -1,4 +1,7 @@
-"""File command execution."""
+"""src/omym/ui/cli/commands/file.py
+What: Execute organise runs targeting a single file via the CLI.
+Why: Let users process individual tracks without rewriting orchestration.
+"""
 
 from typing import override
 
@@ -18,4 +21,6 @@ class FileCommand(CommandExecutor):
         """
         results = [self.processor.process_file(self.args.music_path)]
         self.display_results(results)
+        pending_total = self.calculate_unprocessed_pending(self.args.music_path.parent, results)
+        self.result_display.show_unprocessed_total(pending_total, quiet=self.args.quiet)
         return results

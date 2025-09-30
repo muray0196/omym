@@ -1,4 +1,7 @@
-"""Directory command execution."""
+"""src/omym/ui/cli/commands/directory.py
+What: Execute organise runs for directory roots via the CLI.
+Why: Bridge parsed arguments with application services for bulk processing.
+"""
 
 from typing import override
 
@@ -23,4 +26,6 @@ class DirectoryCommand(CommandExecutor):
             interactive=self.args.interactive,
         )
         self.display_results(results)
+        pending_total = self.calculate_unprocessed_pending(self.args.music_path, results)
+        self.result_display.show_unprocessed_total(pending_total, quiet=self.args.quiet)
         return results

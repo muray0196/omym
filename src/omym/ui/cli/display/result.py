@@ -1,6 +1,10 @@
-"""Result display functionality for CLI."""
+"""src/omym/ui/cli/display/result.py
+What: Render user-facing summaries for organise/restore CLI flows.
+Why: Keep console output formatting consistent across the interface.
+"""
 
 from typing import final
+
 from rich.console import Console
 
 from omym.features.metadata import ProcessResult
@@ -35,3 +39,11 @@ class ResultDisplay:
             success_label="Successful",
             failure_label="Failed",
         )
+
+    def show_unprocessed_total(self, pending_count: int, *, quiet: bool = False) -> None:
+        """Render the count of files that still require manual review."""
+
+        if quiet:
+            return
+
+        self.console.print(f"Unprocessed files awaiting review: {pending_count}")

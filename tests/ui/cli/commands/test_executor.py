@@ -7,8 +7,14 @@ import shutil
 from pytest_mock import MockerFixture
 from unittest.mock import MagicMock
 
-from omym.features.metadata import TrackMetadata
-from omym.features.metadata import ProcessResult
+from omym.features.metadata import (
+    TrackMetadata,
+    ProcessResult,
+    LyricsProcessingResult,
+    ArtworkProcessingResult,
+)
+from omym.application.services.organize_service import OrganizeRequest
+from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.ui.cli.args.options import OrganizeArgs
 from omym.ui.cli.commands import FileCommand, DirectoryCommand
 
@@ -42,7 +48,7 @@ def test_args(test_dir: Path) -> OrganizeArgs:
     """
     return OrganizeArgs(
         command='organize',
-        music_path=test_dir,
+        music_path=test_dir / "test.mp3",
         target_path=test_dir,
         dry_run=False,
         verbose=False,
@@ -67,6 +73,7 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
     """
     mock = mocker.patch("omym.application.services.organize_service.MusicProcessor", autospec=True)
     mock_instance = mock.return_value
+    mock_instance.base_path = Path("output")
 
     # Setup mock process_file method
     metadata = TrackMetadata(
@@ -114,6 +121,7 @@ def test_file_command(test_args: OrganizeArgs, mock_processor: MagicMock, mocker
     assert len(results) == 1
     mock_processor.process_file.assert_called_once_with(test_args.music_path)
     mock_result.return_value.show_results.assert_called_once()
+    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -125,6 +133,7 @@ def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, m
         mock_processor: Mock processor fixture.
         mocker: Pytest mocker fixture.
     """
+    test_args.music_path = test_args.target_path
     # Mock displays
     mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
     mock_progress = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay", autospec=True)
@@ -147,10 +156,15 @@ def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, m
     assert args[2] == test_args.music_path
     assert kwargs.get("interactive") == test_args.interactive
     mock_result.return_value.show_results.assert_called_once()
+    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_dry_run_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
+def test_dry_run_mode(
+    test_args: OrganizeArgs,
+    mock_processor: MagicMock,
+    mocker: MockerFixture,
+) -> None:
     """Test command execution in dry-run mode.
 
     Args:
@@ -159,6 +173,7 @@ def test_dry_run_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
     """
     # Enable dry-run mode
     test_args.dry_run = True
+    mock_processor.process_file.return_value.source_path = test_args.music_path
 
     # Mock displays
     mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
@@ -173,6 +188,7 @@ def test_dry_run_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
     assert len(results) == 1
     mock_preview.return_value.show_preview.assert_called_once()
     mock_result.return_value.show_results.assert_not_called()
+    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
 
 
 def test_file_command_error(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
@@ -201,6 +217,7 @@ def test_file_command_error(test_args: OrganizeArgs, mock_processor: MagicMock, 
     assert len(results) == 1
     assert not results[0].success
     mock_result.return_value.show_results.assert_called_once()
+    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -214,6 +231,7 @@ def test_directory_command_interactive(test_args: OrganizeArgs, mock_processor: 
     """
     # Enable interactive mode
     test_args.interactive = True
+    test_args.music_path = test_args.target_path
 
     # Mock displays
     mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
@@ -235,10 +253,15 @@ def test_directory_command_interactive(test_args: OrganizeArgs, mock_processor: 
     assert args[2] == test_args.music_path
     assert kwargs.get("interactive") is True
     mock_result.return_value.show_results.assert_called_once()
+    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_quiet_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
+def test_quiet_mode(
+    test_args: OrganizeArgs,
+    mock_processor: MagicMock,
+    mocker: MockerFixture,
+) -> None:
     """Test command execution in quiet mode.
 
     Args:
@@ -247,6 +270,7 @@ def test_quiet_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
     """
     # Enable quiet mode
     test_args.quiet = True
+    mock_processor.process_file.return_value.source_path = test_args.music_path
 
     # Mock displays
     mock_preview = mocker.patch("omym.ui.cli.commands.executor.PreviewDisplay", autospec=True)
@@ -260,4 +284,88 @@ def test_quiet_mode(test_args: OrganizeArgs, mocker: MockerFixture) -> None:
     # Verify
     assert len(results) == 1
     mock_result.return_value.show_results.assert_called_once_with(results, quiet=True)
+    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=True)
     mock_preview.return_value.show_preview.assert_not_called()
+
+
+def test_calculate_unprocessed_pending_dry_run(tmp_path: Path) -> None:
+    """Ensure dry-run pending calculation counts survivors outside organised targets."""
+
+    command = DirectoryCommand.__new__(DirectoryCommand)
+    command.request = OrganizeRequest(
+        base_path=tmp_path,
+        dry_run=True,
+        clear_artist_cache=False,
+        clear_cache=False,
+    )
+
+    remaining = tmp_path / "song.flac"
+    already = tmp_path / "already.flac"
+    failing = tmp_path / "fails.flac"
+    lyrics_path = tmp_path / "lyrics.lrc"
+    artwork_path = tmp_path / "art.jpg"
+    _ = remaining.write_bytes(b"1")
+    _ = already.write_bytes(b"2")
+    _ = failing.write_bytes(b"3")
+    _ = lyrics_path.write_bytes(b"4")
+    _ = artwork_path.write_bytes(b"5")
+
+    results = [
+        ProcessResult(
+            source_path=remaining,
+            target_path=tmp_path / "dest" / remaining.name,
+            success=True,
+            dry_run=True,
+            lyrics_result=LyricsProcessingResult(
+                source_path=lyrics_path,
+                target_path=tmp_path / "dest" / "lyrics.lrc",
+                moved=False,
+                dry_run=True,
+            ),
+            artwork_results=[
+                ArtworkProcessingResult(
+                    source_path=artwork_path,
+                    target_path=tmp_path / "dest" / "art.jpg",
+                    linked_track=None,
+                    moved=False,
+                    dry_run=True,
+                )
+            ],
+        ),
+        ProcessResult(
+            source_path=already,
+            target_path=already,
+            success=True,
+            dry_run=True,
+        ),
+        ProcessResult(
+            source_path=failing,
+            target_path=None,
+            success=False,
+            dry_run=True,
+        ),
+    ]
+
+    pending = command.calculate_unprocessed_pending(tmp_path, results)
+    assert pending == 1
+
+
+def test_calculate_unprocessed_pending_real_run(tmp_path: Path) -> None:
+    """Ensure real runs report files that actually reside under the unprocessed folder."""
+
+    command = DirectoryCommand.__new__(DirectoryCommand)
+    command.request = OrganizeRequest(
+        base_path=tmp_path,
+        dry_run=False,
+        clear_artist_cache=False,
+        clear_cache=False,
+    )
+
+    unprocessed_root = tmp_path / UNPROCESSED_DIR_NAME
+    nested = unprocessed_root / "nested"
+    nested.mkdir(parents=True)
+    _ = (nested / "track1.mp3").write_bytes(b"1")
+    _ = (unprocessed_root / "track2.flac").write_bytes(b"2")
+
+    pending = command.calculate_unprocessed_pending(tmp_path, [])
+    assert pending == 2

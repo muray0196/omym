@@ -5,8 +5,7 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.features.metadata import TrackMetadata
-from omym.features.metadata import ProcessResult
+from omym.features.metadata import ProcessResult, TrackMetadata
 from omym.ui.cli.display.result import ResultDisplay
 
 
@@ -200,3 +199,27 @@ def test_show_results_quiet_mode(mocker: MockerFixture) -> None:
 
     mock_console.return_value.print.assert_not_called()
     render_mock.assert_not_called()
+
+
+def test_show_unprocessed_total_counts_files(mocker: MockerFixture) -> None:
+    """Ensure unprocessed total rendering includes the provided count."""
+
+    mock_console = mocker.patch("omym.ui.cli.display.result.Console")
+    display = ResultDisplay()
+
+    display.show_unprocessed_total(2, quiet=False)
+
+    mock_console.return_value.print.assert_called_with(
+        "Unprocessed files awaiting review: 2"
+    )
+
+
+def test_show_unprocessed_total_respects_quiet(mocker: MockerFixture) -> None:
+    """Ensure quiet mode suppresses the unprocessed count output."""
+
+    mock_console = mocker.patch("omym.ui.cli.display.result.Console")
+    display = ResultDisplay()
+
+    display.show_unprocessed_total(5, quiet=True)
+
+    mock_console.return_value.print.assert_not_called()
