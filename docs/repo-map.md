@@ -10,6 +10,7 @@ review_cadence: quarterly
     - `usecases/`: application services, commands, queries, and port protocols.
     - `adapters/`: infrastructure implementations (DB, filesystem, external APIs) that fulfil ports.
   - [`omym/platform/`](../src/omym/platform): Cross-cutting technical services—database manager, filesystem primitives, logging bootstrap, configuration providers, MusicBrainz HTTP client.
+    - `musicbrainz/`: split into focused modules (`http_client`, `rate_limit`, `romanization`, `cache`, `user_agent`) with `client.py` acting as the public façade.
   - [`omym/shared/`](../src/omym/shared): Feature-agnostic value objects, typed results, error types, functional helpers.
   - [`omym/ui/`](../src/omym/ui): CLI and experimental GUI adapters that call feature use cases only.
   - [`omym/config/`](../src/omym/config): Typed configuration loading (environment + TOML defaults) fed into `platform` and feature factories.
