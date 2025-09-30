@@ -1,4 +1,8 @@
-"""Preview display functionality for CLI."""
+"""src/omym/ui/cli/display/preview.py
+Where: CLI adapter layer for preview rendering.
+What: Build Rich trees that preview planned metadata operations.
+Why: Provide users with a safe, visual diff before applying changes.
+"""
 
 from pathlib import Path
 from typing import Literal, final
@@ -35,7 +39,7 @@ class PreviewDisplay:
             success: bool,
             dry_run: bool,
             warning_reason: str | None,
-            entry_type: Literal["audio", "lyrics"],
+            entry_type: Literal["audio", "lyrics", "artwork"],
         ) -> None:
             nonlocal current_artist, current_album, artist_node, album_node
 
@@ -59,8 +63,17 @@ class PreviewDisplay:
                     album_node = artist_node.add(f"📁 {current_album}")
 
             target_node = album_node or artist_node or tree
-            icon, status = self._determine_preview_icon(success, dry_run, warning_reason)
-            type_marker = "🎵" if entry_type == "audio" else "📝"
+            icon, status = self._determine_preview_icon(
+                entry_type,
+                success,
+                dry_run,
+                warning_reason,
+            )
+            type_marker = {
+                "audio": "🎵",
+                "lyrics": "📝",
+                "artwork": "🖼️",
+            }[entry_type]
             filename = rel_path.name
             label = f"{type_marker} {icon} {filename} {status}"
             _ = target_node.add(label)
@@ -89,6 +102,22 @@ class PreviewDisplay:
                     "lyrics",
                 )
 
+            for artwork_result in result.artwork_results:
+                if not artwork_result.target_path:
+                    continue
+
+                artwork_warning: str | None = None
+                if not artwork_result.moved and not artwork_result.dry_run:
+                    artwork_warning = self._format_artwork_warning(artwork_result.reason)
+
+                add_entry(
+                    artwork_result.target_path,
+                    artwork_result.moved or artwork_result.dry_run,
+                    artwork_result.dry_run,
+                    artwork_warning,
+                    "artwork",
+                )
+
         self.console.print(tree)
 
         if show_db:
@@ -98,6 +127,7 @@ class PreviewDisplay:
 
     def _determine_preview_icon(
         self,
+        entry_type: Literal["audio", "lyrics", "artwork"],
         success: bool,
         dry_run: bool,
         warning_reason: str | None,
@@ -105,7 +135,12 @@ class PreviewDisplay:
         """Return the icon and status label for a preview entry."""
 
         if warning_reason:
-            return "\u26a0\ufe0f", f"[yellow]Skipped ({warning_reason})[/yellow]"
+            warning_prefix = {
+                "audio": "Skipped",
+                "lyrics": "Skipped",
+                "artwork": "Skipped",
+            }[entry_type]
+            return "\u26a0\ufe0f", f"[yellow]{warning_prefix} ({warning_reason})[/yellow]"
         if not success:
             return "\u274c", "[red]Error[/red]"
         if dry_run:
@@ -125,6 +160,24 @@ class PreviewDisplay:
         mapping = {
             "target_exists": "target already exists",
             "lyrics_source_missing": "source lyrics missing",
+        }
+        return mapping.get(normalized, normalized.replace("_", " "))
+
+    def _format_artwork_warning(self, reason: str | None) -> str:
+        """Convert an artwork warning reason into a user-facing message."""
+
+        if reason is None:
+            return "skipped"
+
+        normalized = reason.strip()
+        if not normalized:
+            return "skipped"
+
+        mapping = {
+            "target_exists": "target already exists",
+            "source_missing": "source artwork missing",
+            "already_at_target": "already at destination",
+            "no_target_track": "target track unavailable",
         }
         return mapping.get(normalized, normalized.replace("_", " "))
 
