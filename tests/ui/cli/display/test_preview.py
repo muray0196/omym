@@ -191,6 +191,52 @@ def test_show_preview_includes_artwork(mocker: MockerFixture) -> None:
     assert any("✨" in label and label.endswith("[yellow]Preview[/yellow]") for label in artwork_labels)
 
 
+def test_show_preview_marks_duplicates(mocker: MockerFixture) -> None:
+    """Duplicate audio entries surface as skipped warnings in the preview."""
+
+    _ = mocker.patch("omym.ui.cli.display.preview.Console")
+
+    class FakeNode:
+        def __init__(self, label: str) -> None:
+            self.label: str = label
+            self.children: list["FakeNode"] = []
+
+        def add(self, label: str) -> "FakeNode":
+            child = FakeNode(label)
+            self.children.append(child)
+            return child
+
+    class FakeTree(FakeNode):
+        last_instance: ClassVar["FakeTree | None"] = None
+
+        def __init__(self, label: str) -> None:
+            super().__init__(label)
+            FakeTree.last_instance = self
+
+    _ = mocker.patch("omym.ui.cli.display.preview.Tree", FakeTree)
+
+    display = PreviewDisplay()
+    base_path = Path("library")
+    target_path = base_path / "Artist/Album/01_track.mp3"
+
+    result = ProcessResult(
+        source_path=target_path,
+        target_path=target_path,
+        success=True,
+        dry_run=True,
+        skipped_duplicate=True,
+    )
+
+    display.show_preview([result], base_path)
+
+    tree = FakeTree.last_instance
+    assert tree is not None
+    artist_node = tree.children[0]
+    album_node = artist_node.children[0]
+    labels = [child.label for child in album_node.children]
+    assert any("⚠️" in label and "Skipped (duplicate)" in label for label in labels)
+
+
 def test_show_preview_with_db(mocker: MockerFixture) -> None:
     """Test showing preview with database operations."""
     # Mock console

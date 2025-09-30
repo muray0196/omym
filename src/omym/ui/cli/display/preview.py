@@ -87,7 +87,15 @@ class PreviewDisplay:
             if not result.target_path:
                 continue
 
-            add_entry(result.target_path, result.success, result.dry_run, None, "audio")
+            audio_warning = self._determine_audio_warning(result)
+
+            add_entry(
+                result.target_path,
+                result.success,
+                result.dry_run,
+                audio_warning,
+                "audio",
+            )
 
             lyrics_result = result.lyrics_result
             if lyrics_result and lyrics_result.target_path:
@@ -146,6 +154,27 @@ class PreviewDisplay:
         if dry_run:
             return "\u2728", "[yellow]Preview[/yellow]"
         return "\u2705", "[green]Done[/green]"
+
+    def _determine_audio_warning(self, result: ProcessResult) -> str | None:
+        """Translate duplicate and in-place results into preview warnings."""
+
+        if result.skipped_duplicate:
+            return "duplicate"
+
+        target_path = result.target_path
+        if target_path is None:
+            return None
+
+        if target_path == result.source_path:
+            return "already organized"
+
+        try:
+            if target_path.samefile(result.source_path):
+                return "already organized"
+        except (FileNotFoundError, OSError):
+            return None
+
+        return None
 
     def _format_lyrics_warning(self, reason: str | None) -> str:
         """Convert an internal lyrics warning reason into a user-facing message."""
