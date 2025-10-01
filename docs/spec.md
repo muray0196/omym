@@ -15,7 +15,7 @@ review_cadence: quarterly
 
 ## User Stories and Acceptance Criteria
 - **Organise an entire library**: Given `uv run python -m omym organize <source> --target <dest>`, all supported tracks move under `<dest>/<Artist>/<YYYY_Album>/` using sanitised directory and file names, and the command exits with status 0 when no failures are reported.
-- **Preview without side effects**: When `--dry-run` is supplied, no filesystem changes occur, the console lists the plan, and the SQLite log persists the preview for later inspection.
+- **Preview without side effects**: When `--dry-run` is supplied, no filesystem changes occur, the console lists the plan, and the SQLite log persists the preview for later inspection. Successful dry-runs cache the previewed metadata so the next real run can reuse romanised names and target paths without repeating extraction.
 - **Preview duplicates clearly**: Dry-run previews label detected duplicate hashes as `Skipped (duplicate)` and in-place matches as `Skipped (already organized)` so operators can triage no-op entries before executing real moves.
 - **Cache preview IDs**: Database previews surface cached artist IDs when available and rely on filename heuristics only when results omit an ID.
 - **Handle multi-disc releases**: Tracks containing disc metadata are written as `<dest>/<Artist>/<YYYY_Album>/D<n>_<track>_<title>_<artistId>.<ext>` (adding the disc prefix only when required), and duplicate hashes are skipped with a warning rather than overwriting existing files.

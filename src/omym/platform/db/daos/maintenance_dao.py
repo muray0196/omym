@@ -47,6 +47,7 @@ class MaintenanceDAO:
             _ = cur.execute("DELETE FROM processing_before")
             _ = cur.execute("DELETE FROM albums")
             _ = cur.execute("DELETE FROM artist_cache")
+            _ = cur.execute("DELETE FROM processing_preview")
             self.conn.commit()
             return True
         except sqlite3.Error as e:

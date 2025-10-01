@@ -2,6 +2,7 @@
 
 import logging
 import sqlite3
+from dataclasses import asdict
 from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
@@ -18,6 +19,7 @@ from omym.features.metadata import (
     ProcessingEvent,
     ProcessResult,
 )
+from omym.features.metadata.usecases.ports import PreviewCacheEntry
 
 
 @pytest.fixture
@@ -52,12 +54,13 @@ def file_hash() -> str:
 
 
 @pytest.fixture
-def processor(mocker: MockerFixture, tmp_path: Path) -> MusicProcessor:
+def processor(mocker: MockerFixture, tmp_path: Path, file_hash: str) -> MusicProcessor:
     """Create a test processor with mocked dependencies.
 
     Args:
         mocker: Pytest mocker fixture.
         tmp_path: Temporary path fixture.
+        file_hash: Deterministic hash used for mocked calculations.
 
     Returns:
         MusicProcessor: A test processor.
@@ -70,6 +73,7 @@ def processor(mocker: MockerFixture, tmp_path: Path) -> MusicProcessor:
     mock_before_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingBeforeDAO").return_value
     mock_after_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingAfterDAO").return_value
     mock_artist_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ArtistCacheDAO").return_value
+    mock_preview_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingPreviewDAO").return_value
 
     # Configure DAO behavior
     _ = mock_before_dao.check_file_exists.return_value = False
@@ -78,6 +82,10 @@ def processor(mocker: MockerFixture, tmp_path: Path) -> MusicProcessor:
     _ = mock_artist_dao.get_artist_id.return_value = "PNKFL"
     _ = mock_artist_dao.get_romanized_name.return_value = None
     _ = mock_artist_dao.insert_artist_id.return_value = True
+    _ = mock_artist_dao.upsert_romanized_name.return_value = True
+    _ = mock_preview_dao.get_preview.return_value = None
+    _ = mock_preview_dao.upsert_preview.return_value = True
+    _ = mock_preview_dao.delete_preview.return_value = True
 
     # Create processor
     processor = MusicProcessor(base_path=tmp_path)
@@ -188,6 +196,107 @@ class TestMusicProcessor:
         assert not artwork_file.exists()
         assert artwork_result.target_path.exists()
         assert result.warnings == []
+
+    def test_dry_run_caches_preview(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+        file_hash: str,
+    ) -> None:
+        """Dry-run processing should persist preview details for reuse."""
+
+        processor.dry_run = True
+        preview_mock = cast(MagicMock, processor.preview_dao)
+        preview_mock.reset_mock()
+
+        source_file = tmp_path / "dryrun.mp3"
+        source_file.touch()
+
+        metadata_copy = TrackMetadata(**asdict(metadata))
+        original_artist = metadata_copy.artist
+        original_album_artist = metadata_copy.album_artist
+
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=metadata_copy,
+        )
+        processor.romanization.ensure_scheduled = MagicMock()
+        def _romanize(name: str) -> str:
+            return f"{name}_rn"
+
+        processor.romanization.await_result = MagicMock(side_effect=_romanize)
+
+        result = processor.process_file(source_file)
+
+        assert result.dry_run is True
+        preview_mock.upsert_preview.assert_called_once()
+        _, kwargs = preview_mock.upsert_preview.call_args
+        assert kwargs["file_hash"] == file_hash
+        assert kwargs["source_path"] == source_file.resolve()
+        assert kwargs["base_path"] == processor.base_path.resolve()
+        payload = kwargs["payload"]
+        assert payload["original_artist"] == (original_artist or "")
+        assert payload["original_album_artist"] == (original_album_artist or "")
+        cached_metadata = payload["metadata"]
+        assert cached_metadata["artist"] == f"{original_artist}_rn"
+
+    def test_process_file_reuses_preview_entry(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+        file_hash: str,
+    ) -> None:
+        """Real runs should reuse cached dry-run previews when hashes align."""
+
+        source_file = tmp_path / "reuse.mp3"
+        source_file.touch()
+
+        preview_metadata = TrackMetadata(
+            title=metadata.title,
+            artist="Pink Floyd RN",
+            album=metadata.album,
+            album_artist="Pink Floyd RN",
+            genre=metadata.genre,
+            year=metadata.year,
+            track_number=metadata.track_number,
+            track_total=metadata.track_total,
+            disc_number=metadata.disc_number,
+            disc_total=metadata.disc_total,
+            file_extension=metadata.file_extension,
+        )
+        metadata_payload = cast(object, asdict(preview_metadata))
+        payload: dict[str, object] = {
+            "metadata": metadata_payload,
+            "original_artist": "ピンク・フロイド",
+            "original_album_artist": "ピンク・フロイド",
+        }
+        preview_mock = cast(MagicMock, processor.preview_dao)
+        preview_mock.get_preview.return_value = PreviewCacheEntry(
+            file_hash=file_hash,
+            source_path=source_file,
+            base_path=processor.base_path,
+            target_path=None,
+            payload=payload,
+        )
+
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            side_effect=AssertionError("Extraction should be skipped when preview exists"),
+        )
+
+        result = processor.process_file(source_file)
+
+        assert result.success is True
+        artist_cache_mock = cast(MagicMock, processor.artist_dao)
+        artist_cache_mock.upsert_romanized_name.assert_any_call(
+            "ピンク・フロイド",
+            "Pink Floyd RN",
+        )
+        preview_mock.delete_preview.assert_called_once_with(file_hash)
 
     def test_process_file_artwork_conflict(
         self,

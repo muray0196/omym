@@ -7,6 +7,7 @@ Why: Decouple use cases from concrete DB and cache adapters for testing and swap
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection
 from typing import Protocol, runtime_checkable
@@ -80,4 +81,40 @@ class ArtistCachePort(Protocol):
 
     def clear_cache(self) -> bool:
         """Erase cached artist data."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class PreviewCacheEntry:
+    """Value object describing a cached dry-run preview."""
+
+    file_hash: str
+    source_path: Path
+    base_path: Path
+    target_path: Path | None
+    payload: dict[str, object]
+
+
+@runtime_checkable
+class PreviewCachePort(Protocol):
+    """Port for cached dry-run preview access."""
+
+    def upsert_preview(
+        self,
+        *,
+        file_hash: str,
+        source_path: Path,
+        base_path: Path,
+        target_path: Path | None,
+        payload: dict[str, object],
+    ) -> bool:
+        """Insert or update a preview entry."""
+        ...
+
+    def get_preview(self, file_hash: str) -> PreviewCacheEntry | None:
+        """Fetch a preview entry if available."""
+        ...
+
+    def delete_preview(self, file_hash: str) -> bool:
+        """Remove a cached preview entry."""
         ...

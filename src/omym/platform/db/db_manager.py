@@ -81,6 +81,7 @@ class DatabaseManager:
             expected_tables = {
                 "processing_before",
                 "processing_after",
+                "processing_preview",
                 "artist_cache",
                 "albums",
                 "track_positions",
@@ -94,6 +95,7 @@ class DatabaseManager:
                 WHERE type='table' AND name IN (
                     'processing_before',
                     'processing_after',
+                    'processing_preview',
                     'artist_cache',
                     'albums',
                     'track_positions',
@@ -144,6 +146,21 @@ class DatabaseManager:
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (file_hash) REFERENCES processing_before (file_hash)
+                )
+                """
+            )
+
+            # Create processing_preview table
+            _ = cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS processing_preview (
+                    file_hash TEXT PRIMARY KEY,
+                    source_path TEXT NOT NULL,
+                    base_path TEXT NOT NULL,
+                    target_path TEXT,
+                    payload_json TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )

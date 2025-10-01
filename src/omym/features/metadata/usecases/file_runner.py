@@ -9,7 +9,8 @@ import logging
 import time
 import uuid
 from pathlib import Path
-from typing import Protocol
+from dataclasses import asdict
+from typing import Any, Protocol, cast
 
 from omym.features.path.usecases.renamer import (
     CachedArtistIdGenerator,
@@ -21,11 +22,19 @@ from .asset_detection import find_associated_lyrics, resolve_directory_artwork
 from .file_context import FileProcessingContext
 from .file_duplicate import handle_duplicate
 from .file_success import complete_success
-from .ports import ArtistCachePort, ProcessingAfterPort, ProcessingBeforePort
+from .ports import (
+    ArtistCachePort,
+    PreviewCachePort,
+    ProcessingAfterPort,
+    ProcessingBeforePort,
+)
 from .processing_types import ProcessResult, ProcessingEvent
 from .extraction.romanization import RomanizationCoordinator
 from .extraction.track_metadata_extractor import MetadataExtractor
 from ..domain.track_metadata import TrackMetadata
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ProcessorLike(Protocol):
@@ -36,6 +45,7 @@ class ProcessorLike(Protocol):
     before_dao: ProcessingBeforePort
     after_dao: ProcessingAfterPort
     artist_dao: ArtistCachePort
+    preview_dao: PreviewCachePort
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
     file_name_generator: FileNameGenerator
@@ -163,6 +173,18 @@ def run_file_processing(
             dry_run=processor.dry_run,
         )
 
+        preview_entry = None
+        preview_used = False
+        preview_payload: dict[str, object] = {}
+        if not processor.dry_run:
+            preview_entry = processor.preview_dao.get_preview(ctx.file_hash)
+            if preview_entry is not None:
+                source_matches = str(preview_entry.source_path) == str(file_path)
+                base_matches = str(preview_entry.base_path) == str(processor.base_path)
+                if source_matches and base_matches:
+                    preview_payload = preview_entry.payload
+                    preview_used = True
+
         if processor.before_dao.check_file_exists(ctx.file_hash):
             target_raw = processor.before_dao.get_target_path(ctx.file_hash)
             return handle_duplicate(
@@ -172,20 +194,67 @@ def run_file_processing(
                 associated_artwork=associated_artwork,
             )
 
-        metadata = MetadataExtractor.extract(file_path)
-        if not metadata:
-            raise ValueError("Failed to extract metadata")
+        metadata: TrackMetadata | None = None
+        original_artist: str | None = None
+        original_album_artist: str | None = None
 
-        if metadata.artist:
-            processor.romanization.ensure_scheduled(metadata.artist)
-            metadata.artist = processor.romanization.await_result(metadata.artist)
-        if metadata.album_artist:
-            processor.romanization.ensure_scheduled(metadata.album_artist)
-            metadata.album_artist = processor.romanization.await_result(metadata.album_artist)
+        if preview_used:
+            maybe_metadata = preview_payload.get("metadata")
+            if isinstance(maybe_metadata, dict):
+                metadata_dict = cast(dict[str, object], maybe_metadata)
+                metadata = _metadata_from_payload(metadata_dict)
+            raw_original_artist = preview_payload.get("original_artist")
+            if isinstance(raw_original_artist, str):
+                original_artist = raw_original_artist
+            raw_original_album_artist = preview_payload.get("original_album_artist")
+            if isinstance(raw_original_album_artist, str):
+                original_album_artist = raw_original_album_artist
+
+        if metadata is None:
+            raw_metadata = cast(Any, MetadataExtractor.extract(file_path))
+            if raw_metadata is None:  # Defensive for mocked extractors in tests.
+                raise ValueError("Failed to extract metadata")
+            metadata = cast(TrackMetadata, raw_metadata)
+
+            original_artist = metadata.artist
+            original_album_artist = metadata.album_artist
+
+            if metadata.artist:
+                processor.romanization.ensure_scheduled(metadata.artist)
+                metadata.artist = processor.romanization.await_result(metadata.artist)
+            if metadata.album_artist:
+                processor.romanization.ensure_scheduled(metadata.album_artist)
+                metadata.album_artist = processor.romanization.await_result(metadata.album_artist)
 
         target_path = processor.generate_target_path(metadata, existing_path=file_path)
         if not target_path:
             raise ValueError("Failed to generate target path")
+
+        if preview_used and not processor.dry_run:
+            _sync_preview_romanization(
+                processor,
+                original_artist,
+                metadata.artist,
+            )
+            _sync_preview_romanization(
+                processor,
+                original_album_artist,
+                metadata.album_artist,
+            )
+
+        if processor.dry_run:
+            payload: dict[str, object] = {
+                "metadata": asdict(metadata),
+                "original_artist": original_artist or "",
+                "original_album_artist": original_album_artist or "",
+            }
+            _ = processor.preview_dao.upsert_preview(
+                file_hash=ctx.file_hash,
+                source_path=file_path.resolve(),
+                base_path=processor.base_path.resolve(),
+                target_path=target_path,
+                payload=payload,
+            )
 
         if not processor.dry_run:
             if not processor.before_dao.insert_file(ctx.file_hash, file_path):
@@ -205,7 +274,7 @@ def run_file_processing(
                 raise ValueError("Failed to save file state to database")
 
         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-        return complete_success(
+        result = complete_success(
             ctx,
             target_path=target_path,
             metadata=metadata,
@@ -213,6 +282,9 @@ def run_file_processing(
             associated_artwork=associated_artwork,
             duration_ms=duration_ms,
         )
+        if not processor.dry_run and preview_used and result.success:
+            _ = processor.preview_dao.delete_preview(ctx.file_hash)
+        return result
 
     except Exception as exc:
         error_message = str(exc) if str(exc) else type(exc).__name__
@@ -243,6 +315,54 @@ def run_file_processing(
             file_hash=ctx.file_hash,
             artwork_results=ctx.artwork_results,
             warnings=ctx.warnings,
+        )
+
+
+def _metadata_from_payload(raw: dict[str, object]) -> TrackMetadata:
+    """Reconstruct metadata objects from cached payloads."""
+
+    return TrackMetadata(
+        title=cast(str | None, raw.get("title")),
+        artist=cast(str | None, raw.get("artist")),
+        album=cast(str | None, raw.get("album")),
+        album_artist=cast(str | None, raw.get("album_artist")),
+        genre=cast(str | None, raw.get("genre")),
+        year=cast(int | None, raw.get("year")),
+        track_number=cast(int | None, raw.get("track_number")),
+        track_total=cast(int | None, raw.get("track_total")),
+        disc_number=cast(int | None, raw.get("disc_number")),
+        disc_total=cast(int | None, raw.get("disc_total")),
+        file_extension=cast(str | None, raw.get("file_extension")),
+    )
+
+
+def _sync_preview_romanization(
+    processor: ProcessorLike,
+    original_name: str | None,
+    romanized_name: str | None,
+) -> None:
+    """Persist romanized names collected during dry runs."""
+
+    if not original_name or not romanized_name:
+        return
+
+    normalized_original = original_name.strip()
+    normalized_romanized = romanized_name.strip()
+    if not normalized_original or not normalized_romanized:
+        return
+    if normalized_original == normalized_romanized:
+        return
+
+    try:
+        _ = processor.artist_dao.upsert_romanized_name(
+            normalized_original,
+            normalized_romanized,
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        LOGGER.warning(
+            "Failed to persist romanized name for '%s': %s",
+            normalized_original,
+            exc,
         )
 
 

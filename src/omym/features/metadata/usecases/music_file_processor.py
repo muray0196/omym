@@ -26,6 +26,7 @@ from omym.features.path.usecases.renamer import (
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
+from omym.platform.db.daos.processing_preview_dao import ProcessingPreviewDAO
 from omym.platform.db.db_manager import DatabaseManager
 from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import configure_romanization_cache
@@ -42,6 +43,7 @@ from .unprocessed_cleanup import (
 from .ports import (
     ArtistCachePort,
     DatabaseManagerPort,
+    PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
 )
@@ -72,6 +74,7 @@ class MusicProcessor:
     before_dao: ProcessingBeforePort
     after_dao: ProcessingAfterPort
     artist_dao: ArtistCachePort
+    preview_dao: PreviewCachePort
     artist_name_preferences: ArtistNamePreferenceRepository
     artist_id_generator: CachedArtistIdGenerator
     directory_generator: DirectoryGenerator
@@ -86,6 +89,7 @@ class MusicProcessor:
         before_gateway: ProcessingBeforePort | None = None,
         after_gateway: ProcessingAfterPort | None = None,
         artist_cache: ArtistCachePort | None = None,
+        preview_cache: PreviewCachePort | None = None,
     ) -> None:
         self.base_path = base_path
         self.dry_run = dry_run
@@ -106,6 +110,7 @@ class MusicProcessor:
 
         self.before_dao = before_gateway or ProcessingBeforeDAO(conn)
         self.after_dao = after_gateway or ProcessingAfterDAO(conn)
+        self.preview_dao = preview_cache or ProcessingPreviewDAO(conn)
 
         if artist_cache is not None:
             self.artist_dao = artist_cache
