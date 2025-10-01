@@ -5,8 +5,8 @@ from typing import final
 
 from omym.features.restoration.domain.models import RestoreResult
 from omym.ui.cli.args import ArgumentParser
-from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, RestoreArgs
-from omym.ui.cli.commands import DirectoryCommand, FileCommand, RestoreCommand
+from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, PreferencesArgs, RestoreArgs
+from omym.ui.cli.commands import DirectoryCommand, FileCommand, PreferencesCommand, RestoreCommand
 from omym.platform.logging import logger
 
 
@@ -33,6 +33,10 @@ class CommandProcessor:
                 results = command.execute()
                 if any(not r.success for r in results):
                     sys.exit(1)
+                return
+
+            if isinstance(args, PreferencesArgs):
+                PreferencesCommand(args).execute()
                 return
 
             assert isinstance(args, RestoreArgs)

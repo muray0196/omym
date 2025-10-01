@@ -16,7 +16,7 @@ from omym.features.restoration.domain.models import (
     RestoreResult,
 )
 from omym.ui.cli import CommandProcessor
-from omym.ui.cli.args.options import RestoreArgs
+from omym.ui.cli.args.options import PreferencesArgs, RestoreArgs
 
 
 @pytest.fixture
@@ -276,3 +276,21 @@ def test_restore_command_failure_exit(tmp_path: Path, mocker: MockerFixture) -> 
     CommandProcessor.process_command()
 
     mock_exit.assert_called_once_with(1)
+
+
+def test_preferences_command_invocation(mocker: MockerFixture) -> None:
+    """Preferences command should delegate to the preferences command executor."""
+
+    preferences_args = PreferencesArgs(
+        command="preferences",
+        show_all=False,
+        only_missing=True,
+    )
+
+    _ = mocker.patch("omym.ui.cli.cli.ArgumentParser.process_args", return_value=preferences_args)
+    preferences_command = mocker.patch("omym.ui.cli.cli.PreferencesCommand")
+
+    CommandProcessor.process_command()
+
+    preferences_command.assert_called_once_with(preferences_args)
+    preferences_command.return_value.execute.assert_called_once()

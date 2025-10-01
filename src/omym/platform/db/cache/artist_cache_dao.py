@@ -115,6 +115,55 @@ class ArtistCacheDAO:
             logger.warning("Failed to fetch romanized name for '%s': %s", normalized_name, e)
             return None
 
+    def list_romanizations(self) -> list[tuple[str, str | None, str | None, str | None]]:
+        """Return all cached romanizations sorted by artist name.
+
+        Returns:
+            List of tuples containing artist name, romanized name (if any),
+            romanization source, and the timestamp when the romanized value was
+            recorded. Values are normalised to ``None`` when fields are empty.
+        """
+
+        try:
+            with self._lock:
+                cursor = self.conn.cursor()
+                _ = cursor.execute(
+                    """
+                    SELECT artist_name, romanized_name, romanization_source, romanized_at
+                    FROM artist_cache
+                    """
+                )
+                rows = cursor.fetchall()
+
+            def _clean(value: object) -> str | None:
+                if not isinstance(value, str):
+                    return None
+                trimmed = value.strip()
+                return trimmed or None
+
+            normalized_rows: list[tuple[str, str | None, str | None, str | None]] = []
+            for artist_name, romanized_name, source, romanized_at in rows:
+                if not isinstance(artist_name, str):
+                    continue
+                normalized_name = artist_name.strip()
+                if not normalized_name:
+                    continue
+                normalized_rows.append(
+                    (
+                        normalized_name,
+                        _clean(romanized_name),
+                        _clean(source),
+                        _clean(romanized_at),
+                    )
+                )
+
+            normalized_rows.sort(key=lambda item: item[0].casefold())
+            return normalized_rows
+
+        except sqlite3.Error as e:
+            logger.error("Failed to list artist romanizations: %s", e)
+            return []
+
     def upsert_romanized_name(
         self,
         artist_name: str,

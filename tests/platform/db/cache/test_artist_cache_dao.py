@@ -45,3 +45,29 @@ class TestArtistCacheDAO:
         assert dao.upsert_romanized_name("米津玄師", "Yonezu Kenshi", source="manual") is True
         assert dao.get_romanized_name("米津玄師") == "Yonezu Kenshi"
         assert dao.get_artist_id("米津玄師") == "YONEZ"
+
+    def test_list_romanizations_returns_sorted_and_normalized_rows(self, tmp_path: Path) -> None:
+        dao = self._create_dao(tmp_path)
+
+        assert dao.insert_artist_id("Perfume", "PERF") is True
+        assert dao.upsert_romanized_name("beta", "Beta", source=None) is True
+        assert dao.upsert_romanized_name("Alpha", "Alpha", source="manual") is True
+
+        rows = dao.list_romanizations()
+
+        assert [row[0] for row in rows] == ["Alpha", "beta", "Perfume"]
+
+        alpha_row = rows[0]
+        assert alpha_row[1] == "Alpha"
+        assert alpha_row[2] == "manual"
+        assert alpha_row[3] is not None
+
+        perfume_row = next(row for row in rows if row[0] == "Perfume")
+        assert perfume_row[1] is None
+        assert perfume_row[2] is None
+        assert perfume_row[3] is None
+
+        beta_row = rows[1]
+        assert beta_row[1] == "Beta"
+        assert beta_row[2] == "musicbrainz"
+        assert beta_row[3] is not None

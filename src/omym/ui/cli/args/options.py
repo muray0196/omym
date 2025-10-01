@@ -43,6 +43,16 @@ class RestoreArgs:
     purge_state: bool
 
 
-CLIArgs = OrganizeArgs | RestoreArgs
+@final
+@dataclass(slots=True)
+class PreferencesArgs:
+    """Command line arguments for the ``preferences`` subcommand."""
 
-__all__ = ["CLIArgs", "OrganizeArgs", "RestoreArgs"]
+    command: Literal["preferences"]
+    show_all: bool
+    only_missing: bool
+
+
+CLIArgs = OrganizeArgs | RestoreArgs | PreferencesArgs
+
+__all__ = ["CLIArgs", "OrganizeArgs", "PreferencesArgs", "RestoreArgs"]

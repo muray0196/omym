@@ -11,7 +11,7 @@ from omym.platform.filesystem import ensure_directory
 from omym.platform.logging import DEFAULT_LOG_FILE, logger, setup_logger
 from omym.config.config import Config
 from omym.features.restoration.domain.models import CollisionPolicy
-from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, RestoreArgs
+from omym.ui.cli.args.options import CLIArgs, OrganizeArgs, PreferencesArgs, RestoreArgs
 
 
 @final
@@ -149,6 +149,22 @@ class ArgumentParser:
             help="Clear cached processing state after a successful restore",
         )
 
+        preferences_parser = subparsers.add_parser(
+            "preferences",
+            help="Inspect configured artist name preferences alongside cache entries",
+        )
+        preference_group = preferences_parser.add_mutually_exclusive_group()
+        _ = preference_group.add_argument(
+            "--all",
+            action="store_true",
+            help="Show all known artists regardless of configuration state",
+        )
+        _ = preference_group.add_argument(
+            "--only-missing",
+            action="store_true",
+            help="Show only artists missing a user preference or cache entry",
+        )
+
         return parser
 
     @staticmethod
@@ -168,9 +184,12 @@ class ArgumentParser:
         parsed_args = parser.parse_args(args_list)
 
         # Set log level based on verbosity flags
-        if parsed_args.quiet:
+        is_quiet = bool(getattr(parsed_args, "quiet", False))
+        is_verbose = bool(getattr(parsed_args, "verbose", False))
+
+        if is_quiet:
             log_level = logging.ERROR
-        elif parsed_args.verbose:
+        elif is_verbose:
             log_level = logging.DEBUG
         else:
             log_level = logging.INFO
@@ -186,6 +205,9 @@ class ArgumentParser:
 
         if command == "restore":
             return ArgumentParser._process_restore(parsed_args)
+
+        if command == "preferences":
+            return ArgumentParser._process_preferences(parsed_args)
 
         logger.error("Unsupported command: %s", command)
         sys.exit(2)
@@ -249,4 +271,16 @@ class ArgumentParser:
             continue_on_error=parsed_args.continue_on_error,
             limit=limit,
             purge_state=parsed_args.purge_state,
+        )
+
+    @staticmethod
+    def _process_preferences(parsed_args: argparse.Namespace) -> PreferencesArgs:
+        show_all: bool = bool(parsed_args.all)
+        # Default behaviour is to show only missing entries when no flags are supplied.
+        only_missing: bool = bool(parsed_args.only_missing) or not show_all
+
+        return PreferencesArgs(
+            command="preferences",
+            show_all=show_all,
+            only_missing=only_missing,
         )

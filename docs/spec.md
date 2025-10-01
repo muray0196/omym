@@ -1,6 +1,6 @@
 owner: Maintainers
 status: active
-last_updated: 2024-10-17
+last_updated: 2025-10-01
 review_cadence: quarterly
 
 ## Goals and Success Metrics
@@ -21,6 +21,7 @@ review_cadence: quarterly
 - **Handle multi-disc releases**: Tracks containing disc metadata are written as `<dest>/<Artist>/<YYYY_Album>/D<n>_<track>_<title>_<artistId>.<ext>` (adding the disc prefix only when required), and duplicate hashes are skipped with a warning rather than overwriting existing files.
 - **Restore previous runs**: Running `uv run python -m omym restore <dest>` replays the persisted plan back to the original paths (or an alternate `--destination`) honouring the selected collision policy (`abort`, `skip`, or `backup`), and automatically moves any files parked under `<dest>/<unprocessed_dir_name>/` back to their relative paths.
 - **Maintain caches**: Supplying `--clear-cache` clears persisted processing state, while `--clear-artist-cache` flushes the artist romanisation cache; operations continue even if cache eviction encounters recoverable errors.
+- **Inspect artist preferences**: Running `uv run python -m omym preferences --only-missing` lists artists without a preferred override or cached romanisation, and `--all` expands the view to every known artist with source attribution and status labels.
 - **Collect unprocessed files**: After organising `music_path`, any files still located under the source tree move to `<music_path>/<unprocessed_dir_name>/...`, preserving their original relative paths so users can review leftovers; the default folder name is `!unprocessed` and can be overridden in the config file. Files that are already in their target location are counted as processed and remain in place, and the CLI reports `Unprocessed files awaiting review: <count>` at the end of each organise run.
 
 ## Flows

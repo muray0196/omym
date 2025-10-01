@@ -35,6 +35,19 @@ Audio library ingestion, organisation, and restoration toolkit.
 - Directory responsibilities are listed in [`docs/repo-map.md`](docs/repo-map.md).
 - Feature ADRs belong under `docs/adr/` (create as needed).
 
+## Inspect Artist Preferences
+- `uv run python -m omym preferences --only-missing` lists artists that still need a preferred romanised name or cached lookup.
+- Add `--all` to review every configured or cached artist alongside the recorded source.
+- Example output:
+  ```text
+  +--------------+-----------+----------+------------+--------------------+
+  | Artist       | Preferred | Cached   | Source     | Status             |
+  +--------------+-----------+----------+------------+--------------------+
+  | 宇多田ヒカル  | Utada ... | Utada ...| musicbrainz| synced             |
+  | 東京事変      | N/A       | Tokyo ...| manual     | needs preference   |
+  +--------------+-----------+----------+------------+--------------------+
+  ```
+
 ## Contributing
 - Update docs alongside code changes.
 - Keep commits focused on a single feature migration step.

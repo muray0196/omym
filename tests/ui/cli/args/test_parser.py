@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.ui.cli.args import ArgumentParser, OrganizeArgs, RestoreArgs
+from omym.ui.cli.args import ArgumentParser, OrganizeArgs, PreferencesArgs, RestoreArgs
 from omym.platform.logging import DEFAULT_LOG_FILE
 
 
@@ -138,6 +138,22 @@ def test_process_args_restore(test_dir: Path, mocker: MockerFixture) -> None:
     assert mock_setup_logger.call_args.kwargs["console_level"] == logging.ERROR
     assert mock_setup_logger.call_args.kwargs["log_file"] == custom_log_path
     mock_config.load.assert_called_once()
+
+
+def test_process_args_preferences_defaults(mocker: MockerFixture) -> None:
+    """Preferences command should default to missing-only view with info logging."""
+
+    mock_config = mocker.patch("omym.ui.cli.args.parser.Config")
+    mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
+    mock_config.load.return_value.log_file = None
+
+    args = ArgumentParser.process_args(["preferences"])
+
+    assert isinstance(args, PreferencesArgs)
+    assert not args.show_all
+    assert args.only_missing
+    assert mock_setup_logger.call_args.kwargs["console_level"] == logging.INFO
+    assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
 
 
 def test_process_args_invalid_path(mocker: MockerFixture) -> None:
