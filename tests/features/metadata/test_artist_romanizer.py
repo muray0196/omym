@@ -108,3 +108,31 @@ class TestArtistRomanizer:
 
         assert result == "R-宇多田ヒカル, R-米津玄師"
         assert calls == ["宇多田ヒカル", "米津玄師"]
+
+    def test_musicbrainz_formatted_name_not_re_romanized(self) -> None:
+        """Skip re-romanization for names already formatted by MusicBrainz."""
+
+        calls: list[str] = []
+
+        def fetcher(name: str) -> str | None:
+            calls.append(name)
+            assert name == "佐藤貴文"
+            return "Satō, Takafumi"
+
+        def detector(text: str) -> str | None:
+            return "ja" if text == "佐藤貴文" else "en"
+
+        romanizer = ArtistRomanizer(
+            enabled_supplier=lambda: True,
+            fetcher=fetcher,
+            language_detector=detector,
+            transliterator=lambda _: "fallback",
+        )
+
+        first_pass = romanizer.romanize_name("佐藤貴文")
+        assert first_pass == "Satō, Takafumi"
+
+        second_pass = romanizer.romanize_name(first_pass)
+
+        assert second_pass == "Satō, Takafumi"
+        assert calls == ["佐藤貴文"]

@@ -7,6 +7,7 @@ Why: Allow metadata extraction and pipeline components to reuse a single impleme
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -25,6 +26,21 @@ Transliterator = Callable[[str], str]
 
 _TARGET_LANGS = {"ja", "zh"}
 _KAKASI = pykakasi.Kakasi()
+
+
+def _contains_non_latin(text: str) -> bool:
+    """Return True when text includes alphabetic characters outside the Latin script."""
+
+    for char in text:
+        if not char.isalpha():
+            continue
+        try:
+            name = unicodedata.name(char)
+        except ValueError:
+            return True
+        if "LATIN" not in name:
+            return True
+    return False
 
 
 def _default_enabled() -> bool:
@@ -130,7 +146,12 @@ class ArtistRomanizer:
             parts = [part.strip() for part in trimmed.split(", ") if part.strip()]
             if not parts:
                 return name
-            romanized_parts = [self._romanize_single(part) for part in parts]
+            romanized_parts: list[str] = []
+            for part in parts:
+                if _contains_non_latin(part):
+                    romanized_parts.append(self._romanize_single(part))
+                else:
+                    romanized_parts.append(part)
             return ", ".join(romanized_parts)
 
         return self._romanize_single(trimmed)
