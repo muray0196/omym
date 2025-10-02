@@ -16,7 +16,7 @@ import logging
 import time
 import uuid
 from pathlib import Path
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any, Protocol, cast
 
 from omym.features.path.usecases.renamer import (
@@ -140,6 +140,7 @@ def run_file_processing(
     total: int | None = None,
     source_root: Path | None = None,
     target_root: Path | None = None,
+    precomputed_metadata: TrackMetadata | None = None,
 ) -> ProcessResult:
     start_time = time.perf_counter()
     current_process_id = process_id or uuid.uuid4().hex[:12]
@@ -224,10 +225,13 @@ def run_file_processing(
                 original_album_artist = raw_original_album_artist
 
         if metadata is None:
-            raw_metadata = cast(Any, MetadataExtractor.extract(file_path))
-            if raw_metadata is None:  # Defensive for mocked extractors in tests.
-                raise ValueError("Failed to extract metadata")
-            metadata = cast(TrackMetadata, raw_metadata)
+            if precomputed_metadata is not None:
+                metadata = replace(precomputed_metadata)
+            else:
+                raw_metadata = cast(Any, MetadataExtractor.extract(file_path))
+                if raw_metadata is None:  # Defensive for mocked extractors in tests.
+                    raise ValueError("Failed to extract metadata")
+                metadata = cast(TrackMetadata, raw_metadata)
 
             original_artist = metadata.artist
             original_album_artist = metadata.album_artist

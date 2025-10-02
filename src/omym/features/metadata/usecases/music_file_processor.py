@@ -277,6 +277,7 @@ class MusicProcessor:
         total: int | None = None,
         source_root: Path | None = None,
         target_root: Path | None = None,
+        precomputed_metadata: TrackMetadata | None = None,
     ) -> ProcessResult:
         return run_file_processing(
             self,
@@ -286,6 +287,7 @@ class MusicProcessor:
             total=total,
             source_root=source_root,
             target_root=target_root,
+            precomputed_metadata=precomputed_metadata,
         )
 
     def _process_directory(

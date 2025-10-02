@@ -197,6 +197,32 @@ class TestMusicProcessor:
         assert artwork_result.target_path.exists()
         assert result.warnings == []
 
+    def test_process_file_uses_precomputed_metadata(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        metadata: TrackMetadata,
+        tmp_path: Path,
+    ) -> None:
+        """Ensure extractor is bypassed when metadata is preloaded."""
+
+        source_file = tmp_path / "precomputed.mp3"
+        source_file.touch()
+
+        extractor_mock = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=metadata,
+        )
+
+        result = processor.process_file(
+            source_file,
+            precomputed_metadata=metadata,
+        )
+
+        extractor_mock.assert_not_called()
+        assert result.success is True
+        assert result.target_path is not None
+
     def test_dry_run_caches_preview(
         self,
         mocker: MockerFixture,

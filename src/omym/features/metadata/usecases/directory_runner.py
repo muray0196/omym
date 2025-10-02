@@ -24,6 +24,7 @@ from .processing_types import (
 from .extraction.romanization import RomanizationCoordinator
 from .extraction.track_metadata_extractor import MetadataExtractor
 from .ports import DatabaseManagerPort
+from ..domain.track_metadata import TrackMetadata
 
 
 class ProcessorLike(Protocol):
@@ -54,6 +55,7 @@ class ProcessorLike(Protocol):
         total: int | None = None,
         source_root: Path | None = None,
         target_root: Path | None = None,
+        precomputed_metadata: TrackMetadata | None = None,
     ) -> ProcessResult:
         ...
 
@@ -110,6 +112,7 @@ def run_directory_processing(
         source_base_path=directory,
     )
 
+    precomputed_metadata: dict[Path, TrackMetadata] = {}
     for pre_file in supported_files:
         try:
             metadata = MetadataExtractor.extract(pre_file)
@@ -121,6 +124,7 @@ def run_directory_processing(
             processor.romanization.ensure_scheduled(metadata.album_artist)
         processor.directory_generator.register_album_year(metadata)
         FileNameGenerator.register_album_track_width(metadata)
+        precomputed_metadata[pre_file] = metadata
 
     processed_count = 0
     conn = processor.db_manager.conn  # type: ignore[attr-defined]
@@ -140,6 +144,7 @@ def run_directory_processing(
                     total=total_files,
                     source_root=directory,
                     target_root=processor.base_path,
+                    precomputed_metadata=precomputed_metadata.get(current_file),
                 )
             except Exception as exc:  # pragma: no cover - defensive logging
                 error_message = str(exc) if str(exc) else type(exc).__name__
