@@ -192,9 +192,7 @@ def run_file_processing(
         duplicate_target_path: Path | None = None
         if processor.before_dao.check_file_exists(ctx.file_hash):
             target_raw = processor.before_dao.get_target_path(ctx.file_hash)
-            if isinstance(target_raw, Path):
-                duplicate_target_path = target_raw
-            elif isinstance(target_raw, str):
+            if target_raw is not None:
                 duplicate_target_path = Path(target_raw)
 
         preview_entry = None

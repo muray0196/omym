@@ -12,25 +12,44 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+from omym.features.metadata.usecases.ports import (
+    ArtistCachePort,
+    ProcessingAfterPort,
+    ProcessingBeforePort,
+    PreviewCacheEntry,
+    PreviewCachePort,
+)
+from omym.features.path.usecases.renamer import (
+    CachedArtistIdGenerator,
+    DirectoryGenerator,
+    FileNameGenerator,
+)
 
 from pytest_mock import MockerFixture
 
 from omym.features.metadata import TrackMetadata
+from omym.features.metadata.usecases.extraction.romanization import RomanizationCoordinator
 from omym.features.metadata.usecases.file_runner import run_file_processing
 
 
-class _StubBeforeDAO:
+class _StubBeforeDAO(ProcessingBeforePort):
     """Minimal DAO stub that mimics duplicate detection bookkeeping."""
+
+    _duplicate_target: Path
+    insert_calls: list[tuple[str, Path]]
 
     def __init__(self, duplicate_target: Path) -> None:
         self._duplicate_target = duplicate_target
-        self.insert_calls: list[tuple[str, Path]] = []
+        self.insert_calls = []
 
     def check_file_exists(self, file_hash: str) -> bool:
+        del file_hash
         return True
 
-    def get_target_path(self, file_hash: str) -> Path:
+    def get_target_path(self, file_hash: str) -> Path | None:
+        del file_hash
         return self._duplicate_target
 
     def insert_file(self, file_hash: str, file_path: Path) -> bool:
@@ -38,42 +57,81 @@ class _StubBeforeDAO:
         return True
 
 
-class _StubAfterDAO:
+class _StubAfterDAO(ProcessingAfterPort):
     """Minimal DAO stub that records inserts for verification."""
 
+    insert_calls: list[tuple[str, Path, Path]]
+
     def __init__(self) -> None:
-        self.insert_calls: list[tuple[str, Path, Path]] = []
+        self.insert_calls = []
 
     def insert_file(self, file_hash: str, file_path: Path, target_path: Path) -> bool:
         self.insert_calls.append((file_hash, file_path, target_path))
         return True
 
 
-class _StubPreviewDAO:
+class _StubPreviewDAO(PreviewCachePort):
     """Preview DAO stub that keeps the interface surface minimal."""
 
-    def get_preview(self, file_hash: str) -> Any:
+    def get_preview(self, file_hash: str) -> PreviewCacheEntry | None:
+        del file_hash
         return None
 
-    def upsert_preview(self, **_: Any) -> None:
-        return None
+    def upsert_preview(
+        self,
+        *,
+        file_hash: str,
+        source_path: Path,
+        base_path: Path,
+        target_path: Path | None,
+        payload: dict[str, object],
+    ) -> bool:
+        del file_hash
+        del source_path
+        del base_path
+        del target_path
+        del payload
+        return True
 
-    def delete_preview(self, file_hash: str) -> None:
-        return None
+    def delete_preview(self, file_hash: str) -> bool:
+        del file_hash
+        return True
 
 
-class _StubArtistDAO:
+class _StubArtistDAO(ArtistCachePort):
     """Artist DAO stub for romanization sync."""
 
-    def upsert_romanized_name(self, *_: Any) -> None:
-        return None
+    _ids: dict[str, str]
+    _romanized: dict[str, tuple[str, str | None]]
 
+    def __init__(self) -> None:
+        self._ids = {}
+        self._romanized = {}
 
-class _StubArtistIdGenerator:
-    """Artist ID generator stub returning deterministic identifiers."""
+    def insert_artist_id(self, artist_name: str, artist_id: str) -> bool:
+        self._ids[artist_name] = artist_id
+        return True
 
-    def generate(self, artist: str) -> str:
-        return "NEW456"
+    def get_artist_id(self, artist_name: str) -> str | None:
+        return self._ids.get(artist_name)
+
+    def get_romanized_name(self, artist_name: str) -> str | None:
+        stored = self._romanized.get(artist_name)
+        return stored[0] if stored else None
+
+    def upsert_romanized_name(
+        self,
+        artist_name: str,
+        romanized_name: str,
+        source: str | None = None,
+    ) -> bool:
+        self._romanized[artist_name] = (romanized_name, source)
+        return True
+
+    def clear_cache(self) -> bool:
+        self._ids.clear()
+        self._romanized.clear()
+        return True
 
 
 class _StubRomanization:
@@ -89,33 +147,69 @@ class _StubRomanization:
 class _StubProcessor:
     """Processor-like stub tailored for run_file_processing tests."""
 
-    SUPPORTED_EXTENSIONS = {".mp3"}
-    SUPPORTED_IMAGE_EXTENSIONS = {".jpg"}
+    SUPPORTED_EXTENSIONS: set[str] = {".mp3"}
+    SUPPORTED_IMAGE_EXTENSIONS: set[str] = {".jpg"}
+    dry_run: bool
+    base_path: Path
+    before_dao: ProcessingBeforePort
+    before_dao_stub: _StubBeforeDAO
+    after_dao: ProcessingAfterPort
+    after_dao_stub: _StubAfterDAO
+    preview_dao: PreviewCachePort
+    preview_dao_stub: _StubPreviewDAO
+    artist_dao: ArtistCachePort
+    artist_dao_stub: _StubArtistDAO
+    artist_id_generator: CachedArtistIdGenerator
+    directory_generator: DirectoryGenerator
+    file_name_generator: FileNameGenerator
+    _romanization: _StubRomanization
+    _new_target: Path
+    move_calls: list[tuple[Path, Path]]
 
     def __init__(self, *, base_path: Path, duplicate_target: Path, new_target: Path) -> None:
         self.dry_run = False
         self.base_path = base_path
-        self.before_dao = _StubBeforeDAO(duplicate_target)
-        self.after_dao = _StubAfterDAO()
-        self.preview_dao = _StubPreviewDAO()
-        self.artist_dao = _StubArtistDAO()
-        self.artist_id_generator = _StubArtistIdGenerator()
-        self.directory_generator = object()
-        self.file_name_generator = object()
+        self.before_dao_stub = _StubBeforeDAO(duplicate_target)
+        self.before_dao = self.before_dao_stub
+        self.after_dao_stub = _StubAfterDAO()
+        self.after_dao = self.after_dao_stub
+        self.preview_dao_stub = _StubPreviewDAO()
+        self.preview_dao = self.preview_dao_stub
+        self.artist_dao_stub = _StubArtistDAO()
+        self.artist_dao = self.artist_dao_stub
+        self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao_stub)
+        self.directory_generator = DirectoryGenerator()
+        self.file_name_generator = FileNameGenerator(self.artist_id_generator)
         self._romanization = _StubRomanization()
         self._new_target = new_target
-        self.move_calls: list[tuple[Path, Path]] = []
+        self.move_calls = []
 
     def _calculate_file_hash(self, file_path: Path) -> str:
+        del file_path
         return "hash"
 
     def calculate_file_hash(self, file_path: Path) -> str:
+        del file_path
         return "hash"
 
-    def _generate_target_path(self, metadata: TrackMetadata, *, existing_path: Path | None = None) -> Path:
+    def _generate_target_path(
+        self,
+        metadata: TrackMetadata,
+        *,
+        existing_path: Path | None = None,
+    ) -> Path:
+        del metadata
+        del existing_path
         return self._new_target
 
-    def generate_target_path(self, metadata: TrackMetadata, *, existing_path: Path | None = None) -> Path:
+    def generate_target_path(
+        self,
+        metadata: TrackMetadata,
+        *,
+        existing_path: Path | None = None,
+    ) -> Path:
+        del metadata
+        del existing_path
         return self._new_target
 
     def _move_file(
@@ -129,6 +223,11 @@ class _StubProcessor:
         source_root: Path | None = None,
         target_root: Path | None = None,
     ) -> None:
+        del process_id
+        del sequence
+        del total
+        del source_root
+        del target_root
         self.move_file(src_path, dest_path)
 
     def move_file(
@@ -142,8 +241,13 @@ class _StubProcessor:
         source_root: Path | None = None,
         target_root: Path | None = None,
     ) -> None:
+        del process_id
+        del sequence
+        del total
+        del source_root
+        del target_root
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        src_path.replace(dest_path)
+        _ = src_path.replace(dest_path)
         self.move_calls.append((src_path, dest_path))
 
     def log_processing(
@@ -154,11 +258,15 @@ class _StubProcessor:
         *args: object,
         **context: object,
     ) -> None:
+        del level
+        del event
+        del message
+        _ = (args, context)
         return None
 
     @property
-    def romanization(self) -> _StubRomanization:
-        return self._romanization
+    def romanization(self) -> RomanizationCoordinator:
+        return cast(RomanizationCoordinator, cast(object, self._romanization))
 
 
 def test_reorganize_moves_when_target_changes(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -206,5 +314,5 @@ def test_reorganize_moves_when_target_changes(tmp_path: Path, mocker: MockerFixt
     assert new_target.exists()
     assert not old_target.exists()
     assert processor.move_calls == [(old_target, new_target)]
-    assert processor.before_dao.insert_calls == [("hash", old_target)]
-    assert processor.after_dao.insert_calls == [("hash", old_target, new_target)]
+    assert processor.before_dao_stub.insert_calls == [("hash", old_target)]
+    assert processor.after_dao_stub.insert_calls == [("hash", old_target, new_target)]
