@@ -17,7 +17,14 @@ from __future__ import annotations
 
 from typing import Any, Final, cast
 
-from omym.config.settings import MB_APP_NAME, MB_APP_VERSION, MB_CONTACT
+import langid
+
+from omym.config.settings import (
+    MB_APP_NAME,
+    MB_APP_VERSION,
+    MB_CONTACT,
+    MB_NON_LATIN_LANG_CODES,
+)
 
 from .cache import (
     RomanizationCache,
@@ -36,6 +43,18 @@ from .user_agent import configure_client_user_agent, format_user_agent
 MB_BASE_URL: Final[str] = "https://musicbrainz.org/ws/2/artist/"
 _CACHE_SOURCE: Final[str] = "musicbrainz"
 _HTTP_CLIENT: HTTPClient = DEFAULT_HTTP_CLIENT
+
+
+def _is_latin_result(value: str) -> bool:
+    """Return True when langid classifies the value as Latin script."""
+
+    if not value.strip():
+        return False
+    try:
+        lang_code, _ = langid.classify(value)
+    except Exception:
+        return True
+    return lang_code not in MB_NON_LATIN_LANG_CODES
 
 
 def _sanitize_musicbrainz_name(value: str) -> str:
@@ -99,13 +118,15 @@ def fetch_romanized_name(name: str) -> str | None:
     if romanized:
         sanitized_alias = _sanitize_musicbrainz_name(romanized)
         if sanitized_alias:
-            save_cached_name(trimmed, sanitized_alias, source=_CACHE_SOURCE)
+            if _is_latin_result(sanitized_alias):
+                save_cached_name(trimmed, sanitized_alias, source=_CACHE_SOURCE)
             return sanitized_alias
 
     sort_name = best.get("sort-name")
     if isinstance(sort_name, str) and sort_name.strip():
         sanitized = _sanitize_musicbrainz_name(sort_name)
-        save_cached_name(trimmed, sanitized, source=_CACHE_SOURCE)
+        if _is_latin_result(sanitized):
+            save_cached_name(trimmed, sanitized, source=_CACHE_SOURCE)
         return sanitized
 
     return None

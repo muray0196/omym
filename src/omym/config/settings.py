@@ -12,6 +12,12 @@ USE_MB_ROMANIZATION: bool = bool(getattr(app_config, "use_mb_romanization", True
 
 # MusicBrainz application identity ------------------------------------------
 
+# Language codes reported by langid that indicate non-Latin results from
+# MusicBrainz. These codes align with the languages we request romanization
+# for and are used to keep caches free of non-Latin values.
+MB_NON_LATIN_LANG_CODES: tuple[str, ...] = ("ja", "zh")
+
+
 # MusicBrainz recommends a User-Agent of the form:
 #   "AppName/AppVersion (contact-url-or-email)"
 # See: https://musicbrainz.org/doc/MusicBrainz_API/Best_Practices#User-Agent
@@ -34,4 +40,5 @@ __all__ = [
     "MB_CONTACT",
     "UNPROCESSED_DIR_NAME",
     "UNPROCESSED_PREVIEW_LIMIT",
+    "MB_NON_LATIN_LANG_CODES",
 ]

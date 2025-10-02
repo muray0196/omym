@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+import langid
 
 @pytest.fixture(autouse=True)
 def reset_romanization_cache() -> Iterator[None]:
@@ -118,6 +119,43 @@ def test_fetch_romanized_name_caches_new_values(monkeypatch: pytest.MonkeyPatch)
     assert got == "Kenshi Yonezu"
     assert cache.get_romanized_name("米津玄師") == "Kenshi Yonezu"
     assert ("米津玄師", "Kenshi Yonezu", "musicbrainz") in cache.upserts
+
+
+def test_fetch_romanized_name_skips_cache_for_non_latin_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-Latin MusicBrainz alias results should not be cached."""
+
+    from omym.platform.musicbrainz import client
+
+    cache = _DummyCache()
+    client.configure_romanization_cache(cache)
+
+    sample = {
+        "artists": [
+            {
+                "name": "宇多田ヒカル",
+                "sort-name": "Utada, Hikaru",
+                "score": "100",
+                "aliases": [
+                    {"name": "宇多田ヒカル", "locale": "ja-Latn", "primary": True},
+                ],
+            }
+        ]
+    }
+
+    def fake_get_json(_url: str, _params: dict[str, str]) -> Any:
+        return _wrap_result(sample)
+
+    def fake_classify(_: str) -> tuple[str, float]:
+        return ("ja", 0.0)
+
+    monkeypatch.setattr(client, "_http_get_json", fake_get_json)
+    monkeypatch.setattr(langid, "classify", fake_classify)
+
+    got = client.fetch_romanized_name("宇多田ヒカル")
+    assert got == "宇多田ヒカル"
+    assert cache.upserts == []
 
 
 def test_fetch_romanized_name_falls_back_to_sort_name(monkeypatch: pytest.MonkeyPatch) -> None:

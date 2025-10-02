@@ -14,7 +14,7 @@ from typing import Callable
 import langid
 import pykakasi
 
-from omym.config.settings import USE_MB_ROMANIZATION
+from omym.config.settings import MB_NON_LATIN_LANG_CODES, USE_MB_ROMANIZATION
 from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import fetch_romanized_name
 
@@ -24,7 +24,7 @@ ArtistFetcher = Callable[[str], str | None]
 LanguageDetector = Callable[[str], str | None]
 Transliterator = Callable[[str], str]
 
-_TARGET_LANGS = {"ja", "zh"}
+_TARGET_LANGS = set(MB_NON_LATIN_LANG_CODES)
 _KAKASI = pykakasi.Kakasi()
 
 
