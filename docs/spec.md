@@ -56,6 +56,11 @@ review_cadence: quarterly
 - A starter file is created automatically on first run at `config/artist_name_preferences.toml`. As you run dry-run or organise commands, encountered artists are appended with empty values for quick editing.
 - Run targeted tests with `uv run pytest tests/config/test_artist_name_preferences.py` after editing preference logic.
 
+## Artist Identifier Policy
+- Multi-artist strings separated by commas are processed from left to right. For each artist we walk its hyphen-delimited segments, emit consonant-preferring characters in their original order (the first character always survives, even if it is a vowel), and stop once the global six-character budget is reached.
+- If the current artist still has capacity after exhausting its consonants, we reintroduce its deferred vowels or punctuation in-place, preserving the artist's original character order before moving on to the next artist.
+- Remaining artists repeat the same procedure with whatever budget is left. When no artist can contribute additional characters, we fall back to truncating the sanitised names to fill the identifier.
+
 ## Assumptions, Constraints, Dependencies
 - Requires Python ≥3.13 with dependencies pinned in [`pyproject.toml`](../pyproject.toml) and managed via `uv`.
 - Expects all files on locally mounted filesystems accessible by the running user; network shares are treated as opaque POSIX/NTFS mounts.

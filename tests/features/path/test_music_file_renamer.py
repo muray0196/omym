@@ -23,46 +23,61 @@ class TestArtistIdGenerator:
     def test_generate_english(self) -> None:
         """Test ID generation with English text."""
         # Test basic English name
-        assert ArtistIdGenerator.generate("John Smith") == "JHNSM"
+        assert ArtistIdGenerator.generate("John Smith") == "JHNSMT"
 
         # Test name with special characters
-        assert ArtistIdGenerator.generate("John-Smith") == "JHNSM"
+        assert ArtistIdGenerator.generate("John-Smith") == "JHNSMT"
 
         # Test name with numbers
-        assert ArtistIdGenerator.generate("123 John Smith") == "12JHS"
+        assert ArtistIdGenerator.generate("123 John Smith") == "12JHSM"
 
         # Test short name (no padding)
         assert ArtistIdGenerator.generate("Jo") == "JO"
 
         # Test long name
-        assert ArtistIdGenerator.generate("John Jacob Smith") == "JHJCS"
+        assert ArtistIdGenerator.generate("John Jacob Smith") == "JHJCSM"
 
         # Test Vowel removal
-        assert ArtistIdGenerator.generate("On the Ant") == "ONTHA"
+        assert ArtistIdGenerator.generate("On the Ant") == "ONTHAN"
 
     def test_generate_multi_artist(self) -> None:
-        """Multiple artists separated by comma use combined string for ID."""
+        """Multiple artists interleave segments until the target length."""
 
-        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHSMD"
+        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHNSMT"
+
+    def test_generate_multi_artist_hyphenated_segments(self) -> None:
+        """Hyphen-separated segments alternate across artists."""
+
+        assert ArtistIdGenerator.generate("Michael Jackson, More More Jump") == "MCHLJC"
+
+    def test_generate_multi_artist_preserves_initial_vowel(self) -> None:
+        """Initial vowels for subsequent artists remain in the identifier."""
+
+        assert ArtistIdGenerator.generate("kaf, isekaijoucho") == "KAFISK"
+
+    def test_generate_multi_artist_inserts_vowels_in_place(self) -> None:
+        """Fallback vowels re-enter at their original positions within each artist."""
+
+        assert ArtistIdGenerator.generate("kaf, kafu") == "KAFKAF"
 
     def test_generate_japanese(self) -> None:
         """Test ID generation with Japanese text."""
-        assert ArtistIdGenerator.generate("やまだたろう") == "YMDTR"
-        assert ArtistIdGenerator.generate("DJやまだ") == "DJYMD"
-        assert ArtistIdGenerator.generate("すずきいちろう") == "SZKCH"
+        assert ArtistIdGenerator.generate("やまだたろう") == "YAMDTR"
+        assert ArtistIdGenerator.generate("DJやまだ") == "DJYAMD"
+        assert ArtistIdGenerator.generate("すずきいちろう") == "SZKCHR"
         # Test that Chinese-detected text is treated as Japanese
-        assert ArtistIdGenerator.generate("山田太郎") == "YMDTR"
+        assert ArtistIdGenerator.generate("山田太郎") == "YAMDTR"
 
     def test_generate_other_languages(self) -> None:
         """Test ID generation with other languages."""
         # Test name with diacritics
-        assert ArtistIdGenerator.generate("José González") == "JSGNZ"
+        assert ArtistIdGenerator.generate("José González") == "JSGNZL"
 
         # Test name with non-Latin characters
         assert ArtistIdGenerator.generate("Björk") == "BJORK"
 
         # Test name with special characters
-        assert ArtistIdGenerator.generate("Jean-Pierre") == "JNPRR"
+        assert ArtistIdGenerator.generate("Jean-Pierre") == "JENPRR"
 
     def test_generate_edge_cases(self) -> None:
         """Test ID generation with edge cases."""
@@ -76,14 +91,14 @@ class TestArtistIdGenerator:
         assert ArtistIdGenerator.generate("12345") == "12345"
 
         # Test name with mixed case
-        assert ArtistIdGenerator.generate("JoHn SmItH") == "JHNSM"
+        assert ArtistIdGenerator.generate("JoHn SmItH") == "JHNSMT"
 
     def test_generate_sparse_consonants(self) -> None:
-        """Scarce-consonant names retain all words within five characters."""
+        """Scarce-consonant names retain all words within six characters."""
 
-        assert ArtistIdGenerator.generate("Fujii Kaze") == "FUJKZ"
+        assert ArtistIdGenerator.generate("Fujii Kaze") == "FUJKAZ"
 
-        assert ArtistIdGenerator.generate("Michael-Jackson") == "MCHJC"
+        assert ArtistIdGenerator.generate("Michael-Jackson") == "MCHJCK"
 
         abc_id = ArtistIdGenerator.generate("A-B-C")
         assert abc_id == "ABC"
@@ -116,7 +131,7 @@ class TestCachedArtistIdGenerator:
         # Test first-time generation
         artist_name = "John Smith"
         artist_id = generator.generate(artist_name)
-        assert artist_id == "JHNSM"
+        assert artist_id == "JHNSMT"
 
         # Test cached retrieval
         cached_id = generator.generate(artist_name)
@@ -125,7 +140,7 @@ class TestCachedArtistIdGenerator:
         # Test different artist name
         other_artist = "Jane Doe"
         other_id = generator.generate(other_artist)
-        assert other_id == "JANDO"
+        assert other_id == "JANEDO"
 
         # Test case insensitivity
         mixed_case = "jOhN sMiTh"

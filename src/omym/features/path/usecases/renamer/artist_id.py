@@ -109,7 +109,7 @@ class ArtistIdGenerator:
 
     KEEP_CHARS: ClassVar[re.Pattern[str]] = re.compile(r"[^A-Z0-9-]")
     VOWELS: ClassVar[re.Pattern[str]] = re.compile(r"[AEIOU]")
-    ID_LENGTH: ClassVar[int] = 5
+    ID_LENGTH: ClassVar[int] = 6
     DEFAULT_ID: ClassVar[str] = "NOART"
     _kakasi: ClassVar = pykakasi.Kakasi()
 
@@ -229,50 +229,157 @@ class ArtistIdGenerator:
             return text
 
     @classmethod
+    def _split_artists(cls, artist_name: str) -> list[str]:
+        """Split raw artist string into individual artists by comma."""
+
+        parts = [part.strip() for part in artist_name.split(",")]
+        return [part for part in parts if part]
+
+    @classmethod
+    def _normalize_artist(cls, artist: str) -> str:
+        """Transliterate, sanitize, and uppercase a single artist name."""
+
+        name = artist
+
+        try:
+            lang, _ = langid.classify(name)
+            if lang in ["ja", "zh"]:
+                name = cls._transliterate_japanese(name)
+            else:
+                name = unidecode(name)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Language detection/transliteration failed for '%s': %s",
+                artist,
+                exc,
+            )
+            name = unidecode(artist)
+
+        sanitized = Sanitizer.sanitize_artist_name(name).upper()
+        return sanitized
+
+    @classmethod
+    def _prepare_artist_segments(
+        cls,
+        artist: str,
+    ) -> tuple[list[tuple[str, str]], str]:
+        """Return per-segment processed pairs alongside normalized text."""
+
+        normalized = cls._normalize_artist(artist)
+        if not normalized:
+            return [], ""
+
+        words = [word for word in normalized.split("-") if word]
+        if not words:
+            return [], normalized
+
+        segments = [cls._process_word(word) for word in words]
+        return segments, normalized
+
+    @classmethod
+    def _build_multi_artist_id(
+        cls,
+        artists_segments: list[list[tuple[str, str]]],
+        target_length: int,
+    ) -> str:
+        """Generate a multi-artist ID preserving original artist order."""
+
+        if not artists_segments or target_length <= 0:
+            return ""
+
+        result: list[str] = []
+
+        for segments in artists_segments:
+            available = target_length - len(result)
+            if available <= 0:
+                break
+
+            tokens: list[_WordToken] = []
+            for processed, original in segments:
+                state = _WordState.from_processed(processed or "", original or "")
+                tokens.extend(state.tokens)
+
+            if not tokens:
+                continue
+
+            included = [False] * len(tokens)
+            count = 0
+
+            for idx, token in enumerate(tokens):
+                if token.is_processed and count < available:
+                    included[idx] = True
+                    count += 1
+
+            if count < available:
+                for idx, token in enumerate(tokens):
+                    if not included[idx] and count < available:
+                        included[idx] = True
+                        count += 1
+                    if count >= available:
+                        break
+
+            if not any(included):
+                continue
+
+            for idx, token in enumerate(tokens):
+                if included[idx]:
+                    result.append(token.char)
+                    if len(result) >= target_length:
+                        break
+            if len(result) >= target_length:
+                break
+
+        return "".join(result)[:target_length]
+
+    @classmethod
     def generate(cls, artist_name: str | None) -> str:
-        """Generate an artist ID (up to 5 characters) from an artist name."""
+        """Generate an artist ID (up to 6 characters) from an artist name."""
 
         try:
             if not artist_name or not artist_name.strip():
                 return cls.DEFAULT_ID
 
-            name = artist_name
-            if ", " in artist_name:
-                parts = [part.strip() for part in artist_name.split(", ") if part.strip()]
-                if parts:
-                    name = "".join(parts)
+            artists = cls._split_artists(artist_name)
 
-            try:
-                lang, _ = langid.classify(name)
-                if lang in ["ja", "zh"]:
-                    name = cls._transliterate_japanese(name)
-                else:
-                    name = unidecode(name)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                logger.warning(
-                    "Language detection/transliteration failed for '%s': %s",
-                    artist_name,
-                    exc,
-                )
-                name = unidecode(artist_name)
+            if len(artists) <= 1:
+                target = artist_name.strip()
+                normalized = cls._normalize_artist(target)
+                if not normalized:
+                    return "XXXXX"
 
-            name = Sanitizer.sanitize_artist_name(name).upper()
-            if not name:
+                if len(normalized) <= cls.ID_LENGTH and "-" not in normalized:
+                    return normalized
+
+                words = [word for word in normalized.split("-") if word]
+                processed_results = [cls._process_word(word) for word in words]
+
+                balanced_id = cls._build_balanced_id(processed_results, cls.ID_LENGTH)
+                if balanced_id:
+                    return balanced_id
+
+                fallback = "".join(word for _, word in processed_results if word)
+                if fallback:
+                    return fallback[: cls.ID_LENGTH]
+
                 return "XXXXX"
 
-            if len(name) <= cls.ID_LENGTH and "-" not in name:
-                return name
+            artist_segments: list[list[tuple[str, str]]] = []
+            normalized_parts: list[str] = []
+            for artist in artists:
+                segments, normalized = cls._prepare_artist_segments(artist)
+                if segments:
+                    artist_segments.append(segments)
+                if normalized:
+                    normalized_parts.append(normalized)
 
-            words = name.split("-")
-            processed_results: list[tuple[str, str]] = [cls._process_word(word) for word in words]
+            multi_id = cls._build_multi_artist_id(artist_segments, cls.ID_LENGTH)
+            if multi_id:
+                return multi_id
 
-            balanced_id = cls._build_balanced_id(processed_results, cls.ID_LENGTH)
-            if balanced_id:
-                return balanced_id
-
-            fallback = "".join(result[1] for result in processed_results if result[1])
-            if fallback:
-                return fallback[: cls.ID_LENGTH]
+            if normalized_parts:
+                fallback_multi = "".join(normalized_parts)
+                if fallback_multi:
+                    return fallback_multi[: cls.ID_LENGTH]
 
             return "XXXXX"
 
