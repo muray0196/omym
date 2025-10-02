@@ -1,7 +1,5 @@
 # Project
 config/
-!src/omym/config/
-!tests/config/
 .data/
 logs/
 # Editor
@@ -12,5 +10,3 @@ __pycache__/
 .ruff_cache/
 .coverage
 uv.lock
-# MCP
-.serena/
