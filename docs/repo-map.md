@@ -18,7 +18,7 @@ review_cadence: quarterly
   - `tests/features/<feature>/` for domain and use case tests (ports mocked).
   - `tests/platform/` for shared infrastructure tests.
   - `tests/integration/` for adapter + platform wiring.
-- [`docs/`](./): Living design docs ([spec](spec.md), [architecture](architecture.md), [glossary](glossary.md)); diagrams live under [`docs/diagrams/`](diagrams/).
+- [`docs/`](./): Living design docs ([spec](spec.md), [architecture](architecture.md), [glossary](glossary.md))
 - [`.github/workflows/`](../.github/workflows): CI pipeline definition.
 - [`pyproject.toml`](../pyproject.toml): Tooling configuration and dependency metadata.
 - [`README.md`](../README.md): High-level usage guide and quick-start instructions.
