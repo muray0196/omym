@@ -71,6 +71,24 @@ class TestArtistRomanizer:
 
         assert result == "Fallback"
 
+    def test_musicbrainz_non_latin_value_triggers_transliterator(self) -> None:
+        romanizer = ArtistRomanizer(
+            enabled_supplier=lambda: True,
+            fetcher=lambda _: "雀が原中学卓球部",
+            language_detector=lambda _: "ja",
+            transliterator=lambda _: "Suzumegarasu Chugaku Takkyubu",
+        )
+
+        first_result = romanizer.romanize_name("雀が原中学卓球部")
+
+        assert first_result == "Suzumegarasu Chugaku Takkyubu"
+        assert romanizer.consume_last_result_source() == "transliteration"
+
+        second_result = romanizer.romanize_name("雀が原中学卓球部")
+
+        assert second_result == "Suzumegarasu Chugaku Takkyubu"
+        assert romanizer.consume_last_result_source() == "cache"
+
     def test_english_names_bypass_musicbrainz(self) -> None:
         calls: list[str] = []
 
@@ -93,9 +111,14 @@ class TestArtistRomanizer:
     def test_multiple_artists_processed_individually(self) -> None:
         calls: list[str] = []
 
+        romanized_values = {
+            "宇多田ヒカル": "Utada Hikaru",
+            "米津玄師": "Yonezu Kenshi",
+        }
+
         def fetcher(name: str) -> str | None:
             calls.append(name)
-            return f"R-{name}"
+            return romanized_values[name]
 
         romanizer = ArtistRomanizer(
             enabled_supplier=lambda: True,
@@ -106,7 +129,7 @@ class TestArtistRomanizer:
 
         result = romanizer.romanize_name("宇多田ヒカル, 米津玄師")
 
-        assert result == "R-宇多田ヒカル, R-米津玄師"
+        assert result == "Utada Hikaru, Yonezu Kenshi"
         assert calls == ["宇多田ヒカル", "米津玄師"]
 
     def test_musicbrainz_formatted_name_not_re_romanized(self) -> None:

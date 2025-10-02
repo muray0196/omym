@@ -32,7 +32,7 @@ def _contains_non_latin(text: str) -> bool:
     """Return True when text includes alphabetic characters outside the Latin script."""
 
     for char in text:
-        if not char.isalpha():
+        if char.isascii():
             continue
         try:
             name = unicodedata.name(char)
@@ -94,6 +94,7 @@ class ArtistRomanizer:
     _last_fetch_source: str | None = field(default=None, init=False, repr=False)
     _last_fetch_original: str | None = field(default=None, init=False, repr=False)
     _last_fetch_value: str | None = field(default=None, init=False, repr=False)
+    _last_result_source: str | None = field(default=None, init=False, repr=False)
 
     def record_fetch_context(
         self,
@@ -134,6 +135,7 @@ class ArtistRomanizer:
             Romanized artist name if MusicBrainz returns one; otherwise the
             original name (including whitespace-only inputs).
         """
+        self._last_result_source = None
         if name is None:
             return None
         trimmed = name.strip()
@@ -160,6 +162,7 @@ class ArtistRomanizer:
         cached = self._cache.get(text)
         if cached is not None:
             logger.debug("Using cached romanized name for '%s': %s", text, cached)
+            self._last_result_source = "cache"
             return cached
 
         detected_lang = self.language_detector(text)
@@ -176,12 +179,23 @@ class ArtistRomanizer:
         normalized = romanized.strip() if romanized else None
         if normalized:
             source = self._consume_fetch_context(text, romanized)
-            if source == "cache":
-                logger.info("Using cached MusicBrainz romanized '%s' -> '%s'", text, normalized)
+            if _contains_non_latin(normalized):
+                if source:
+                    logger.info(
+                        "MusicBrainz source '%s' returned non-Latin value for '%s'; falling back",
+                        source,
+                        text,
+                    )
             else:
-                logger.info("MusicBrainz romanized '%s' -> '%s'", text, normalized)
-            self._cache[text] = normalized
-            return normalized
+                if source == "cache":
+                    logger.info("Using cached MusicBrainz romanized '%s' -> '%s'", text, normalized)
+                else:
+                    logger.info("MusicBrainz romanized '%s' -> '%s'", text, normalized)
+                self._cache[text] = normalized
+                self._last_result_source = source or "musicbrainz"
+                return normalized
+        else:
+            _ = self._consume_fetch_context(text, romanized)
 
         fallback = self.transliterator(text).strip()
         if fallback:
@@ -191,10 +205,18 @@ class ArtistRomanizer:
                 fallback,
             )
             self._cache[text] = fallback
+            self._last_result_source = "transliteration"
             return fallback
 
         self._cache[text] = text
         return text
+
+    def consume_last_result_source(self) -> str | None:
+        """Return and clear the origin of the most recent romanization result."""
+
+        source = self._last_result_source
+        self._last_result_source = None
+        return source
 
     def romanize_metadata(self, metadata: TrackMetadata | None) -> TrackMetadata | None:
         """Apply romanization to artist-related fields within metadata.

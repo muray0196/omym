@@ -295,6 +295,7 @@ class TestMusicProcessor:
         artist_cache_mock.upsert_romanized_name.assert_any_call(
             "ピンク・フロイド",
             "Pink Floyd RN",
+            source=None,
         )
         preview_mock.delete_preview.assert_called_once_with(file_hash)
 
@@ -925,7 +926,11 @@ class TestMusicProcessor:
         assert processor._await_romanization(cached_name) == cached_romanized  # pyright: ignore[reportPrivateUsage] - ensure reuse
         submit_mock.assert_not_called()
         artist_dao_mock.get_romanized_name.assert_called_once_with(cached_name)
-        artist_dao_mock.upsert_romanized_name.assert_called_once_with(cached_name, cached_romanized)
+        artist_dao_mock.upsert_romanized_name.assert_called_once_with(
+            cached_name,
+            cached_romanized,
+            source=None,
+        )
 
     def test_file_extension_safety(
         self,

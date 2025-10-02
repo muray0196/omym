@@ -8,6 +8,7 @@ Why: Isolate asynchronous romanization concerns away from the main processor log
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
+import unicodedata
 from typing import Callable
 
 from omym.platform.logging import logger
@@ -88,6 +89,23 @@ class RomanizationCoordinator:
         )
         return result
 
+    @staticmethod
+    def _value_contains_non_latin(text: str) -> bool:
+        """Detect non-Latin characters similarly to ArtistRomanizer."""
+
+        for char in text:
+            if char.isspace() or char == ",":
+                continue
+            if char.isascii():
+                continue
+            try:
+                name = unicodedata.name(char)
+            except ValueError:
+                return True
+            if "LATIN" not in name:
+                return True
+        return False
+
     def ensure_scheduled(self, name: str) -> None:
         """Schedule a romanization task if needed."""
 
@@ -110,11 +128,16 @@ class RomanizationCoordinator:
             logger.warning("Failed to read cached romanized name for '%s': %s", trimmed, exc)
 
         if cached_value:
-            cached_future: Future[str] = Future()
-            cached_future.set_result(cached_value)
-            self._futures[trimmed] = cached_future
-            logger.debug("Using persisted romanization cache for '%s'", trimmed)
-            return
+            if self._value_contains_non_latin(cached_value):
+                logger.debug(
+                    "Discarding non-Latin cached romanization for '%s'", trimmed
+                )
+            else:
+                cached_future: Future[str] = Future()
+                cached_future.set_result(cached_value)
+                self._futures[trimmed] = cached_future
+                logger.debug("Using persisted romanization cache for '%s'", trimmed)
+                return
 
         def _romanize() -> str:
             return self._romanizer.romanize_name(trimmed) or trimmed
@@ -139,7 +162,10 @@ class RomanizationCoordinator:
         try:
             romanized = future.result()
             if romanized != trimmed:
-                _ = self._artist_cache.upsert_romanized_name(trimmed, romanized)
+                source = self._romanizer.consume_last_result_source()
+                _ = self._artist_cache.upsert_romanized_name(trimmed, romanized, source=source)
+            else:
+                _ = self._romanizer.consume_last_result_source()
             return romanized
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.warning("Romanization future failed for '%s': %s", trimmed, exc)

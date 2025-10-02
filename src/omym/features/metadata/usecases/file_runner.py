@@ -384,6 +384,7 @@ def _sync_preview_romanization(
         _ = processor.artist_dao.upsert_romanized_name(
             normalized_original,
             normalized_romanized,
+            source=None,
         )
     except Exception as exc:  # pragma: no cover - defensive logging
         LOGGER.warning(

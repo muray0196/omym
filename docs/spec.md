@@ -42,6 +42,7 @@ review_cadence: quarterly
 - Override resolution honours the precedence `user preferences → persistent cache → MusicBrainz → pykakasi transliteration`.
 - Users can provide preferred artist names at `config/artist_name_preferences.toml`; set `OMYM_ARTIST_NAME_PREFERENCES_PATH` to point elsewhere.
 - MusicBrainz-provided romanised names collapse literal `", "` sequences to a single space before persistence so downstream comma-based splitters remain accurate.
+- MusicBrainz responses that still contain non-Latin characters are treated as missing romanization and fall back to pykakasi transliteration before caching.
 - The loader accepts a minimal TOML document:
   ```toml
   metadata_version = 1
