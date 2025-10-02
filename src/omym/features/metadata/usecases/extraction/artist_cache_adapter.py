@@ -1,7 +1,12 @@
-"""src/omym/features/metadata/usecases/extraction/artist_cache_adapter.py
-What: In-memory wrapper to make artist cache writes safe during dry runs.
-Why: Keep MusicProcessor focused on orchestration and reuse adapter elsewhere if needed.
-"""
+# Where: src/omym/features/metadata/usecases/extraction/artist_cache_adapter.py
+# What: Dry-run artist cache adapter that now persists through to the backing DAO.
+# Why: Plan runs must pre-populate persistent caches so organising reuses stable IDs.
+# Assumptions:
+# - Plan/preview mode should leave filesystem untouched but may safely update SQLite caches.
+# - Delegate DAO enforces its own locking and validation around SQLite writes.
+# Trade-offs:
+# - Persisting during dry runs adds I/O; mitigate by keeping in-memory fallback when the DB fails.
+# - Delegate failures are swallowed to preserve historical dry-run behaviour.
 
 from __future__ import annotations
 
@@ -9,6 +14,7 @@ from sqlite3 import Connection
 from typing import ClassVar
 
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
+from omym.platform.logging import logger
 
 
 class DryRunArtistCacheAdapter:
@@ -28,6 +34,20 @@ class DryRunArtistCacheAdapter:
         if not normalized_name or not normalized_id:
             return False
         self._memory_artist_ids[normalized_name] = normalized_id
+        persisted = False
+        try:
+            persisted = self._delegate.insert_artist_id(normalized_name, normalized_id)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug(
+                "Dry-run artist cache adapter failed to persist ID for '%s': %s",
+                normalized_name,
+                exc,
+            )
+        if not persisted:
+            logger.debug(
+                "Dry-run artist cache adapter cached ID for '%s' in memory only",
+                normalized_name,
+            )
         return True
 
     def get_artist_id(self, artist_name: str) -> str | None:
@@ -51,6 +71,24 @@ class DryRunArtistCacheAdapter:
             return False
         effective_source = (source or self._DEFAULT_SOURCE).strip() or self._DEFAULT_SOURCE
         self._memory_romanized[normalized_name] = (normalized_romanized, effective_source)
+        persisted = False
+        try:
+            persisted = self._delegate.upsert_romanized_name(
+                normalized_name,
+                normalized_romanized,
+                effective_source,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug(
+                "Dry-run artist cache adapter failed to persist romanization for '%s': %s",
+                normalized_name,
+                exc,
+            )
+        if not persisted:
+            logger.debug(
+                "Dry-run artist cache adapter cached romanization for '%s' in memory only",
+                normalized_name,
+            )
         return True
 
     def get_romanized_name(self, artist_name: str) -> str | None:
@@ -65,7 +103,11 @@ class DryRunArtistCacheAdapter:
     def clear_cache(self) -> bool:
         self._memory_artist_ids.clear()
         self._memory_romanized.clear()
-        return True
+        try:
+            return self._delegate.clear_cache()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug("Dry-run artist cache adapter failed to clear delegate cache: %s", exc)
+            return False
 
 
 __all__ = ["DryRunArtistCacheAdapter"]

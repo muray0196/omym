@@ -27,7 +27,7 @@ You are an AI assistant specialized in Python development.
 </code_quality>
 
 <testing_flow>
-- Quick check (MUST): `uv run pytest -q --maxfail=1 --tb=line --show-capture=stdout`
+- Quick global check (MUST): `uv run pytest -q --maxfail=1 --tb=line --show-capture=stdout`
 - Inspect failure (SHOULD): `uv run pytest TEST_TARGET -q --tb=short --show-capture=all`
 - Deep debug (MAY): `uv run pytest TEST_TARGET -q --tb=long -s --show-capture=all`
 </testing_flow>

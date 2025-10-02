@@ -9,7 +9,7 @@ from pytest_mock import MockerFixture
 from typing import Callable
 from omym.features.metadata import TrackMetadata
 from omym.features.metadata import ProcessResult
-from omym.ui.cli.display.progress import ProgressDisplay
+from omym.ui.cli.display.progress import ProgressDisplay, ProcessorWithProgress
 from omym.application.services.organize_service import OrganizeRequest
 from omym.platform.logging import logger
 
@@ -177,3 +177,50 @@ def test_run_with_service_interactive_detail_selection(mocker: MockerFixture) ->
     printed_messages = [arg for call in mock_console.print.call_args_list for arg in call.args]
     assert any("Error: Unit test failure" in str(message) for message in printed_messages)
     assert any("Target:" in str(message) for message in printed_messages)
+
+
+def test_run_with_service_reuses_processor(mocker: MockerFixture) -> None:
+    """Reuse a pre-built processor instead of invoking the application service."""
+
+    mock_progress = mocker.patch("omym.ui.cli.display.progress.Progress")
+    _ = mock_progress.return_value.__enter__.return_value
+
+    processor = mocker.create_autospec(ProcessorWithProgress, instance=True)
+    metadata = TrackMetadata(
+        title="Song",
+        artist="Artist",
+        album="Album",
+        genre=None,
+        year=2024,
+        track_number=1,
+        track_total=None,
+        disc_number=1,
+        disc_total=None,
+        file_extension=".mp3",
+    )
+    processor.process_directory.return_value = [
+        ProcessResult(
+            source_path=Path("track.mp3"),
+            target_path=Path("Artist/Album/01_Song.mp3"),
+            success=True,
+            metadata=metadata,
+            artist_id=None,
+        )
+    ]
+    processor.base_path = Path("out")
+
+    app = mocker.Mock()
+    app.process_directory_with_progress = mocker.Mock()
+    request = mocker.Mock()
+
+    display = ProgressDisplay()
+    results = display.run_with_service(
+        app,
+        request,
+        Path("music"),
+        processor=processor,
+    )
+
+    processor.process_directory.assert_called_once()
+    app.process_directory_with_progress.assert_not_called()
+    assert len(results) == 1

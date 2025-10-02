@@ -24,6 +24,7 @@ class DirectoryCommand(CommandExecutor):
             self.request,
             self.args.music_path,
             interactive=self.args.interactive,
+            processor=self.processor,
         )
         self.display_results(results)
         summary = self.calculate_unprocessed_pending(self.args.music_path, results)

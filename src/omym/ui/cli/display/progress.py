@@ -24,6 +24,20 @@ class OrganizeServiceLike(Protocol):
 
 
 @final
+class ProcessorWithProgress(Protocol):
+    """Minimal processor interface supporting progress-aware directory runs."""
+
+    base_path: Path
+
+    def process_directory(
+        self,
+        directory: Path,
+        progress_callback: Callable[[int, int, Path], None] | None = None,
+    ) -> list[ProcessResult]:
+        ...
+
+
+@final
 class ProgressDisplay:
     """Handles progress display in CLI."""
 
@@ -33,6 +47,7 @@ class ProgressDisplay:
         request: OrganizeRequest,
         directory: Path,
         interactive: bool = False,
+        processor: ProcessorWithProgress | None = None,
     ) -> list[ProcessResult]:
         """Run directory processing via application service with progress bar.
 
@@ -41,6 +56,8 @@ class ProgressDisplay:
             request: Organize operation parameters.
             directory: Directory to process.
             interactive: Whether to run in interactive mode.
+            processor: Optional pre-built processor to reuse instead of invoking the
+                application service.
 
         Returns:
             List of processing results.
@@ -80,7 +97,10 @@ class ProgressDisplay:
                 )
                 last_count = processed
 
-            results = app.process_directory_with_progress(request, directory, _cb)
+            if processor is None:
+                results = app.process_directory_with_progress(request, directory, _cb)
+            else:
+                results = processor.process_directory(directory, progress_callback=_cb)
 
         if interactive:
             failed_results = [result for result in results if not result.success]

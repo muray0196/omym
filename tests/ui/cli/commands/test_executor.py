@@ -159,6 +159,7 @@ def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, m
     args, kwargs = mock_progress_instance.run_with_service.call_args
     assert args[2] == test_args.music_path
     assert kwargs.get("interactive") == test_args.interactive
+    assert kwargs.get("processor") is mock_processor
     mock_result.return_value.show_results.assert_called_once()
     mock_result.return_value.show_unprocessed_summary.assert_called_once()
     summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
