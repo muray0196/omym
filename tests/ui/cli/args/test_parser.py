@@ -35,6 +35,11 @@ def test_create_parser() -> None:
     assert organize_args.command == "organize"
     assert organize_args.music_path == "music"
 
+    plan_args: Namespace = parser.parse_args(["plan", "music"])
+    assert plan_args.command == "plan"
+    assert plan_args.music_path == "music"
+    assert plan_args.dry_run
+
     restore_args: Namespace = parser.parse_args(["restore", "organized"])
     assert restore_args.command == "restore"
     assert restore_args.source_root == "organized"
@@ -45,7 +50,6 @@ def test_create_parser() -> None:
             "music",
             "--target",
             "target",
-            "--dry-run",
             "--verbose",
             "--force",
             "--interactive",
@@ -54,7 +58,8 @@ def test_create_parser() -> None:
             "--clear-cache",
         ]
     )
-    assert all_flags.dry_run and all_flags.verbose and all_flags.force
+    assert not all_flags.dry_run
+    assert all_flags.verbose and all_flags.force
     assert all_flags.interactive and all_flags.db
 
 
@@ -83,7 +88,6 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
             str(test_dir),
             "--target",
             str(target_path),
-            "--dry-run",
             "--verbose",
             "--force",
             "--interactive",
@@ -94,9 +98,29 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
     )
     assert isinstance(args, OrganizeArgs)
     assert args.target_path == target_path
-    assert args.dry_run and args.verbose and args.force and args.interactive
+    assert not args.dry_run
+    assert args.verbose and args.force and args.interactive
     assert args.show_db and args.clear_artist_cache and args.clear_cache
     assert mock_setup_logger.call_args.kwargs["console_level"] == logging.DEBUG
+    assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
+
+
+def test_process_args_plan(test_dir: Path, mocker: MockerFixture) -> None:
+    """Process plan arguments and ensure dry-run-only execution is enforced."""
+
+    mock_config = mocker.patch("omym.ui.cli.args.parser.Config")
+    mock_setup_logger = mocker.patch("omym.ui.cli.args.parser.setup_logger")
+
+    mock_config.load.return_value.log_file = None
+
+    args = ArgumentParser.process_args(["plan", str(test_dir)])
+    assert isinstance(args, OrganizeArgs)
+    assert args.command == "plan"
+    assert args.music_path == test_dir
+    assert args.target_path == test_dir
+    assert args.dry_run
+    assert not args.force
+    assert mock_setup_logger.call_args.kwargs["console_level"] == logging.INFO
     assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
 
 

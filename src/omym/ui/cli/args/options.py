@@ -10,9 +10,9 @@ from omym.features.restoration.domain.models import CollisionPolicy
 @final
 @dataclass(slots=True)
 class OrganizeArgs:
-    """Command line arguments for the ``organize`` subcommand."""
+    """Command line arguments for the ``organize`` or ``plan`` subcommands."""
 
-    command: Literal["organize"]
+    command: Literal["organize", "plan"]
     music_path: Path
     target_path: Path
     dry_run: bool

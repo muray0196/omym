@@ -27,7 +27,7 @@ review_cadence: quarterly
 ## Naming Conventions
 - Packages and modules use lowercase with underscores; classes use PascalCase.
 - Tests follow `test_*.py` and mirror package names.
-- CLI options use kebab-case (e.g., `--dry-run`, `--clear-cache`).
+- CLI options use kebab-case (e.g., `--clear-cache`), and preview runs are exposed via the `plan` subcommand.
 
 ## Common Commands
 - Install & sync dependencies: `uv sync --group dev`.

@@ -10,13 +10,13 @@ review_cadence: quarterly
 - Restore operations complete with zero data loss when run with the default `--collision-policy abort` guardrail.
 
 ## In-scope / Out-of-scope
-- **In-scope**: scanning directories, extracting and enriching tags, hashing files, grouping into disc/track hierarchies, relocating audio, `.lrc` lyrics, and companion artwork, persisting processing state in SQLite, and restoring files back to their recorded origins. Command options include dry-run previews, cache maintenance, and collision policy selection.
+- **In-scope**: scanning directories, extracting and enriching tags, hashing files, grouping into disc/track hierarchies, relocating audio, `.lrc` lyrics, and companion artwork, persisting processing state in SQLite, and restoring files back to their recorded origins. Command options include plan previews, cache maintenance, and collision policy selection.
 - **Out-of-scope**: mutating embedded tags, downloading remote assets, streaming playback, concurrent multi-host coordination, or automating configuration management beyond the local machine.
 
 ## User Stories and Acceptance Criteria
 - **Organise an entire library**: Given `uv run python -m omym organize <source> --target <dest>`, all supported tracks move under `<dest>/<Artist>/<YYYY_Album>/` using sanitised directory and file names, and the command exits with status 0 when no failures are reported.
-- **Preview without side effects**: When `--dry-run` is supplied, no filesystem changes occur, the console lists the plan, and the SQLite log persists the preview for later inspection. Successful dry-runs cache the previewed metadata so the next real run can reuse romanised names and target paths without repeating extraction.
-- **Preview duplicates clearly**: Dry-run previews label detected duplicate hashes as `Skipped (duplicate)` and in-place matches as `Skipped (already organized)` so operators can triage no-op entries before executing real moves.
+- **Preview without side effects**: When the `plan` subcommand is used, no filesystem changes occur, the console lists the plan, and the SQLite log persists the preview for later inspection. Successful previews cache the metadata so the next real run can reuse romanised names and target paths without repeating extraction.
+- **Preview duplicates clearly**: Plan previews label detected duplicate hashes as `Skipped (duplicate)` and in-place matches as `Skipped (already organized)` so operators can triage no-op entries before executing real moves.
 - **Cache preview IDs**: Database previews surface cached artist IDs when available and rely on filename heuristics only when results omit an ID.
 - **Handle multi-disc releases**: Tracks containing disc metadata are written as `<dest>/<Artist>/<YYYY_Album>/D<n>_<track>_<title>_<artistId>.<ext>` (adding the disc prefix only when required), and duplicate hashes are skipped with a warning rather than overwriting existing files.
 - **Restore previous runs**: Running `uv run python -m omym restore <dest>` replays the persisted plan back to the original paths (or an alternate `--destination`) honouring the selected collision policy (`abort`, `skip`, or `backup`), and automatically moves any files parked under `<dest>/<unprocessed_dir_name>/` back to their relative paths.
@@ -28,7 +28,7 @@ review_cadence: quarterly
 - **Primary organise flow**: CLI parsing → configuration load → construct `OrganizeMusicService` → build a `MusicProcessor` that wires together metadata extraction, artist romanisation, duplicate detection, directory generation, and file-name generation (`DirectoryGenerator`, `FileNameGenerator`) → enumerate supported files and schedule romanisation lookups → extract metadata (Mutagen) with optional MusicBrainz romanisation → compute target paths → move audio/lyrics/artwork via filesystem adapters → persist `processing_before/after` rows → emit Rich console summary.
 - **Restore flow**: CLI parsing → build `RestoreMusicService` request → load persisted plan from SQLite (`processing_after` + path elements) → evaluate collision policy (abort/skip/backup) → move or copy files back to origin/destination → optionally purge state.
 - **Error and retry handling**: Metadata extraction or IO failures mark the result unsuccessful, skip the file, and continue processing. Rate-limited MusicBrainz lookups obey 1 req/s with a single retry on 429/5xx and downgrade to local naming when network calls fail. Keyboard interrupts exit with code 130 after logging.
-- **Dry-run flow**: All filesystem operations short-circuit to planning only, but metadata extraction, hashing, and logging still execute for parity with real runs.
+- **Plan flow**: All filesystem operations short-circuit to planning only, but metadata extraction, hashing, and logging still execute for parity with real runs.
 
 ## Non-functional Requirements
 - Capable of processing tens of thousands of files on a modern laptop using bounded worker pools and streaming IO without exceeding available memory.
@@ -53,7 +53,7 @@ review_cadence: quarterly
   Perfume = "Perfume"
   ```
 - Keep the document to simple key/value pairs. Duplicate keys after case normalisation are rejected to avoid ambiguity, and blanks are retained as placeholders for later editing.
-- A starter file is created automatically on first run at `config/artist_name_preferences.toml`. As you run dry-run or organise commands, encountered artists are appended with empty values for quick editing.
+- A starter file is created automatically on first run at `config/artist_name_preferences.toml`. As you run plan or organise commands, encountered artists are appended with empty values for quick editing.
 - Run targeted tests with `uv run pytest tests/config/test_artist_name_preferences.py` after editing preference logic.
 
 ## Artist Identifier Policy

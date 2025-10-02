@@ -36,58 +36,13 @@ class ArgumentParser:
             "organize",
             help="Organize a file or directory into the target structure",
         )
-        _ = organize_parser.add_argument(
-            "music_path",
-            type=str,
-            help="Path to music file or directory to process",
-            metavar="MUSIC_PATH",
+        ArgumentParser._configure_organize_parser(organize_parser, dry_run_default=False)
+
+        plan_parser = subparsers.add_parser(
+            "plan",
+            help="Preview organize results without applying filesystem changes",
         )
-        _ = organize_parser.add_argument(
-            "--target",
-            type=str,
-            help="Target directory for organized files (defaults to music_path)",
-            metavar="TARGET_PATH",
-        )
-        _ = organize_parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Preview changes without applying them",
-        )
-        _ = organize_parser.add_argument(
-            "--verbose",
-            action="store_true",
-            help="Show detailed processing information",
-        )
-        _ = organize_parser.add_argument(
-            "--quiet",
-            action="store_true",
-            help="Suppress all output except errors",
-        )
-        _ = organize_parser.add_argument(
-            "--force",
-            action="store_true",
-            help="Override safety checks",
-        )
-        _ = organize_parser.add_argument(
-            "--interactive",
-            action="store_true",
-            help="Enable interactive mode",
-        )
-        _ = organize_parser.add_argument(
-            "--db",
-            action="store_true",
-            help="Enable database operations preview",
-        )
-        _ = organize_parser.add_argument(
-            "--clear-artist-cache",
-            action="store_true",
-            help="Clear cached artist IDs before processing",
-        )
-        _ = organize_parser.add_argument(
-            "--clear-cache",
-            action="store_true",
-            help="Clear all caches and processing state before processing",
-        )
+        ArgumentParser._configure_organize_parser(plan_parser, dry_run_default=True)
 
         restore_parser = subparsers.add_parser(
             "restore",
@@ -200,7 +155,7 @@ class ArgumentParser:
 
         command: str = parsed_args.command
 
-        if command == "organize":
+        if command in {"organize", "plan"}:
             return ArgumentParser._process_organize(parsed_args)
 
         if command == "restore":
@@ -211,6 +166,63 @@ class ArgumentParser:
 
         logger.error("Unsupported command: %s", command)
         sys.exit(2)
+
+    @staticmethod
+    def _configure_organize_parser(
+        parser: argparse.ArgumentParser,
+        *,
+        dry_run_default: bool,
+    ) -> None:
+        """Apply shared configuration for organize-style subparsers."""
+
+        parser.set_defaults(dry_run=dry_run_default)
+        _ = parser.add_argument(
+            "music_path",
+            type=str,
+            help="Path to music file or directory to process",
+            metavar="MUSIC_PATH",
+        )
+        _ = parser.add_argument(
+            "--target",
+            type=str,
+            help="Target directory for organized files (defaults to music_path)",
+            metavar="TARGET_PATH",
+        )
+        _ = parser.add_argument(
+            "--verbose",
+            action="store_true",
+            help="Show detailed processing information",
+        )
+        _ = parser.add_argument(
+            "--quiet",
+            action="store_true",
+            help="Suppress all output except errors",
+        )
+        _ = parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Override safety checks",
+        )
+        _ = parser.add_argument(
+            "--interactive",
+            action="store_true",
+            help="Enable interactive mode",
+        )
+        _ = parser.add_argument(
+            "--db",
+            action="store_true",
+            help="Enable database operations preview",
+        )
+        _ = parser.add_argument(
+            "--clear-artist-cache",
+            action="store_true",
+            help="Clear cached artist IDs before processing",
+        )
+        _ = parser.add_argument(
+            "--clear-cache",
+            action="store_true",
+            help="Clear all caches and processing state before processing",
+        )
 
     @staticmethod
     def _process_organize(parsed_args: argparse.Namespace) -> OrganizeArgs:
@@ -226,7 +238,7 @@ class ArgumentParser:
             target_path = music_path.parent if music_path.is_file() else music_path
 
         return OrganizeArgs(
-            command="organize",
+            command=parsed_args.command,
             music_path=music_path,
             target_path=target_path,
             dry_run=parsed_args.dry_run,

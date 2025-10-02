@@ -140,8 +140,8 @@ def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: Mo
     mock_preview.return_value.show_preview.assert_not_called()
 
 
-def test_dry_run_mode(test_dir: Path, mocker: MockerFixture) -> None:
-    """Test dry-run mode.
+def test_plan_subcommand(test_dir: Path, mocker: MockerFixture) -> None:
+    """Plan subcommand should preview without mutating results.
 
     Args:
         test_dir: Test directory fixture.
@@ -152,8 +152,8 @@ def test_dry_run_mode(test_dir: Path, mocker: MockerFixture) -> None:
     _ = mocker.patch("omym.ui.cli.commands.executor.ProgressDisplay")
     mock_result = mocker.patch("omym.ui.cli.commands.executor.ResultDisplay")
 
-    # Process in dry-run mode
-    CommandProcessor.process_command(['organize', str(test_dir), '--dry-run'])
+    # Process via plan subcommand
+    CommandProcessor.process_command(['plan', str(test_dir)])
 
     # Verify
     mock_preview.return_value.show_preview.assert_called_once()
