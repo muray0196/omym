@@ -91,14 +91,15 @@ class CachedArtistIdGenerator:
         if len(artist_id) > ArtistIdGenerator.ID_LENGTH:
             return False
 
-        if artist_id in [ArtistIdGenerator.DEFAULT_ID, "XXXXX"]:
+        if artist_id in [ArtistIdGenerator.DEFAULT_ID, ArtistIdGenerator.FALLBACK_ID]:
             return True
 
         return bool(ArtistIdGenerator.KEEP_CHARS.sub("", artist_id) == artist_id)
 
     def _should_cache(self, artist_id: str) -> bool:
         return (
-            artist_id not in [ArtistIdGenerator.DEFAULT_ID, "XXXXX"]
+            artist_id
+            not in [ArtistIdGenerator.DEFAULT_ID, ArtistIdGenerator.FALLBACK_ID]
             and self._is_valid_id(artist_id)
             and all(char.isalnum() or char == "-" for char in artist_id)
         )

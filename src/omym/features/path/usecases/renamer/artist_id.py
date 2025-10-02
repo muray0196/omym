@@ -15,6 +15,7 @@ import langid
 import pykakasi
 from unidecode import unidecode
 
+from omym.config.settings import ARTIST_ID_MAX_LENGTH
 from omym.features.path.domain.sanitizer import Sanitizer
 from omym.platform.logging import logger
 
@@ -109,8 +110,9 @@ class ArtistIdGenerator:
 
     KEEP_CHARS: ClassVar[re.Pattern[str]] = re.compile(r"[^A-Z0-9-]")
     VOWELS: ClassVar[re.Pattern[str]] = re.compile(r"[AEIOU]")
-    ID_LENGTH: ClassVar[int] = 6
+    ID_LENGTH: ClassVar[int] = ARTIST_ID_MAX_LENGTH
     DEFAULT_ID: ClassVar[str] = "NOART"
+    FALLBACK_ID: ClassVar[str] = "X" * ARTIST_ID_MAX_LENGTH
     _kakasi: ClassVar = pykakasi.Kakasi()
 
     @classmethod
@@ -289,7 +291,7 @@ class ArtistIdGenerator:
             return ""
 
         if not normalized:
-            return "XXXXX"[: target_length]
+            return cls.FALLBACK_ID[: target_length]
 
         if len(normalized) <= target_length and "-" not in normalized:
             return normalized[:target_length]
@@ -305,87 +307,51 @@ class ArtistIdGenerator:
         if fallback:
             return fallback[:target_length]
 
-        return "XXXXX"[: target_length]
+        return cls.FALLBACK_ID[: target_length]
 
     @staticmethod
-    def _allocate_multi_artist_shares(
-        tokens_per_artist: list[list[_WordToken]],
-        canonical_order: list[int],
+    def _artist_token_capacity(
+        segments: list[tuple[str, str]],
+        normalized: str,
+    ) -> int:
+        """Estimate the maximum usable characters for a single artist."""
+
+        capacity = sum(len(original or "") for _, original in segments if original)
+        if capacity <= 0 and normalized:
+            return len(normalized)
+        return capacity
+
+    @staticmethod
+    def _distribute_artist_shares(
+        capacities: list[int],
         target_length: int,
-    ) -> dict[int, int]:
-        """Distribute character quotas across artists deterministically."""
+    ) -> list[int]:
+        """Allocate per-artist character counts via round-robin rotation."""
 
-        shares: dict[int, int] = {idx: 0 for idx in range(len(tokens_per_artist))}
-        lengths = [len(tokens) for tokens in tokens_per_artist]
+        shares = [0] * len(capacities)
+        active = [idx for idx, capacity in enumerate(capacities) if capacity > 0]
+        if not active or target_length <= 0:
+            return shares
+
         remaining = target_length
-        eligible: list[int] = [idx for idx in canonical_order if lengths[idx] > 0]
+        position = 0
 
-        while remaining > 0 and eligible:
-            slots = len(eligible)
-            base = remaining // slots
-            remainder = remaining % slots
-            if base == 0 and remainder == 0:
-                remainder = remaining
+        while remaining > 0 and active:
+            current_idx = active[position]
+            shares[current_idx] += 1
+            remaining -= 1
 
-            progressed = False
-            for position, idx in enumerate(eligible):
-                if remaining <= 0:
+            if shares[current_idx] >= capacities[current_idx]:
+                _ = active.pop(position)
+                if not active:
                     break
+                if position >= len(active):
+                    position = 0
+                continue
 
-                quota = base + (1 if position < remainder else 0)
-                if quota == 0:
-                    continue
-
-                capacity = lengths[idx] - shares[idx]
-                if capacity <= 0:
-                    continue
-
-                allocation = min(quota, capacity, remaining)
-                if allocation <= 0:
-                    continue
-
-                shares[idx] += allocation
-                remaining -= allocation
-                progressed = True
-
-            if not progressed:
-                break
-
-            eligible = [
-                idx for idx in eligible if lengths[idx] - shares[idx] > 0
-            ]
+            position = (position + 1) % len(active)
 
         return shares
-
-    @staticmethod
-    def _select_artist_tokens(
-        tokens: list[_WordToken],
-        count: int,
-    ) -> str:
-        """Select up to `count` characters from the provided token list."""
-
-        if count <= 0:
-            return ""
-
-        included = [False] * len(tokens)
-        taken = 0
-
-        for idx, token in enumerate(tokens):
-            if token.is_processed and taken < count:
-                included[idx] = True
-                taken += 1
-
-        if taken < count:
-            for idx, token in enumerate(tokens):
-                if not included[idx] and taken < count:
-                    included[idx] = True
-                    taken += 1
-                if taken >= count:
-                    break
-
-        return "".join(
-            token.char for idx, token in enumerate(tokens) if included[idx]
-        )
 
     @classmethod
     def _build_multi_artist_id(
@@ -393,51 +359,48 @@ class ArtistIdGenerator:
         artist_entries: list[tuple[list[tuple[str, str]], str]],
         target_length: int,
     ) -> str:
-        """Generate a multi-artist ID with deterministic, order-invariant quotas."""
+        """Generate a multi-artist ID using per-artist round-robin slices."""
 
         if not artist_entries or target_length <= 0:
             return ""
 
-        tokens_per_artist: list[list[_WordToken]] = []
-        normalized_lookup: list[str] = []
+        capacities = [
+            cls._artist_token_capacity(segments, normalized)
+            for segments, normalized in artist_entries
+        ]
 
-        for segments, normalized in artist_entries:
-            tokens: list[_WordToken] = []
-            for processed, original in segments:
-                state = _WordState.from_processed(processed or "", original or "")
-                tokens.extend(state.tokens)
-            tokens_per_artist.append(tokens)
-            normalized_lookup.append(normalized)
-
-        canonical_order = list(range(len(tokens_per_artist)))
-
-        shares = cls._allocate_multi_artist_shares(
-            tokens_per_artist,
-            canonical_order,
-            target_length,
-        )
+        shares = cls._distribute_artist_shares(capacities, target_length)
 
         parts: list[str] = []
-        for idx in canonical_order:
-            share = shares.get(idx, 0)
+        for (segments, normalized), share in zip(artist_entries, shares):
             if share <= 0:
                 parts.append("")
                 continue
 
-            tokens = tokens_per_artist[idx]
-            if tokens:
-                parts.append(cls._select_artist_tokens(tokens, share))
+            artist_fragment = cls._generate_single_artist_id(
+                segments,
+                normalized,
+                share,
+            )
+
+            if artist_fragment:
+                parts.append(artist_fragment)
                 continue
 
-            normalized = normalized_lookup[idx]
-            parts.append((normalized or "")[:share])
+            sanitized = (normalized or "")[:share]
+            if sanitized:
+                parts.append(sanitized)
+                continue
+
+            fallback = "".join(original for _, original in segments if original)
+            parts.append(fallback[:share])
 
         combined = "".join(parts)
         return combined[:target_length]
 
     @classmethod
     def generate(cls, artist_name: str | None) -> str:
-        """Generate an artist ID (up to 6 characters) from an artist name."""
+        """Generate an artist ID up to the configured maximum length."""
 
         try:
             if not artist_name or not artist_name.strip():
@@ -468,7 +431,7 @@ class ArtistIdGenerator:
                 if fallback_multi:
                     return fallback_multi[: cls.ID_LENGTH]
 
-            return "XXXXX"
+            return cls.FALLBACK_ID[: cls.ID_LENGTH]
 
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Failed to generate artist ID for '%s': %s", artist_name, exc)

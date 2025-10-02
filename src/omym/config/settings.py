@@ -8,6 +8,7 @@ Trade-offs: - Validation is limited to simple boundary checks for speed.
 from __future__ import annotations
 
 from omym.config.config import (
+    ARTIST_ID_MAX_LENGTH_DEFAULT,
     FILE_HASH_CHUNK_SIZE_DEFAULT,
     config as app_config,
 )
@@ -46,6 +47,14 @@ FILE_HASH_CHUNK_SIZE: int = (
 )
 
 
+_artist_id_max = getattr(app_config, "artist_id_max_length", ARTIST_ID_MAX_LENGTH_DEFAULT)
+ARTIST_ID_MAX_LENGTH: int = (
+    _artist_id_max
+    if isinstance(_artist_id_max, int) and _artist_id_max > 0
+    else ARTIST_ID_MAX_LENGTH_DEFAULT
+)
+
+
 __all__ = [
     "USE_MB_ROMANIZATION",
     "MB_APP_NAME",
@@ -55,4 +64,5 @@ __all__ = [
     "UNPROCESSED_PREVIEW_LIMIT",
     "MB_NON_LATIN_LANG_CODES",
     "FILE_HASH_CHUNK_SIZE",
+    "ARTIST_ID_MAX_LENGTH",
 ]

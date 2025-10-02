@@ -15,6 +15,7 @@ from omym.config.paths import default_config_path
 from omym.platform.logging import logger
 
 FILE_HASH_CHUNK_SIZE_DEFAULT: Final[int] = 131072
+ARTIST_ID_MAX_LENGTH_DEFAULT: Final[int] = 8
 
 
 def _path_field(default: Path | None = None) -> Any:
@@ -47,6 +48,9 @@ class Config:
 
     # File hashing chunk size in bytes
     file_hash_chunk_size: int = FILE_HASH_CHUNK_SIZE_DEFAULT
+
+    # Maximum length for generated artist identifiers
+    artist_id_max_length: int = ARTIST_ID_MAX_LENGTH_DEFAULT
 
     # MusicBrainz settings
     use_mb_romanization: bool = True
@@ -158,6 +162,13 @@ class Config:
         lines.append("# Chunk size in bytes used when hashing files (set higher for large files)")
         lines.append(
             f"file_hash_chunk_size = {self._format_toml_value(config['file_hash_chunk_size'])}"
+        )
+        lines.append("")
+
+        # Artist identifier settings
+        lines.append("# Maximum number of characters generated for artist IDs")
+        lines.append(
+            f"artist_id_max_length = {self._format_toml_value(config['artist_id_max_length'])}"
         )
         lines.append("")
 

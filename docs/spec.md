@@ -60,9 +60,10 @@ review_cadence: quarterly
 - Run targeted tests with `uv run pytest tests/config/test_artist_name_preferences.py` after editing preference logic.
 
 ## Artist Identifier Policy
-- Multi-artist strings separated by commas are processed in their input order. Each artist is normalised, tokenised, and then assigned a quota via a length-aware round-robin so the first-listed performers retain priority without starving later collaborators.
-- Within an artist's quota we preserve the original consonant-first selection rules: consonant tokens are taken before vowels, and deferred characters are reintroduced in their original positions until the quota is filled.
-- When an artist cannot exhaust its share, the leftover capacity is redistributed amongst the remaining artists using the same deterministic scheme. If no artist has characters left, we fall back to truncating the concatenated normalised names to fill the identifier.
+- Multi-artist strings separated by commas are processed in their input order. Characters are allocated one at a time via artist-level round-robin rotation so the single-artist progression (word balancing, consonant priority) repeats across collaborators.
+- Within each artist's share we preserve the original consonant-first selection rules: consonant tokens are taken before vowels, and deferred characters are reintroduced in their original positions until the quota is filled.
+- Artists that exhaust their available characters drop out of the rotation; if no artist has characters left before the target length is filled, we fall back to truncating the concatenated normalised names.
+- The generated identifier length defaults to eight characters and can be tuned via `artist_id_max_length`.
 
 ## Assumptions, Constraints, Dependencies
 - Requires Python ≥3.13 with dependencies pinned in [`pyproject.toml`](../pyproject.toml) and managed via `uv`.

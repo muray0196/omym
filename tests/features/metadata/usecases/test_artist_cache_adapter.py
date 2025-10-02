@@ -14,6 +14,7 @@ from sqlite3 import Connection
 from typing import cast
 
 from omym.features.metadata.usecases.extraction.artist_cache_adapter import DryRunArtistCacheAdapter
+from omym.features.path.usecases.renamer import ArtistIdGenerator
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.db_manager import DatabaseManager
 
@@ -33,8 +34,9 @@ def _build_adapter(
 def test_dry_run_adapter_persists_artist_ids(tmp_path: Path) -> None:
     manager, conn, adapter = _build_adapter(tmp_path)
     try:
-        assert adapter.insert_artist_id("John Smith", "JHNSMT") is True
-        assert adapter.get_artist_id("John Smith") == "JHNSMT"
+        expected_id = ArtistIdGenerator.generate("John Smith")
+        assert adapter.insert_artist_id("John Smith", expected_id) is True
+        assert adapter.get_artist_id("John Smith") == expected_id
 
         cursor = conn.cursor()
         _ = cursor.execute(
@@ -42,7 +44,7 @@ def test_dry_run_adapter_persists_artist_ids(tmp_path: Path) -> None:
             ("John Smith",),
         )
         row = cursor.fetchone()
-        assert row == ("JHNSMT",)
+        assert row == (expected_id,)
     finally:
         manager.close()
 
