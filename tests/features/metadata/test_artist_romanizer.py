@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pytest_mock import MockerFixture
+
 from omym.features.metadata import ArtistRomanizer
 from omym.features.metadata import TrackMetadata
 
@@ -59,7 +61,13 @@ class TestArtistRomanizer:
         assert metadata.artist == "Hikaru Utada"
         assert metadata.album_artist == "Hikaru Utada"
 
-    def test_fallback_transliterator_used_when_fetcher_returns_none(self) -> None:
+    def test_fallback_transliterator_used_when_fetcher_returns_none(
+        self, mocker: MockerFixture
+    ) -> None:
+        save_cached = mocker.patch(
+            "omym.features.metadata.usecases.extraction.artist_romanizer.save_cached_name"
+        )
+
         romanizer = ArtistRomanizer(
             enabled_supplier=lambda: True,
             fetcher=lambda _: None,
@@ -70,6 +78,7 @@ class TestArtistRomanizer:
         result = romanizer.romanize_name("宇多田ヒカル")
 
         assert result == "Fallback"
+        save_cached.assert_called_once_with("宇多田ヒカル", "Fallback", source="transliteration")
 
     def test_musicbrainz_non_latin_value_triggers_transliterator(self) -> None:
         romanizer = ArtistRomanizer(

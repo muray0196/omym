@@ -40,6 +40,7 @@ review_cadence: quarterly
 
 ## Artist Override Configuration
 - Override resolution honours the precedence `user preferences → persistent cache → MusicBrainz → pykakasi transliteration`.
+- Transliteration fallbacks (source `transliteration`) always appear in the default missing-view so users can promote them to explicit preferences.
 - Users can provide preferred artist names at `config/artist_name_preferences.toml`; set `OMYM_ARTIST_NAME_PREFERENCES_PATH` to point elsewhere.
 - MusicBrainz-provided romanised names collapse literal `", "` sequences to a single space before persistence so downstream comma-based splitters remain accurate.
 - MusicBrainz responses that remain non-Latin are identified via langid and are not cached, ensuring downstream transliteration handles the fallback path.

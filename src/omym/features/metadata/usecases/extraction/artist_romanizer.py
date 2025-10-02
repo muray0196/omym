@@ -17,6 +17,7 @@ import pykakasi
 from omym.config.settings import MB_NON_LATIN_LANG_CODES, USE_MB_ROMANIZATION
 from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import fetch_romanized_name
+from omym.platform.musicbrainz.cache import save_cached_name
 
 from ...domain.track_metadata import TrackMetadata
 
@@ -204,6 +205,8 @@ class ArtistRomanizer:
                 text,
                 fallback,
             )
+            # Persist transliteration so CLI views surface the fallback result.
+            save_cached_name(text, fallback, source="transliteration")
             self._cache[text] = fallback
             self._last_result_source = "transliteration"
             return fallback

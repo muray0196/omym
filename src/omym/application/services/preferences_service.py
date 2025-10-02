@@ -11,6 +11,16 @@ from typing import final
 from omym.config.artist_name_preferences import load_artist_name_preferences
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 
+_TRANSLITERATION_SOURCE = "transliteration"
+
+
+def _is_transliteration(source: str | None) -> bool:
+    """Return True when the cached source represents a pykakasi fallback."""
+
+    if source is None:
+        return False
+    return source.casefold() == _TRANSLITERATION_SOURCE
+
 
 def _normalize_optional(value: str | None) -> str | None:
     """Strip whitespace and coerce blank strings to ``None``."""
@@ -110,6 +120,7 @@ class ArtistPreferenceInspector:
                 and (
                     _contains_non_ascii(row.artist_name)
                     or _contains_non_ascii(row.cached_name)
+                    or _is_transliteration(row.source)
                 )
             ]
 

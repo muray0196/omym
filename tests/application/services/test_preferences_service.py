@@ -105,3 +105,43 @@ def test_collect_filters_ascii_untracked(configured_environment: tuple[ArtistPre
 
     ascii_names = {row.artist_name for row in rows if row.artist_name.isascii()}
     assert not ascii_names
+
+
+def test_collect_includes_transliteration_ascii(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Transliteration fallbacks should surface in missing view even if ASCII."""
+
+    preferences_path = tmp_path / "artist_prefs.toml"
+    _ = preferences_path.write_text(
+        textwrap.dedent(
+            """
+            metadata_version = 1
+
+            [defaults]
+
+            [preferences]
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OMYM_ARTIST_NAME_PREFERENCES_PATH", str(preferences_path))
+
+    manager = DatabaseManager(tmp_path / "cache.db")
+    manager.connect()
+    try:
+        assert manager.conn is not None
+        dao = ArtistCacheDAO(manager.conn)
+        assert dao.upsert_romanized_name("Kana Artist", "Kana Artist", source="transliteration") is True
+
+        inspector = ArtistPreferenceInspector(dao)
+        rows = inspector.collect(include_all=False)
+    finally:
+        manager.close()
+
+    lookup = {row.artist_name: row for row in rows}
+    transliteration_row = lookup.get("Kana Artist")
+    assert transliteration_row is not None
+    assert transliteration_row.cached_name == "Kana Artist"
+    assert transliteration_row.source == "transliteration"
