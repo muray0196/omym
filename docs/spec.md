@@ -57,9 +57,9 @@ review_cadence: quarterly
 - Run targeted tests with `uv run pytest tests/config/test_artist_name_preferences.py` after editing preference logic.
 
 ## Artist Identifier Policy
-- Multi-artist strings separated by commas are processed from left to right. For each artist we walk its hyphen-delimited segments, emit consonant-preferring characters in their original order (the first character always survives, even if it is a vowel), and stop once the global six-character budget is reached.
-- If the current artist still has capacity after exhausting its consonants, we reintroduce its deferred vowels or punctuation in-place, preserving the artist's original character order before moving on to the next artist.
-- Remaining artists repeat the same procedure with whatever budget is left. When no artist can contribute additional characters, we fall back to truncating the sanitised names to fill the identifier.
+- Multi-artist strings separated by commas are processed in their input order. Each artist is normalised, tokenised, and then assigned a quota via a length-aware round-robin so the first-listed performers retain priority without starving later collaborators.
+- Within an artist's quota we preserve the original consonant-first selection rules: consonant tokens are taken before vowels, and deferred characters are reintroduced in their original positions until the quota is filled.
+- When an artist cannot exhaust its share, the leftover capacity is redistributed amongst the remaining artists using the same deterministic scheme. If no artist has characters left, we fall back to truncating the concatenated normalised names to fill the identifier.
 
 ## Assumptions, Constraints, Dependencies
 - Requires Python ≥3.13 with dependencies pinned in [`pyproject.toml`](../pyproject.toml) and managed via `uv`.

@@ -41,19 +41,25 @@ class TestArtistIdGenerator:
         assert ArtistIdGenerator.generate("On the Ant") == "ONTHAN"
 
     def test_generate_multi_artist(self) -> None:
-        """Multiple artists interleave segments until the target length."""
+        """Multiple artists receive length-balanced quotas while preserving order."""
 
-        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHNSMT"
+        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHNJND"
 
     def test_generate_multi_artist_hyphenated_segments(self) -> None:
-        """Hyphen-separated segments alternate across artists."""
+        """Hyphen-separated segments remain balanced but respect input order."""
 
-        assert ArtistIdGenerator.generate("Michael Jackson, More More Jump") == "MCHLJC"
+        assert ArtistIdGenerator.generate("Michael Jackson, More More Jump") == "MCHMRM"
 
     def test_generate_multi_artist_preserves_initial_vowel(self) -> None:
         """Initial vowels for subsequent artists remain in the identifier."""
 
         assert ArtistIdGenerator.generate("kaf, isekaijoucho") == "KAFISK"
+
+    def test_generate_multi_artist_respects_input_order(self) -> None:
+        """Switching artist order changes allocation as expected."""
+
+        assert ArtistIdGenerator.generate("isekaijoucho, kaf") == "ISKKAF"
+        assert ArtistIdGenerator.generate("Jane Doe, John Smith") == "JNDJHN"
 
     def test_generate_multi_artist_inserts_vowels_in_place(self) -> None:
         """Fallback vowels re-enter at their original positions within each artist."""

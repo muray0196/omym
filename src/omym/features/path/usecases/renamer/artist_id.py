@@ -277,59 +277,163 @@ class ArtistIdGenerator:
         return segments, normalized
 
     @classmethod
-    def _build_multi_artist_id(
+    def _generate_single_artist_id(
         cls,
-        artists_segments: list[list[tuple[str, str]]],
+        segments: list[tuple[str, str]],
+        normalized: str,
         target_length: int,
     ) -> str:
-        """Generate a multi-artist ID preserving original artist order."""
+        """Generate an ID for a single artist up to the requested length."""
 
-        if not artists_segments or target_length <= 0:
+        if target_length <= 0:
             return ""
 
-        result: list[str] = []
+        if not normalized:
+            return "XXXXX"[: target_length]
 
-        for segments in artists_segments:
-            available = target_length - len(result)
-            if available <= 0:
+        if len(normalized) <= target_length and "-" not in normalized:
+            return normalized[:target_length]
+
+        if not segments:
+            return normalized[:target_length]
+
+        balanced_id = cls._build_balanced_id(segments, target_length)
+        if balanced_id:
+            return balanced_id[:target_length]
+
+        fallback = "".join(original for _, original in segments if original)
+        if fallback:
+            return fallback[:target_length]
+
+        return "XXXXX"[: target_length]
+
+    @staticmethod
+    def _allocate_multi_artist_shares(
+        tokens_per_artist: list[list[_WordToken]],
+        canonical_order: list[int],
+        target_length: int,
+    ) -> dict[int, int]:
+        """Distribute character quotas across artists deterministically."""
+
+        shares: dict[int, int] = {idx: 0 for idx in range(len(tokens_per_artist))}
+        lengths = [len(tokens) for tokens in tokens_per_artist]
+        remaining = target_length
+        eligible: list[int] = [idx for idx in canonical_order if lengths[idx] > 0]
+
+        while remaining > 0 and eligible:
+            slots = len(eligible)
+            base = remaining // slots
+            remainder = remaining % slots
+            if base == 0 and remainder == 0:
+                remainder = remaining
+
+            progressed = False
+            for position, idx in enumerate(eligible):
+                if remaining <= 0:
+                    break
+
+                quota = base + (1 if position < remainder else 0)
+                if quota == 0:
+                    continue
+
+                capacity = lengths[idx] - shares[idx]
+                if capacity <= 0:
+                    continue
+
+                allocation = min(quota, capacity, remaining)
+                if allocation <= 0:
+                    continue
+
+                shares[idx] += allocation
+                remaining -= allocation
+                progressed = True
+
+            if not progressed:
                 break
 
+            eligible = [
+                idx for idx in eligible if lengths[idx] - shares[idx] > 0
+            ]
+
+        return shares
+
+    @staticmethod
+    def _select_artist_tokens(
+        tokens: list[_WordToken],
+        count: int,
+    ) -> str:
+        """Select up to `count` characters from the provided token list."""
+
+        if count <= 0:
+            return ""
+
+        included = [False] * len(tokens)
+        taken = 0
+
+        for idx, token in enumerate(tokens):
+            if token.is_processed and taken < count:
+                included[idx] = True
+                taken += 1
+
+        if taken < count:
+            for idx, token in enumerate(tokens):
+                if not included[idx] and taken < count:
+                    included[idx] = True
+                    taken += 1
+                if taken >= count:
+                    break
+
+        return "".join(
+            token.char for idx, token in enumerate(tokens) if included[idx]
+        )
+
+    @classmethod
+    def _build_multi_artist_id(
+        cls,
+        artist_entries: list[tuple[list[tuple[str, str]], str]],
+        target_length: int,
+    ) -> str:
+        """Generate a multi-artist ID with deterministic, order-invariant quotas."""
+
+        if not artist_entries or target_length <= 0:
+            return ""
+
+        tokens_per_artist: list[list[_WordToken]] = []
+        normalized_lookup: list[str] = []
+
+        for segments, normalized in artist_entries:
             tokens: list[_WordToken] = []
             for processed, original in segments:
                 state = _WordState.from_processed(processed or "", original or "")
                 tokens.extend(state.tokens)
+            tokens_per_artist.append(tokens)
+            normalized_lookup.append(normalized)
 
-            if not tokens:
+        canonical_order = list(range(len(tokens_per_artist)))
+
+        shares = cls._allocate_multi_artist_shares(
+            tokens_per_artist,
+            canonical_order,
+            target_length,
+        )
+
+        parts: list[str] = []
+        for idx in canonical_order:
+            share = shares.get(idx, 0)
+            if share <= 0:
+                parts.append("")
                 continue
 
-            included = [False] * len(tokens)
-            count = 0
-
-            for idx, token in enumerate(tokens):
-                if token.is_processed and count < available:
-                    included[idx] = True
-                    count += 1
-
-            if count < available:
-                for idx, token in enumerate(tokens):
-                    if not included[idx] and count < available:
-                        included[idx] = True
-                        count += 1
-                    if count >= available:
-                        break
-
-            if not any(included):
+            tokens = tokens_per_artist[idx]
+            if tokens:
+                parts.append(cls._select_artist_tokens(tokens, share))
                 continue
 
-            for idx, token in enumerate(tokens):
-                if included[idx]:
-                    result.append(token.char)
-                    if len(result) >= target_length:
-                        break
-            if len(result) >= target_length:
-                break
+            normalized = normalized_lookup[idx]
+            parts.append((normalized or "")[:share])
 
-        return "".join(result)[:target_length]
+        combined = "".join(parts)
+        return combined[:target_length]
 
     @classmethod
     def generate(cls, artist_name: str | None) -> str:
@@ -343,36 +447,19 @@ class ArtistIdGenerator:
 
             if len(artists) <= 1:
                 target = artist_name.strip()
-                normalized = cls._normalize_artist(target)
-                if not normalized:
-                    return "XXXXX"
+                segments, normalized = cls._prepare_artist_segments(target)
+                return cls._generate_single_artist_id(segments, normalized, cls.ID_LENGTH)
 
-                if len(normalized) <= cls.ID_LENGTH and "-" not in normalized:
-                    return normalized
-
-                words = [word for word in normalized.split("-") if word]
-                processed_results = [cls._process_word(word) for word in words]
-
-                balanced_id = cls._build_balanced_id(processed_results, cls.ID_LENGTH)
-                if balanced_id:
-                    return balanced_id
-
-                fallback = "".join(word for _, word in processed_results if word)
-                if fallback:
-                    return fallback[: cls.ID_LENGTH]
-
-                return "XXXXX"
-
-            artist_segments: list[list[tuple[str, str]]] = []
+            artist_entries: list[tuple[list[tuple[str, str]], str]] = []
             normalized_parts: list[str] = []
             for artist in artists:
                 segments, normalized = cls._prepare_artist_segments(artist)
-                if segments:
-                    artist_segments.append(segments)
+                if segments or normalized:
+                    artist_entries.append((segments, normalized))
                 if normalized:
                     normalized_parts.append(normalized)
 
-            multi_id = cls._build_multi_artist_id(artist_segments, cls.ID_LENGTH)
+            multi_id = cls._build_multi_artist_id(artist_entries, cls.ID_LENGTH)
             if multi_id:
                 return multi_id
 
