@@ -29,13 +29,13 @@ class TestArtistIdGenerator:
         assert ArtistIdGenerator.generate("John-Smith") == "JHNSM"
 
         # Test name with numbers
-        assert ArtistIdGenerator.generate("123 John Smith") == "123JH"
+        assert ArtistIdGenerator.generate("123 John Smith") == "12JHS"
 
         # Test short name (no padding)
         assert ArtistIdGenerator.generate("Jo") == "JO"
 
         # Test long name
-        assert ArtistIdGenerator.generate("John Jacob Smith") == "JHNJC"
+        assert ArtistIdGenerator.generate("John Jacob Smith") == "JHJCS"
 
         # Test Vowel removal
         assert ArtistIdGenerator.generate("On the Ant") == "ONTHA"
@@ -43,7 +43,7 @@ class TestArtistIdGenerator:
     def test_generate_multi_artist(self) -> None:
         """Multiple artists separated by comma use combined string for ID."""
 
-        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHNSM"
+        assert ArtistIdGenerator.generate("John Smith, Jane Doe") == "JHSMD"
 
     def test_generate_japanese(self) -> None:
         """Test ID generation with Japanese text."""
@@ -77,6 +77,18 @@ class TestArtistIdGenerator:
 
         # Test name with mixed case
         assert ArtistIdGenerator.generate("JoHn SmItH") == "JHNSM"
+
+    def test_generate_sparse_consonants(self) -> None:
+        """Scarce-consonant names retain all words within five characters."""
+
+        assert ArtistIdGenerator.generate("Fujii Kaze") == "FUJKZ"
+
+        assert ArtistIdGenerator.generate("Michael-Jackson") == "MCHJC"
+
+        abc_id = ArtistIdGenerator.generate("A-B-C")
+        assert abc_id == "ABC"
+        assert all(char in abc_id for char in "ABC")
+        assert len(abc_id) <= ArtistIdGenerator.ID_LENGTH
 
 
 class TestCachedArtistIdGenerator:
@@ -113,7 +125,7 @@ class TestCachedArtistIdGenerator:
         # Test different artist name
         other_artist = "Jane Doe"
         other_id = generator.generate(other_artist)
-        assert other_id == "JANED"
+        assert other_id == "JANDO"
 
         # Test case insensitivity
         mixed_case = "jOhN sMiTh"

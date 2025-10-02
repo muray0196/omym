@@ -8,6 +8,7 @@ Why: Decouple ID heuristics from higher-level use cases for reuse and testing.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import ClassVar, final
 
 import langid
@@ -16,6 +17,90 @@ from unidecode import unidecode
 
 from omym.features.path.domain.sanitizer import Sanitizer
 from omym.platform.logging import logger
+
+
+@dataclass
+class _WordToken:
+    """Single character token with inclusion state."""
+
+    char: str
+    is_processed: bool
+    included: bool = False
+
+
+@dataclass
+class _WordState:
+    """Track per-word token selections during ID assembly."""
+
+    tokens: list[_WordToken]
+    next_unused_idx: int = 0
+
+    @classmethod
+    def from_processed(cls, processed: str, original: str) -> _WordState:
+        """Create state from processed and original word variants."""
+
+        if not processed and not original:
+            return cls(tokens=[])
+
+        tokens: list[_WordToken] = []
+        processed_idx = 0
+
+        for char in original:
+            if processed_idx < len(processed) and char == processed[processed_idx]:
+                tokens.append(_WordToken(char=char, is_processed=True))
+                processed_idx += 1
+            else:
+                tokens.append(_WordToken(char=char, is_processed=False))
+
+        return cls(tokens=tokens)
+
+    def current_chars(self) -> str:
+        """Return currently selected characters for concatenation."""
+
+        return "".join(token.char for token in self.tokens if token.included)
+
+    def current_length(self) -> int:
+        """Number of currently selected characters."""
+
+        return sum(1 for token in self.tokens if token.included)
+
+    def processed_total(self) -> int:
+        """Count processed tokens available for selection."""
+
+        return sum(1 for token in self.tokens if token.is_processed)
+
+    def include_processed_prefix(self, count: int) -> None:
+        """Mark the first 'count' processed tokens as included."""
+
+        remaining = count
+        for token in self.tokens:
+            if token.is_processed:
+                token.included = remaining > 0
+                if token.included:
+                    remaining -= 1
+                continue
+            token.included = False
+
+        self.next_unused_idx = 0
+
+    def has_unused_tokens(self) -> bool:
+        """Check if unused non-processed tokens remain."""
+
+        return any(not token.included and not token.is_processed for token in self.tokens)
+
+    def activate_next_token(self) -> bool:
+        """Activate the next unused non-processed token in original order."""
+
+        idx = self.next_unused_idx
+        while idx < len(self.tokens):
+            token = self.tokens[idx]
+            if not token.included and not token.is_processed:
+                token.included = True
+                self.next_unused_idx = idx + 1
+                return True
+            idx += 1
+        self.next_unused_idx = len(self.tokens)
+        return False
 
 
 @final
@@ -45,6 +130,92 @@ class ArtistIdGenerator:
             processed = first_char
 
         return processed, word
+
+    @classmethod
+    def _build_balanced_id(
+        cls,
+        processed_results: list[tuple[str, str]],
+        target_length: int,
+    ) -> str:
+        """Assemble an ID respecting per-word order and balance."""
+
+        states = [
+            _WordState.from_processed(processed or "", original or "")
+            for processed, original in processed_results
+            if (processed or original)
+        ]
+
+        if not states:
+            return ""
+
+        cls._select_processed_tokens(states, target_length)
+        cls._expand_states(states, target_length)
+
+        return "".join(state.current_chars() for state in states)
+
+    @staticmethod
+    def _select_processed_tokens(states: list[_WordState], target_length: int) -> None:
+        """Allocate processed characters per word using round-robin selection."""
+
+        processed_totals = [state.processed_total() for state in states]
+        total_processed = sum(processed_totals)
+
+        if total_processed == 0:
+            return
+
+        if total_processed <= target_length:
+            for state, count in zip(states, processed_totals):
+                state.include_processed_prefix(count)
+            return
+
+        allocations = [0] * len(states)
+        remaining = target_length
+        active_indices = [idx for idx, count in enumerate(processed_totals) if count > 0]
+        position = 0
+
+        while remaining > 0 and active_indices:
+            current_idx = active_indices[position]
+            count = processed_totals[current_idx]
+
+            if allocations[current_idx] < count:
+                allocations[current_idx] += 1
+                remaining -= 1
+
+            if allocations[current_idx] >= count:
+                _ = active_indices.pop(position)
+                if not active_indices:
+                    break
+                if position >= len(active_indices):
+                    position = 0
+            else:
+                position = (position + 1) % len(active_indices)
+
+        for state, count in zip(states, allocations):
+            state.include_processed_prefix(count)
+
+    @staticmethod
+    def _expand_states(states: list[_WordState], target_length: int) -> None:
+        """Expand IDs by re-introducing original characters."""
+
+        total_length = sum(state.current_length() for state in states)
+        if total_length >= target_length:
+            return
+
+        active_indices = [idx for idx, state in enumerate(states) if state.has_unused_tokens()]
+        position = 0
+
+        while active_indices and total_length < target_length:
+            current_idx = active_indices[position]
+            state = states[current_idx]
+            if state.activate_next_token():
+                total_length += 1
+
+            if not state.has_unused_tokens():
+                _ = active_indices.pop(position)
+                if position >= len(active_indices):
+                    position = 0
+            else:
+                position = (position + 1) % len(active_indices)
 
     @classmethod
     def _transliterate_japanese(cls, text: str) -> str:
@@ -89,20 +260,21 @@ class ArtistIdGenerator:
             if not name:
                 return "XXXXX"
 
+            if len(name) <= cls.ID_LENGTH and "-" not in name:
+                return name
+
             words = name.split("-")
             processed_results: list[tuple[str, str]] = [cls._process_word(word) for word in words]
 
-            processed_words = [result[0] for result in processed_results]
-            processed_id = "".join(processed_words)
+            balanced_id = cls._build_balanced_id(processed_results, cls.ID_LENGTH)
+            if balanced_id:
+                return balanced_id
 
-            if len(processed_id) < cls.ID_LENGTH:
-                name = "".join(result[1] for result in processed_results)
-            else:
-                name = processed_id
+            fallback = "".join(result[1] for result in processed_results if result[1])
+            if fallback:
+                return fallback[: cls.ID_LENGTH]
 
-            if len(name) > cls.ID_LENGTH:
-                return name[: cls.ID_LENGTH]
-            return name
+            return "XXXXX"
 
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Failed to generate artist ID for '%s': %s", artist_name, exc)

@@ -40,6 +40,7 @@ review_cadence: quarterly
 ## Artist Override Configuration
 - Override resolution honours the precedence `user preferences → persistent cache → MusicBrainz → pykakasi transliteration`.
 - Users can provide preferred artist names at `config/artist_name_preferences.toml`; set `OMYM_ARTIST_NAME_PREFERENCES_PATH` to point elsewhere.
+- MusicBrainz-provided romanised names collapse literal `", "` sequences to a single space before persistence so downstream comma-based splitters remain accurate.
 - The loader accepts a minimal TOML document:
   ```toml
   metadata_version = 1

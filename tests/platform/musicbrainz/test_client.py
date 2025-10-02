@@ -72,7 +72,7 @@ def test_fetch_romanized_name_prefers_ja_latn_primary(monkeypatch: pytest.Monkey
     monkeypatch.setattr(client, "_http_get_json", fake_get_json)
 
     got = client.fetch_romanized_name("坂本龍一")
-    assert got == "Sakamoto, Ryuichi"
+    assert got == "Sakamoto Ryuichi"
 
 
 def test_fetch_romanized_name_uses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -143,7 +143,41 @@ def test_fetch_romanized_name_falls_back_to_sort_name(monkeypatch: pytest.Monkey
     monkeypatch.setattr(client, "_http_get_json", fake_get_json)
 
     got = client.fetch_romanized_name("宇多田ヒカル")
-    assert got == "Utada, Hikaru"
+    assert got == "Utada Hikaru"
+
+
+def test_fetch_romanized_name_sanitizes_commas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure comma-separated single artists collapse to a single space."""
+    from omym.platform.musicbrainz import client
+
+    cache = _DummyCache()
+    client.configure_romanization_cache(cache)
+
+    sample = {
+        "artists": [
+            {
+                "name": "佐藤貴文",
+                "sort-name": "Sato, Takafumi",
+                "score": "100",
+                "aliases": [
+                    {
+                        "name": "Sato, Takafumi",
+                        "locale": "ja-Latn",
+                        "primary": True,
+                    },
+                ],
+            }
+        ]
+    }
+
+    def fake_get_json(_url: str, _params: dict[str, str]) -> Any:
+        return _wrap_result(sample)
+
+    monkeypatch.setattr(client, "_http_get_json", fake_get_json)
+
+    got = client.fetch_romanized_name("佐藤貴文")
+    assert got == "Sato Takafumi"
+    assert cache.get_romanized_name("佐藤貴文") == "Sato Takafumi"
 
 
 def test_fetch_romanized_name_returns_none_on_empty(monkeypatch: pytest.MonkeyPatch) -> None:

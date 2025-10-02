@@ -38,6 +38,12 @@ _CACHE_SOURCE: Final[str] = "musicbrainz"
 _HTTP_CLIENT: HTTPClient = DEFAULT_HTTP_CLIENT
 
 
+def _sanitize_musicbrainz_name(value: str) -> str:
+    """Collapse MusicBrainz commas that conflict with downstream splitting."""
+
+    return value.replace(", ", " ").strip()
+
+
 def _http_get_json(url: str, params: dict[str, str]) -> HTTPResult:
     """Thin wrapper kept for tests patching the HTTP boundary."""
 
@@ -91,12 +97,14 @@ def fetch_romanized_name(name: str) -> str | None:
 
     romanized = choose_romanized_alias(aliases)
     if romanized:
-        save_cached_name(trimmed, romanized, source=_CACHE_SOURCE)
-        return romanized
+        sanitized_alias = _sanitize_musicbrainz_name(romanized)
+        if sanitized_alias:
+            save_cached_name(trimmed, sanitized_alias, source=_CACHE_SOURCE)
+            return sanitized_alias
 
     sort_name = best.get("sort-name")
     if isinstance(sort_name, str) and sort_name.strip():
-        sanitized = sort_name.strip()
+        sanitized = _sanitize_musicbrainz_name(sort_name)
         save_cached_name(trimmed, sanitized, source=_CACHE_SOURCE)
         return sanitized
 
