@@ -44,7 +44,7 @@ Audio library ingestion, organisation, and restoration toolkit.
   | Artist       | Preferred | Cached   | Source     | Status             |
   +--------------+-----------+----------+------------+--------------------+
   | 宇多田ヒカル  | Utada ... | Utada ...| musicbrainz| synced             |
-  | 東京事変      | N/A       | Tokyo ...| manual     | needs preference   |
+  | 東京事変      | N/A       | Tokyo ...| manual     | no preference      |
   +--------------+-----------+----------+------------+--------------------+
   ```
 

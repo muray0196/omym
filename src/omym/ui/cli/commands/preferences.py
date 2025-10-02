@@ -115,7 +115,7 @@ class PreferencesCommand:
         if row.preferred_name is None and row.cached_name is None:
             return Text("untracked", style="yellow")
         if row.preferred_name is None:
-            return Text("needs preference", style="yellow")
+            return Text("no preference", style="yellow")
         if row.cached_name is None:
             return Text("missing cache", style="red")
         if row.preferred_name != row.cached_name:
