@@ -1,8 +1,16 @@
-"""Runtime settings for OMYM sourced from the project config file."""
+"""Where: src/omym/config/settings.py
+What: Derived runtime settings sourced from persisted configuration.
+Why: Expose validated constants to feature layers without file I/O.
+Assumptions: - Config defaults remain compatible with current runtime expectations.
+Trade-offs: - Validation is limited to simple boundary checks for speed.
+"""
 
 from __future__ import annotations
 
-from omym.config.config import config as app_config
+from omym.config.config import (
+    FILE_HASH_CHUNK_SIZE_DEFAULT,
+    config as app_config,
+)
 
 # Core feature switches -------------------------------------------------------
 
@@ -32,6 +40,11 @@ UNPROCESSED_DIR_NAME: str = app_config.unprocessed_dir_name or "!unprocessed"
 _preview_limit = getattr(app_config, "unprocessed_preview_limit", 5)
 UNPROCESSED_PREVIEW_LIMIT: int = _preview_limit if _preview_limit >= 0 else 0
 
+_file_hash_chunk_size = getattr(app_config, "file_hash_chunk_size", FILE_HASH_CHUNK_SIZE_DEFAULT)
+FILE_HASH_CHUNK_SIZE: int = (
+    _file_hash_chunk_size if _file_hash_chunk_size > 0 else FILE_HASH_CHUNK_SIZE_DEFAULT
+)
+
 
 __all__ = [
     "USE_MB_ROMANIZATION",
@@ -41,4 +54,5 @@ __all__ = [
     "UNPROCESSED_DIR_NAME",
     "UNPROCESSED_PREVIEW_LIMIT",
     "MB_NON_LATIN_LANG_CODES",
+    "FILE_HASH_CHUNK_SIZE",
 ]

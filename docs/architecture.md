@@ -51,6 +51,7 @@ review_cadence: quarterly
 
 ## Configuration and Secrets
 - Boot configuration loads typed settings from `src/omym/config/settings.py`, which hydrates defaults from `config/config.toml` and overrides via environment variables (e.g., `OMYM_DATA_DIR`, `MUSICBRAINZ_USER_AGENT`).
+- File hashing throughput is tuned via the `file_hash_chunk_size` config entry (default 131,072 bytes) to balance memory usage and IO throughput.
 - Settings objects are passed into application services and adapters explicitly; features never read environment variables directly.
 - No secrets are stored; operators configure MusicBrainz credentials externally when needed.
 

@@ -1,6 +1,8 @@
-"""src/omym/features/metadata/usecases/file_operations.py
+"""Where: src/omym/features/metadata/usecases/file_operations.py
 What: File movement helpers and target-path generation for music assets.
 Why: Separate low-level filesystem handling from MusicProcessor orchestration.
+Assumptions: - Input paths reference regular files accessible on disk.
+Trade-offs: - Hashing remains synchronous to avoid cross-thread complexity.
 """
 
 from __future__ import annotations
@@ -10,9 +12,10 @@ import logging
 import shutil
 from pathlib import Path
 
+from omym.config.settings import FILE_HASH_CHUNK_SIZE
+from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
 from omym.platform.filesystem import ensure_parent_directory
 from omym.platform.logging import logger
-from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
 
 from .associated_assets import ProcessLogger
 from .processing_types import ProcessingEvent
@@ -24,7 +27,7 @@ def calculate_file_hash(file_path: Path) -> str:
 
     sha256_hash = hashlib.sha256()
     with open(file_path, "rb") as handle:
-        for byte_block in iter(lambda: handle.read(4096), b""):
+        for byte_block in iter(lambda: handle.read(FILE_HASH_CHUNK_SIZE), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 

@@ -1,12 +1,20 @@
-"""Configuration management for OMYM."""
+"""Where: src/omym/config/config.py
+What: Configuration management primitives for OMYM.
+Why: Centralise persisted settings and defaults for runtime use.
+Assumptions: - Configuration file remains small enough for eager loading.
+Trade-offs: - Defaults live in code instead of schema definition for simplicity.
+"""
+
 import tomllib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Final
 
 from omym.config.file_ops import write_text_file
-from omym.platform.logging import logger
 from omym.config.paths import default_config_path
+from omym.platform.logging import logger
+
+FILE_HASH_CHUNK_SIZE_DEFAULT: Final[int] = 131072
 
 
 def _path_field(default: Path | None = None) -> Any:
@@ -36,6 +44,9 @@ class Config:
 
     # Maximum number of unprocessed file paths to show inline after a run
     unprocessed_preview_limit: int = 5
+
+    # File hashing chunk size in bytes
+    file_hash_chunk_size: int = FILE_HASH_CHUNK_SIZE_DEFAULT
 
     # MusicBrainz settings
     use_mb_romanization: bool = True
@@ -140,6 +151,13 @@ class Config:
         lines.append("# Maximum number of unprocessed files to preview inline (set to 0 for all)")
         lines.append(
             f"unprocessed_preview_limit = {self._format_toml_value(config['unprocessed_preview_limit'])}"
+        )
+        lines.append("")
+
+        # File hashing section
+        lines.append("# Chunk size in bytes used when hashing files (set higher for large files)")
+        lines.append(
+            f"file_hash_chunk_size = {self._format_toml_value(config['file_hash_chunk_size'])}"
         )
         lines.append("")
 
