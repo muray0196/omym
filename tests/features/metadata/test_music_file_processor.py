@@ -341,6 +341,7 @@ class TestMusicProcessor:
 
     def test_process_file_duplicate_moves_artwork(
         self,
+        mocker: MockerFixture,
         processor: MusicProcessor,
         tmp_path: Path,
     ) -> None:
@@ -358,6 +359,23 @@ class TestMusicProcessor:
         before_dao_mock = cast(MagicMock, processor.before_dao)
         before_dao_mock.check_file_exists.return_value = True
         before_dao_mock.get_target_path.return_value = str(target_path)
+
+        _ = mocker.patch.object(
+            processor,
+            "generate_target_path",
+            return_value=target_path,
+        )
+
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=TrackMetadata(
+                title="Title",
+                artist="Artist",
+                album="Album",
+                album_artist="Artist",
+                file_extension=".mp3",
+            ),
+        )
 
         result = processor.process_file(source_file)
 
@@ -614,7 +632,15 @@ class TestMusicProcessor:
         )
         before_dao_mock = cast(MagicMock, processor.before_dao)
         before_dao_mock.check_file_exists.side_effect = [True, False, False]
-        before_dao_mock.get_target_path.return_value = str(tmp_path / "library/existing.mp3")
+        existing_target = tmp_path / "library" / "existing.mp3"
+        new_target = tmp_path / "library" / "fresh.mp3"
+        before_dao_mock.get_target_path.return_value = str(existing_target)
+
+        _ = mocker.patch.object(
+            processor,
+            "generate_target_path",
+            side_effect=[existing_target, new_target],
+        )
 
         caplog.set_level(logging.DEBUG, logger="omym")
 
@@ -724,6 +750,7 @@ class TestMusicProcessor:
 
     def test_process_file_duplicate_logs_skip(
         self,
+        mocker: MockerFixture,
         processor: MusicProcessor,
         tmp_path: Path,
         caplog: pytest.LogCaptureFixture,
@@ -739,6 +766,22 @@ class TestMusicProcessor:
         before_dao_mock = cast(MagicMock, processor.before_dao)
         before_dao_mock.check_file_exists.return_value = True
         before_dao_mock.get_target_path.return_value = str(target_path)
+
+        _ = mocker.patch.object(
+            processor,
+            "generate_target_path",
+            return_value=target_path,
+        )
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=TrackMetadata(
+                title="Title",
+                artist="Artist",
+                album="Album",
+                album_artist="Artist",
+                file_extension=".mp3",
+            ),
+        )
 
         caplog.set_level(logging.DEBUG, logger="omym")
 
@@ -765,6 +808,7 @@ class TestMusicProcessor:
 
     def test_process_file_duplicate_same_location_marks_processed(
         self,
+        mocker: MockerFixture,
         processor: MusicProcessor,
         tmp_path: Path,
         caplog: pytest.LogCaptureFixture,
@@ -778,6 +822,22 @@ class TestMusicProcessor:
         before_dao_mock = cast(MagicMock, processor.before_dao)
         before_dao_mock.check_file_exists.return_value = True
         before_dao_mock.get_target_path.return_value = str(source_file)
+
+        _ = mocker.patch.object(
+            processor,
+            "generate_target_path",
+            return_value=source_file,
+        )
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=TrackMetadata(
+                title="Title",
+                artist="Artist",
+                album="Album",
+                album_artist="Artist",
+                file_extension=".mp3",
+            ),
+        )
 
         caplog.set_level(logging.INFO, logger="omym")
 
@@ -793,6 +853,7 @@ class TestMusicProcessor:
 
     def test_process_directory_preserves_already_organized_files(
         self,
+        mocker: MockerFixture,
         processor: MusicProcessor,
         tmp_path: Path,
     ) -> None:
@@ -806,6 +867,22 @@ class TestMusicProcessor:
         before_dao_mock = cast(MagicMock, processor.before_dao)
         before_dao_mock.check_file_exists.return_value = True
         before_dao_mock.get_target_path.return_value = str(organized_file)
+
+        _ = mocker.patch.object(
+            processor,
+            "generate_target_path",
+            return_value=organized_file,
+        )
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+            return_value=TrackMetadata(
+                title="Title",
+                artist="Artist",
+                album="Album",
+                album_artist="Artist",
+                file_extension=".mp3",
+            ),
+        )
 
         results = processor.process_directory(source_dir)
 

@@ -1,6 +1,6 @@
 owner: Maintainers
 status: active
-last_updated: 2025-10-01
+last_updated: 2025-10-02
 review_cadence: quarterly
 
 ## Goals and Success Metrics
@@ -15,6 +15,7 @@ review_cadence: quarterly
 
 ## User Stories and Acceptance Criteria
 - **Organise an entire library**: Given `uv run python -m omym organize <source> --target <dest>`, all supported tracks move under `<dest>/<Artist>/<YYYY_Album>/` using sanitised directory and file names, and the command exits with status 0 when no failures are reported.
+- **Reorganise on metadata changes**: When `organize` runs against an already organised library, tracks whose artist IDs or metadata now map to different targets relocate to their new canonical path while in-place matches remain untouched.
 - **Preview without side effects**: When the `plan` subcommand is used, no filesystem changes occur, the console lists the plan, and the SQLite log persists the preview for later inspection. Successful previews cache the metadata—including artist identifiers and romanised names—so the next real run can reuse them without repeating extraction.
 - **Preview duplicates clearly**: Plan previews label detected duplicate hashes as `Skipped (duplicate)` and in-place matches as `Skipped (already organized)` so operators can triage no-op entries before executing real moves.
 - **Cache preview IDs**: Database previews surface cached artist IDs when available and rely on filename heuristics only when results omit an ID.

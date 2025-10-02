@@ -1,7 +1,14 @@
-"""src/omym/features/metadata/usecases/file_runner.py
-What: Shared implementation for per-file music processing.
-Why: Shrink MusicProcessor by factoring out procedural logic.
-"""
+# /*
+# Where: features/metadata/usecases/file_runner.py
+# What: Shared implementation for per-file music processing orchestration.
+# Why: Keep MusicProcessor lean by isolating procedural flow and duplicate handling.
+# Assumptions:
+# - Processor dependencies follow ports specified in features.metadata.usecases.ports.
+# - File system semantics follow pathlib/shutil guarantees on POSIX-like systems.
+# Trade-offs:
+# - Duplicate detection now defers until metadata extraction to permit reorganizing when targets shift.
+# - Additional filesystem comparisons introduce minor overhead but improve correctness.
+# */
 
 from __future__ import annotations
 
@@ -35,6 +42,15 @@ from ..domain.track_metadata import TrackMetadata
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _paths_point_to_same_file(first: Path, second: Path) -> bool:
+    """Return True when two paths refer to the same filesystem entity."""
+
+    try:
+        return first.samefile(second)
+    except (FileNotFoundError, OSError):
+        return first.resolve() == second.resolve()
 
 
 class ProcessorLike(Protocol):
@@ -173,6 +189,14 @@ def run_file_processing(
             dry_run=processor.dry_run,
         )
 
+        duplicate_target_path: Path | None = None
+        if processor.before_dao.check_file_exists(ctx.file_hash):
+            target_raw = processor.before_dao.get_target_path(ctx.file_hash)
+            if isinstance(target_raw, Path):
+                duplicate_target_path = target_raw
+            elif isinstance(target_raw, str):
+                duplicate_target_path = Path(target_raw)
+
         preview_entry = None
         preview_used = False
         preview_payload: dict[str, object] = {}
@@ -184,15 +208,6 @@ def run_file_processing(
                 if source_matches and base_matches:
                     preview_payload = preview_entry.payload
                     preview_used = True
-
-        if processor.before_dao.check_file_exists(ctx.file_hash):
-            target_raw = processor.before_dao.get_target_path(ctx.file_hash)
-            return handle_duplicate(
-                ctx,
-                target_raw=target_raw,
-                associated_lyrics=associated_lyrics,
-                associated_artwork=associated_artwork,
-            )
 
         metadata: TrackMetadata | None = None
         original_artist: str | None = None
@@ -229,6 +244,18 @@ def run_file_processing(
         target_path = processor.generate_target_path(metadata, existing_path=file_path)
         if not target_path:
             raise ValueError("Failed to generate target path")
+
+        # Defer duplicate checks until after recomputing the destination so reorganize runs
+        # can relocate tracks when artist IDs or metadata evolve.
+        if duplicate_target_path is not None and _paths_point_to_same_file(
+            duplicate_target_path, target_path
+        ):
+            return handle_duplicate(
+                ctx,
+                target_raw=duplicate_target_path,
+                associated_lyrics=associated_lyrics,
+                associated_artwork=associated_artwork,
+            )
 
         if preview_used and not processor.dry_run:
             _sync_preview_romanization(
