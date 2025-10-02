@@ -223,6 +223,11 @@ class ArgumentParser:
             action="store_true",
             help="Clear all caches and processing state before processing",
         )
+        _ = parser.add_argument(
+            "--show-all-unprocessed",
+            action="store_true",
+            help="Display every unprocessed file instead of a truncated preview",
+        )
 
     @staticmethod
     def _process_organize(parsed_args: argparse.Namespace) -> OrganizeArgs:
@@ -249,6 +254,7 @@ class ArgumentParser:
             show_db=parsed_args.db,
             clear_artist_cache=parsed_args.clear_artist_cache,
             clear_cache=parsed_args.clear_cache,
+            show_all_unprocessed=parsed_args.show_all_unprocessed,
         )
 
     @staticmethod

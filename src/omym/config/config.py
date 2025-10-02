@@ -34,6 +34,9 @@ class Config:
     # Folder name for files that could not be organized
     unprocessed_dir_name: str = "!unprocessed"
 
+    # Maximum number of unprocessed file paths to show inline after a run
+    unprocessed_preview_limit: int = 5
+
     # MusicBrainz settings
     use_mb_romanization: bool = True
     mb_app_name: str | None = None
@@ -130,6 +133,13 @@ class Config:
         lines.append("# Folder name for files that could not be organized")
         lines.append(
             f"unprocessed_dir_name = {self._format_toml_value(config['unprocessed_dir_name'])}"
+        )
+        lines.append("")
+
+        # Unprocessed preview limit section
+        lines.append("# Maximum number of unprocessed files to preview inline (set to 0 for all)")
+        lines.append(
+            f"unprocessed_preview_limit = {self._format_toml_value(config['unprocessed_preview_limit'])}"
         )
         lines.append("")
 

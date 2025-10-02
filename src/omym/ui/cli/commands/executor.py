@@ -7,13 +7,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
 
-from omym.config.settings import UNPROCESSED_DIR_NAME
+from omym.config.settings import UNPROCESSED_DIR_NAME, UNPROCESSED_PREVIEW_LIMIT
 from omym.features.metadata import MusicProcessor, ProcessResult
 from omym.application.services.organize_service import OrganizeMusicService, OrganizeRequest
 from omym.ui.cli.args.options import OrganizeArgs
 from omym.ui.cli.display.preview import PreviewDisplay
 from omym.ui.cli.display.progress import ProgressDisplay
 from omym.ui.cli.display.result import ResultDisplay
+from omym.ui.cli.models import UnprocessedSummary
 from omym.features.metadata.usecases.unprocessed_cleanup import (
     calculate_pending_unprocessed,
     snapshot_unprocessed_candidates,
@@ -76,8 +77,31 @@ class CommandExecutor(ABC):
         self,
         source_root: Path,
         results: Sequence[ProcessResult],
-    ) -> int:
-        """Return the number of files that remain outside the organised targets."""
+    ) -> UnprocessedSummary:
+        """Summarise which files still require manual review after a run."""
+
+        pending_paths = self._collect_pending_paths(source_root, results)
+        total = len(pending_paths)
+
+        if total == 0:
+            return UnprocessedSummary(total=0, preview=[], truncated=False)
+
+        sorted_paths = sorted(
+            (self._to_relative_display_path(source_root, candidate) for candidate in pending_paths),
+        )
+
+        limit = 0 if self.args.show_all_unprocessed else UNPROCESSED_PREVIEW_LIMIT
+        preview = sorted_paths if limit <= 0 else sorted_paths[:limit]
+        truncated = len(preview) < total
+
+        return UnprocessedSummary(total=total, preview=preview, truncated=truncated)
+
+    def _collect_pending_paths(
+        self,
+        source_root: Path,
+        results: Sequence[ProcessResult],
+    ) -> set[Path]:
+        """Gather filesystem paths that remain unprocessed after orchestration."""
 
         if self.request.dry_run:
             snapshot = snapshot_unprocessed_candidates(
@@ -85,10 +109,19 @@ class CommandExecutor(ABC):
                 unprocessed_dir_name=UNPROCESSED_DIR_NAME,
             )
             pending_candidates = calculate_pending_unprocessed(snapshot, results)
-            return sum(1 for path in pending_candidates if path.is_file())
+            return {path for path in pending_candidates if path.is_file()}
 
         unprocessed_root = source_root / UNPROCESSED_DIR_NAME
         if not unprocessed_root.exists():
-            return 0
+            return set()
 
-        return sum(1 for candidate in unprocessed_root.rglob("*") if candidate.is_file())
+        return {candidate for candidate in unprocessed_root.rglob("*") if candidate.is_file()}
+
+    @staticmethod
+    def _to_relative_display_path(source_root: Path, candidate: Path) -> str:
+        """Render a candidate path relative to the root when possible."""
+
+        try:
+            return str(candidate.relative_to(source_root))
+        except ValueError:
+            return str(candidate)

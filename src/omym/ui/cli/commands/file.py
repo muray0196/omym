@@ -21,6 +21,6 @@ class FileCommand(CommandExecutor):
         """
         results = [self.processor.process_file(self.args.music_path)]
         self.display_results(results)
-        pending_total = self.calculate_unprocessed_pending(self.args.music_path.parent, results)
-        self.result_display.show_unprocessed_total(pending_total, quiet=self.args.quiet)
+        summary = self.calculate_unprocessed_pending(self.args.music_path.parent, results)
+        self.result_display.show_unprocessed_summary(summary, quiet=self.args.quiet)
         return results

@@ -3,11 +3,14 @@ What: Render user-facing summaries for organise/restore CLI flows.
 Why: Keep console output formatting consistent across the interface.
 """
 
+from __future__ import annotations
+
 from typing import final
 
 from rich.console import Console
 
 from omym.features.metadata import ProcessResult
+from omym.ui.cli.models import UnprocessedSummary
 
 from .summary import render_processing_summary
 
@@ -40,10 +43,22 @@ class ResultDisplay:
             failure_label="Failed",
         )
 
-    def show_unprocessed_total(self, pending_count: int, *, quiet: bool = False) -> None:
-        """Render the count of files that still require manual review."""
+    def show_unprocessed_summary(self, summary: UnprocessedSummary, *, quiet: bool = False) -> None:
+        """Render the pending-unprocessed report including optional previews."""
 
         if quiet:
             return
 
-        self.console.print(f"Unprocessed files awaiting review: {pending_count}")
+        total = summary.total
+        self.console.print(f"Unprocessed files awaiting review: {total}")
+
+        if total == 0:
+            return
+
+        for candidate in summary.preview:
+            self.console.print(f"  • {candidate}")
+
+        if summary.truncated:
+            remaining = total - len(summary.preview)
+            if remaining > 0:
+                self.console.print(f"...and {remaining} more.")

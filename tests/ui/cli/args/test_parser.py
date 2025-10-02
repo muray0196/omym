@@ -56,11 +56,13 @@ def test_create_parser() -> None:
             "--db",
             "--clear-artist-cache",
             "--clear-cache",
+            "--show-all-unprocessed",
         ]
     )
     assert not all_flags.dry_run
     assert all_flags.verbose and all_flags.force
     assert all_flags.interactive and all_flags.db
+    assert all_flags.show_all_unprocessed
 
 
 def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
@@ -76,6 +78,7 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
     assert args.music_path == test_dir
     assert args.target_path == test_dir
     assert not args.dry_run
+    assert not args.show_all_unprocessed
     assert mock_setup_logger.call_args.kwargs["console_level"] == logging.INFO
     assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
     mock_config.load.assert_called_once()
@@ -94,6 +97,7 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
             "--db",
             "--clear-artist-cache",
             "--clear-cache",
+            "--show-all-unprocessed",
         ]
     )
     assert isinstance(args, OrganizeArgs)
@@ -101,6 +105,7 @@ def test_process_args_organize(test_dir: Path, mocker: MockerFixture) -> None:
     assert not args.dry_run
     assert args.verbose and args.force and args.interactive
     assert args.show_db and args.clear_artist_cache and args.clear_cache
+    assert args.show_all_unprocessed
     assert mock_setup_logger.call_args.kwargs["console_level"] == logging.DEBUG
     assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
 
@@ -120,6 +125,7 @@ def test_process_args_plan(test_dir: Path, mocker: MockerFixture) -> None:
     assert args.target_path == test_dir
     assert args.dry_run
     assert not args.force
+    assert not args.show_all_unprocessed
     assert mock_setup_logger.call_args.kwargs["console_level"] == logging.INFO
     assert mock_setup_logger.call_args.kwargs["log_file"] == DEFAULT_LOG_FILE
 

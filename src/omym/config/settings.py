@@ -23,6 +23,9 @@ MB_CONTACT: str = app_config.mb_contact or ""
 # Directory name for collecting unprocessed files under a source root.
 UNPROCESSED_DIR_NAME: str = app_config.unprocessed_dir_name or "!unprocessed"
 
+_preview_limit = getattr(app_config, "unprocessed_preview_limit", 5)
+UNPROCESSED_PREVIEW_LIMIT: int = _preview_limit if _preview_limit >= 0 else 0
+
 
 __all__ = [
     "USE_MB_ROMANIZATION",
@@ -30,4 +33,5 @@ __all__ = [
     "MB_APP_VERSION",
     "MB_CONTACT",
     "UNPROCESSED_DIR_NAME",
+    "UNPROCESSED_PREVIEW_LIMIT",
 ]

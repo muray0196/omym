@@ -1,11 +1,12 @@
 """Tests for command execution."""
 
-import pytest
-from pathlib import Path
-from collections.abc import Generator
 import shutil
-from pytest_mock import MockerFixture
+from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
+from pytest_mock import MockerFixture
 
 from omym.features.metadata import (
     TrackMetadata,
@@ -58,6 +59,7 @@ def test_args(test_dir: Path) -> OrganizeArgs:
         show_db=False,
         clear_artist_cache=False,
         clear_cache=False,
+        show_all_unprocessed=False,
     )
 
 
@@ -121,7 +123,9 @@ def test_file_command(test_args: OrganizeArgs, mock_processor: MagicMock, mocker
     assert len(results) == 1
     mock_processor.process_file.assert_called_once_with(test_args.music_path)
     mock_result.return_value.show_results.assert_called_once()
-    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
+    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
+    assert summary_arg.total == 0
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -156,7 +160,9 @@ def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, m
     assert args[2] == test_args.music_path
     assert kwargs.get("interactive") == test_args.interactive
     mock_result.return_value.show_results.assert_called_once()
-    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
+    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
+    assert summary_arg.total == 0
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -188,7 +194,9 @@ def test_dry_run_mode(
     assert len(results) == 1
     mock_preview.return_value.show_preview.assert_called_once()
     mock_result.return_value.show_results.assert_not_called()
-    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
+    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
+    assert summary_arg.total == 0
 
 
 def test_file_command_error(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
@@ -217,7 +225,9 @@ def test_file_command_error(test_args: OrganizeArgs, mock_processor: MagicMock, 
     assert len(results) == 1
     assert not results[0].success
     mock_result.return_value.show_results.assert_called_once()
-    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
+    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
+    assert summary_arg.total == 0
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -253,7 +263,9 @@ def test_directory_command_interactive(test_args: OrganizeArgs, mock_processor: 
     assert args[2] == test_args.music_path
     assert kwargs.get("interactive") is True
     mock_result.return_value.show_results.assert_called_once()
-    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=False)
+    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
+    assert summary_arg.total == 0
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -284,7 +296,12 @@ def test_quiet_mode(
     # Verify
     assert len(results) == 1
     mock_result.return_value.show_results.assert_called_once_with(results, quiet=True)
-    mock_result.return_value.show_unprocessed_total.assert_called_once_with(0, quiet=True)
+    mock_result.return_value.show_unprocessed_summary.assert_called_once_with(
+        mocker.ANY,
+        quiet=True,
+    )
+    summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
+    assert summary_arg.total == 0
     mock_preview.return_value.show_preview.assert_not_called()
 
 
@@ -346,8 +363,25 @@ def test_calculate_unprocessed_pending_dry_run(tmp_path: Path) -> None:
         ),
     ]
 
-    pending = command.calculate_unprocessed_pending(tmp_path, results)
-    assert pending == 1
+    command.args = OrganizeArgs(
+        command="organize",
+        music_path=tmp_path,
+        target_path=tmp_path,
+        dry_run=True,
+        verbose=False,
+        quiet=False,
+        force=False,
+        interactive=False,
+        show_db=False,
+        clear_artist_cache=False,
+        clear_cache=False,
+        show_all_unprocessed=False,
+    )
+
+    pending_summary = command.calculate_unprocessed_pending(tmp_path, results)
+    assert pending_summary.total == 1
+    assert pending_summary.preview == ["fails.flac"]
+    assert not pending_summary.truncated
 
 
 def test_calculate_unprocessed_pending_real_run(tmp_path: Path) -> None:
@@ -367,5 +401,25 @@ def test_calculate_unprocessed_pending_real_run(tmp_path: Path) -> None:
     _ = (nested / "track1.mp3").write_bytes(b"1")
     _ = (unprocessed_root / "track2.flac").write_bytes(b"2")
 
-    pending = command.calculate_unprocessed_pending(tmp_path, [])
-    assert pending == 2
+    command.args = OrganizeArgs(
+        command="organize",
+        music_path=tmp_path,
+        target_path=tmp_path,
+        dry_run=False,
+        verbose=False,
+        quiet=False,
+        force=False,
+        interactive=False,
+        show_db=False,
+        clear_artist_cache=False,
+        clear_cache=False,
+        show_all_unprocessed=False,
+    )
+
+    pending_summary = command.calculate_unprocessed_pending(tmp_path, [])
+    assert pending_summary.total == 2
+    assert set(pending_summary.preview) == {
+        f"{UNPROCESSED_DIR_NAME}/nested/track1.mp3",
+        f"{UNPROCESSED_DIR_NAME}/track2.flac",
+    }
+    assert not pending_summary.truncated

@@ -7,6 +7,7 @@ from pytest_mock import MockerFixture
 
 from omym.features.metadata import ProcessResult, TrackMetadata
 from omym.ui.cli.display.result import ResultDisplay
+from omym.ui.cli.models import UnprocessedSummary
 
 
 @pytest.fixture
@@ -201,25 +202,34 @@ def test_show_results_quiet_mode(mocker: MockerFixture) -> None:
     render_mock.assert_not_called()
 
 
-def test_show_unprocessed_total_counts_files(mocker: MockerFixture) -> None:
-    """Ensure unprocessed total rendering includes the provided count."""
+def test_show_unprocessed_summary_lists_preview(mocker: MockerFixture) -> None:
+    """Ensure unprocessed summary renders totals, previews, and truncation notes."""
 
     mock_console = mocker.patch("omym.ui.cli.display.result.Console")
     display = ResultDisplay()
 
-    display.show_unprocessed_total(2, quiet=False)
-
-    mock_console.return_value.print.assert_called_with(
-        "Unprocessed files awaiting review: 2"
+    summary = UnprocessedSummary(
+        total=3,
+        preview=["!unprocessed/track1.flac", "!unprocessed/track2.flac"],
+        truncated=True,
     )
 
+    display.show_unprocessed_summary(summary, quiet=False)
 
-def test_show_unprocessed_total_respects_quiet(mocker: MockerFixture) -> None:
-    """Ensure quiet mode suppresses the unprocessed count output."""
+    mock_console.return_value.print.assert_any_call("Unprocessed files awaiting review: 3")
+    mock_console.return_value.print.assert_any_call("  • !unprocessed/track1.flac")
+    mock_console.return_value.print.assert_any_call("  • !unprocessed/track2.flac")
+    mock_console.return_value.print.assert_any_call("...and 1 more.")
+
+
+def test_show_unprocessed_summary_respects_quiet(mocker: MockerFixture) -> None:
+    """Ensure quiet mode suppresses the unprocessed summary output."""
 
     mock_console = mocker.patch("omym.ui.cli.display.result.Console")
     display = ResultDisplay()
 
-    display.show_unprocessed_total(5, quiet=True)
+    summary = UnprocessedSummary(total=5, preview=["a"], truncated=True)
+
+    display.show_unprocessed_summary(summary, quiet=True)
 
     mock_console.return_value.print.assert_not_called()

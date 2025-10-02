@@ -23,6 +23,7 @@ class OrganizeArgs:
     show_db: bool
     clear_artist_cache: bool
     clear_cache: bool
+    show_all_unprocessed: bool
 
 
 @final

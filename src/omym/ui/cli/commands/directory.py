@@ -26,6 +26,6 @@ class DirectoryCommand(CommandExecutor):
             interactive=self.args.interactive,
         )
         self.display_results(results)
-        pending_total = self.calculate_unprocessed_pending(self.args.music_path, results)
-        self.result_display.show_unprocessed_total(pending_total, quiet=self.args.quiet)
+        summary = self.calculate_unprocessed_pending(self.args.music_path, results)
+        self.result_display.show_unprocessed_summary(summary, quiet=self.args.quiet)
         return results
