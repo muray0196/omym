@@ -11,7 +11,7 @@ from pathlib import Path
 from sqlite3 import Connection
 from typing import Protocol, runtime_checkable
 
-from omym.shared.previews import PreviewCacheEntry
+from omym.shared import PreviewCacheEntry
 
 
 @runtime_checkable

@@ -25,7 +25,7 @@ from omym.features.path.usecases.renamer import (
     DirectoryGenerator,
     FileNameGenerator,
 )
-from omym.shared.previews import PreviewCacheEntry
+from omym.shared import PreviewCacheEntry
 
 from pytest_mock import MockerFixture
 
