@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/directory_runner.py
+"""src/omym/features/metadata/usecases/processing/directory_runner.py
 What: Shared implementation for directory-wide music processing.
 Why: Keep MusicProcessor slim while reusing robust directory orchestration logic.
 """
@@ -20,9 +20,9 @@ from .processing_types import (
     ProcessingEvent,
     ProcessingLogContext,
 )
-from .extraction.romanization import RomanizationCoordinator
-from .extraction.track_metadata_extractor import MetadataExtractor
-from .ports import DatabaseManagerPort, FilesystemPort
+from ..extraction.romanization import RomanizationCoordinator
+from ..extraction.track_metadata_extractor import MetadataExtractor
+from ..ports import DatabaseManagerPort, FilesystemPort
 from omym.shared.track_metadata import TrackMetadata
 
 

@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/file_context.py
+"""src/omym/features/metadata/usecases/file_management/file_context.py
 What: Shared state container for per-file processing helpers.
 Why: Avoid long parameter lists when coordinating helper functions.
 """
@@ -12,7 +12,7 @@ from typing import Protocol, TYPE_CHECKING
 if TYPE_CHECKING:
     from omym.features.path.usecases.renamer import CachedArtistIdGenerator
 
-from .processing_types import (
+from ..processing.processing_types import (
     ArtworkProcessingResult,
     LyricsProcessingResult,
     ProcessingEvent,

@@ -1,4 +1,4 @@
-"""Where: src/omym/features/metadata/usecases/file_operations.py
+"""Where: src/omym/features/metadata/usecases/file_management/file_operations.py
 What: File movement helpers and target-path generation for music assets.
 Why: Separate low-level filesystem handling from MusicProcessor orchestration.
 Assumptions: - Input paths reference regular files accessible on disk.
@@ -16,9 +16,9 @@ from omym.config.settings import FILE_HASH_CHUNK_SIZE
 from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
 from omym.platform.logging import logger
 
-from .associated_assets import ProcessLogger
-from .processing_types import ProcessingEvent
-from .ports import FilesystemPort
+from ..assets.associated_assets import ProcessLogger
+from ..processing.processing_types import ProcessingEvent
+from ..ports import FilesystemPort
 from omym.shared.track_metadata import TrackMetadata
 
 

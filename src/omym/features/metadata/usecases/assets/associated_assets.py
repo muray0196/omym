@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/associated_assets.py
+"""src/omym/features/metadata/usecases/assets/associated_assets.py
 What: Convenience re-export for asset detection and handling helpers.
 Why: Preserve existing import surface while splitting hefty modules.
 """

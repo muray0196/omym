@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/music_file_processor.py
+"""src/omym/features/metadata/usecases/processing/music_file_processor.py
 What: High-level coordinator that organises music files into the library structure.
 Why: Tie together metadata extraction, romanisation, persistence, and asset moves.
 """
@@ -32,16 +32,16 @@ from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import configure_romanization_cache
 
 from omym.shared.track_metadata import TrackMetadata
-from ..adapters.filesystem_adapter import LocalFilesystemAdapter
+from ...adapters.filesystem_adapter import LocalFilesystemAdapter
 from .directory_runner import run_directory_processing
 from .file_runner import run_file_processing
-from .file_operations import calculate_file_hash, generate_target_path, move_file
-from .unprocessed_cleanup import (
+from ..file_management.file_operations import calculate_file_hash, generate_target_path, move_file
+from ..cleanup.unprocessed_cleanup import (
     calculate_pending_unprocessed,
     relocate_unprocessed_files,
     snapshot_unprocessed_candidates,
 )
-from .ports import (
+from ..ports import (
     ArtistCachePort,
     DatabaseManagerPort,
     FilesystemPort,
@@ -50,8 +50,8 @@ from .ports import (
     ProcessingBeforePort,
 )
 from .processing_types import ProcessingEvent
-from .extraction.artist_cache_adapter import DryRunArtistCacheAdapter
-from .extraction.romanization import RomanizationCoordinator
+from ..extraction.artist_cache_adapter import DryRunArtistCacheAdapter
+from ..extraction.romanization import RomanizationCoordinator
 
 if TYPE_CHECKING:
     from .processing_types import ProcessResult

@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/processing_types.py
+"""src/omym/features/metadata/usecases/processing/processing_types.py
 Where: Metadata feature usecases layer.
 What: Shared enums and dataclasses for music file processing flow.
 Why: Keep the core processor lean by centralising type definitions.

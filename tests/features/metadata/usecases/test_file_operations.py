@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from omym.features.metadata.usecases import file_operations
+from omym.features.metadata.usecases.file_management import file_operations
 
 
 def test_calculate_file_hash_matches_sha256(

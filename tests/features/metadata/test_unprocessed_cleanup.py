@@ -8,7 +8,7 @@ from pytest_mock import MockerFixture
 
 from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.features.metadata.usecases.ports import FilesystemPort
-from omym.features.metadata.usecases.unprocessed_cleanup import relocate_unprocessed_files
+from omym.features.metadata.usecases.cleanup.unprocessed_cleanup import relocate_unprocessed_files
 
 
 def test_relocate_unprocessed_files_invokes_filesystem_port(

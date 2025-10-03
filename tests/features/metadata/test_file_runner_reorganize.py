@@ -30,7 +30,7 @@ from omym.shared import PreviewCacheEntry, TrackMetadata
 from pytest_mock import MockerFixture
 
 from omym.features.metadata.usecases.extraction.romanization import RomanizationCoordinator
-from omym.features.metadata.usecases.file_runner import run_file_processing
+from omym.features.metadata.usecases.processing.file_runner import run_file_processing
 
 
 class _StubBeforeDAO(ProcessingBeforePort):
@@ -301,7 +301,7 @@ def test_reorganize_moves_when_target_changes(tmp_path: Path, mocker: MockerFixt
     )
 
     _ = mocker.patch(
-        "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
+        "omym.features.metadata.usecases.processing.file_runner.MetadataExtractor.extract",
         return_value=metadata,
     )
 

@@ -8,6 +8,10 @@ review_cadence: quarterly
   - [`omym/features/`](../src/omym/features): Feature-oriented packages combining domain, use case, and adapter slices. Current features: `metadata`, `organization`, `path`, `restoration`.
     - `domain/`: pure business rules for the feature.
     - `usecases/`: application services, commands, queries, and port protocols.
+        - `processing/`: directory and file orchestration plus shared flow types.
+        - `assets/`: lyrics and artwork asset discovery, logging, and summarisation.
+        - `file_management/`: file hashing, duplicate handling, and target path utilities.
+        - `cleanup/`: post-run lifecycle helpers for unprocessed material.
     - `adapters/`: infrastructure implementations (DB, filesystem, external APIs) that fulfil ports.
   - [`omym/platform/`](../src/omym/platform): Cross-cutting technical services—database manager, filesystem primitives, logging bootstrap, configuration providers, MusicBrainz HTTP client.
     - `musicbrainz/`: split into focused modules (`http_client`, `rate_limit`, `romanization`, `cache`, `user_agent`) with `client.py` acting as the public façade.

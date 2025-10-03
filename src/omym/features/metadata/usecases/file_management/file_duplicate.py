@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/file_duplicate.py
+"""src/omym/features/metadata/usecases/file_management/file_duplicate.py
 What: Handle duplicate detection branch for file processing.
 Why: Keep the main runner concise by isolating duplicate logic.
 """
@@ -8,8 +8,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .associated_assets import process_artwork, process_lyrics, summarize_artwork, summarize_lyrics
-from .processing_types import ProcessResult, ProcessingEvent
+from ..assets.associated_assets import process_artwork, process_lyrics, summarize_artwork, summarize_lyrics
+from ..processing.processing_types import ProcessResult, ProcessingEvent
 from .file_context import FileProcessingContext
 
 

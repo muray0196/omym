@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/artwork_assets.py
+"""src/omym/features/metadata/usecases/assets/artwork_assets.py
 Where: Metadata feature usecases layer.
 What: Handle movement and summarisation of artwork files for tracks.
 Why: Separate artwork-specific behaviour from the core processor.
@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from omym.platform.filesystem import ensure_parent_directory
 
 from .asset_logging import ProcessLogger
-from .processing_types import ArtworkProcessingResult, ProcessingEvent
+from ..processing.processing_types import ArtworkProcessingResult, ProcessingEvent
 
 
 def process_artwork(
