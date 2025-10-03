@@ -1,3 +1,7 @@
+# Path: `tests/features/path/test_path_generator.py`
+# Summary: Verify path generation success and logging for failure scenarios.
+# Why: Confirm use cases surface domain issues without relying on domain logging.
+
 """Tests for the path generation system."""
 
 import sqlite3
@@ -279,14 +283,21 @@ def test_generate_paths_missing_values(path_generator: PathGenerator, filter_dao
     assert len(paths) == 0  # No paths generated due to missing album value
 
 
-def test_generate_paths_no_hierarchies(path_generator: PathGenerator) -> None:
+def test_generate_paths_no_hierarchies(
+    path_generator: PathGenerator,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Test generating paths with no hierarchies.
 
     Args:
         path_generator: A test path generator.
+        caplog: Pytest capture fixture for log assertions.
     """
+
+    caplog.set_level("ERROR")
     paths = path_generator.generate_paths()
     assert len(paths) == 0
+    assert any("No hierarchies found" in message for message in caplog.messages)
 
 
 def test_generate_paths_with_injected_port(tmp_path: Path) -> None:

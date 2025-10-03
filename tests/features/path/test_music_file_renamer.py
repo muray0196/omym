@@ -1,12 +1,20 @@
+# Path: `tests/features/path/test_music_file_renamer.py`
+# Summary: Exercise renamer helpers and ensure sanitization failures are logged.
+# Why: Validate that use cases handle domain exceptions without crashing.
+
 """Test renaming logic functionality."""
 
 from pathlib import Path
+
+import pytest
 
 from omym.features.path.usecases.renamer import (
     ArtistIdGenerator,
     CachedArtistIdGenerator,
     DirectoryGenerator,
+    FileNameGenerator,
 )
+from omym.features.path.domain.sanitizer import Sanitizer, SanitizerError
 from omym.shared.track_metadata import TrackMetadata
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.db_manager import DatabaseManager
@@ -238,3 +246,91 @@ class TestDirectoryGenerator:
 
         path = DirectoryGenerator.generate(metadata1)
         assert "0000_No-Year-Album" in str(path)
+
+    def test_directory_generator_logs_sanitizer_error(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Directory generation should log sanitization failures instead of raising."""
+
+        metadata = self.create_test_metadata(2024, "Log Album")
+
+        def _raise_artist(
+            _cls: type[Sanitizer],
+            _value: str | None,
+        ) -> str:
+            raise SanitizerError("artist sanitize failed")
+
+        monkeypatch.setattr(
+            Sanitizer,
+            "sanitize_artist_name",
+            classmethod(_raise_artist),
+        )
+
+        caplog.set_level("ERROR")
+
+        path = DirectoryGenerator.generate(metadata)
+
+        assert str(path) == "ERROR/0000_ERROR"
+        assert any("sanitize" in message for message in caplog.messages)
+
+
+class TestFileNameGenerator:
+    """Validate file name generation logging and fallbacks."""
+
+    def test_file_name_generator_logs_sanitizer_error(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Sanitizer failures should log and fall back to ERROR names with extension."""
+
+        db_path = tmp_path / "artist.db"
+        db_manager = DatabaseManager(db_path)
+        db_manager.connect()
+        if not db_manager.conn:
+            raise RuntimeError("Failed to connect to database")
+
+        generator = FileNameGenerator(CachedArtistIdGenerator(ArtistCacheDAO(db_manager.conn)))
+
+        metadata = TrackMetadata(
+            title="Problem Song",
+            artist="Artist",
+            album="Album",
+            album_artist="Artist",
+            file_extension=".mp3",
+        )
+
+        def _raise_title(
+            _cls: type[Sanitizer],
+            _value: str | None,
+        ) -> str:
+            raise SanitizerError("title sanitize failed")
+
+        monkeypatch.setattr(Sanitizer, "sanitize_title", classmethod(_raise_title))
+
+        caplog.set_level("ERROR")
+
+        result = generator.generate(metadata)
+
+        assert result == "ERROR.mp3"
+        assert any("sanitize" in message for message in caplog.messages)
+
+        caplog.clear()
+
+        metadata_no_ext = TrackMetadata(
+            title="Problem Song",
+            artist="Artist",
+            album="Album",
+            album_artist="Artist",
+            file_extension=None,
+        )
+
+        result_no_ext = generator.generate(metadata_no_ext)
+
+        assert result_no_ext == "ERROR"
+        assert any("sanitize" in message for message in caplog.messages)
+
+        db_manager.close()

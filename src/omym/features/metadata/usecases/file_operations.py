@@ -1,3 +1,7 @@
+# Path: `src/omym/features/metadata/usecases/file_operations.py`
+# Summary: File hashing, target path derivation, and move orchestration helpers.
+# Why: Shield orchestration from filesystem details while logging sanitization issues.
+
 """Where: src/omym/features/metadata/usecases/file_operations.py
 What: File movement helpers and target-path generation for music assets.
 Why: Separate low-level filesystem handling from MusicProcessor orchestration.
@@ -13,7 +17,11 @@ import shutil
 from pathlib import Path
 
 from omym.config.settings import FILE_HASH_CHUNK_SIZE
-from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
+from omym.features.path import (
+    DirectoryGenerator,
+    FileNameGenerator,
+    SanitizerError,
+)
 from omym.platform.logging import logger
 
 from .associated_assets import ProcessLogger
@@ -72,6 +80,9 @@ def generate_target_path(
         file_name = file_name_generator.generate(metadata)
         if not dir_path or not file_name:
             return None
+    except SanitizerError as exc:
+        logger.error("Sanitization failed while generating target path: %s", exc)
+        return None
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error("Error generating target path: %s", exc)
         return None
