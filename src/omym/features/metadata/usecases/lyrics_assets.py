@@ -1,6 +1,11 @@
 """src/omym/features/metadata/usecases/lyrics_assets.py
+Where: Metadata feature usecases layer.
 What: Handle movement and summarisation of lyrics files tied to tracks.
 Why: Keep lyrics-specific side effects isolated from core processing logic.
+Assumptions:
+- Filesystem exposes pathlib.samefile for already-organised detection.
+Trade-offs:
+- Treating identical source/target as organised skips warning about stale files.
 """
 
 from __future__ import annotations
@@ -54,6 +59,32 @@ def process_lyrics(
             dry_run=dry_run,
             reason="lyrics_source_missing",
         )
+
+    try:
+        if target_lyrics_path.exists() and target_lyrics_path.samefile(lyrics_path):
+            log(
+                logging.INFO,
+                ProcessingEvent.LYRICS_SKIP_ALREADY_AT_TARGET,
+                "Lyrics already at target [id=%s, path=%s]",
+                process_id,
+                lyrics_path,
+                process_id=process_id,
+                sequence=sequence,
+                total_files=total,
+                source_path=lyrics_path,
+                source_base_path=source_root,
+                target_path=target_lyrics_path,
+                target_base_path=target_root,
+            )
+            return LyricsProcessingResult(
+                source_path=lyrics_path,
+                target_path=target_lyrics_path,
+                moved=False,
+                dry_run=dry_run,
+                reason="already_at_target",
+            )
+    except OSError:
+        pass
 
     if target_lyrics_path.exists():
         log(
@@ -175,6 +206,7 @@ def summarize_lyrics(result: LyricsProcessingResult | None) -> list[str]:
         reason_map = {
             "target_exists": "target already exists",
             "lyrics_source_missing": "source lyrics missing",
+            "already_at_target": "already organized",
         }
         reason = result.reason or "unknown reason"
         friendly_reason = reason_map.get(reason, reason)

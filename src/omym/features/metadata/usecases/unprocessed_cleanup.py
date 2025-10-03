@@ -1,6 +1,11 @@
 """src/omym/features/metadata/usecases/unprocessed_cleanup.py
+Where: Metadata feature usecases layer.
 What: Utilities to relocate unprocessed files into a dedicated review folder.
 Why: Keep directory processors focused while centralising fallback clean-up logic.
+Assumptions:
+- Asset reasons signalling 'already at target' mean no further action is needed.
+Trade-offs:
+- Maintaining special-case reason lists introduces coupling to asset handlers.
 """
 
 from __future__ import annotations
@@ -12,6 +17,9 @@ from omym.platform.filesystem import ensure_parent_directory, remove_empty_direc
 from omym.platform.logging import logger
 
 from .processing_types import ProcessResult
+
+_LYRICS_COMPLETION_REASONS = {"already_at_target"}
+_ARTWORK_COMPLETION_REASONS = {"already_at_target"}
 
 
 def snapshot_unprocessed_candidates(
@@ -113,12 +121,18 @@ def calculate_pending_unprocessed(
         lyrics_result = result.lyrics_result
         if (
             lyrics_result is not None
-            and lyrics_result.reason is None
+            and (
+                lyrics_result.reason is None
+                or lyrics_result.reason in _LYRICS_COMPLETION_REASONS
+            )
         ):
             pending.discard(lyrics_result.source_path)
 
         for artwork_result in result.artwork_results:
-            if artwork_result.reason is None:
+            if (
+                artwork_result.reason is None
+                or artwork_result.reason in _ARTWORK_COMPLETION_REASONS
+            ):
                 pending.discard(artwork_result.source_path)
 
     return {path for path in pending if path.exists()}

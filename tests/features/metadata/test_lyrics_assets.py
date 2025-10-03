@@ -67,3 +67,36 @@ def test_summarize_lyrics_dry_run(tmp_path: Path) -> None:
     assert warnings == [
         "Dry run: lyrics song.lrc would move to song.lrc"
     ]
+
+
+def test_process_lyrics_already_at_target(tmp_path: Path) -> None:
+    """Lyrics already at the destination should be treated as organised."""
+
+    logger = DummyLogger()
+    library_root = tmp_path / "Library"
+    audio_target = library_root / "Artist" / "Album" / "track.mp3"
+    lyrics_source = audio_target.with_suffix(".lrc")
+    _ = lyrics_source.parent.mkdir(parents=True)
+    _ = lyrics_source.touch()
+
+    result = process_lyrics(
+        lyrics_source,
+        audio_target,
+        dry_run=False,
+        log=logger,
+        process_id="pid",
+        sequence=1,
+        total=1,
+        source_root=tmp_path,
+        target_root=library_root,
+    )
+
+    assert result.moved is False
+    assert result.reason == "already_at_target"
+    assert summarize_lyrics(result) == [
+        f"Lyrics file {lyrics_source.name} not moved: already organized"
+    ]
+    assert any(
+        event is ProcessingEvent.LYRICS_SKIP_ALREADY_AT_TARGET
+        for _, event, _ in logger.calls
+    )

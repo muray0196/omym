@@ -1,6 +1,11 @@
 """src/omym/features/metadata/usecases/artwork_assets.py
+Where: Metadata feature usecases layer.
 What: Handle movement and summarisation of artwork files for tracks.
 Why: Separate artwork-specific behaviour from the core processor.
+Assumptions:
+- samefile is reliable for detecting in-place artwork.
+Trade-offs:
+- Detection adds filesystem calls before moves, impacting throughput slightly.
 """
 
 from __future__ import annotations

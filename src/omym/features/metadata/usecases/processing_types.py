@@ -1,6 +1,11 @@
 """src/omym/features/metadata/usecases/processing_types.py
+Where: Metadata feature usecases layer.
 What: Shared enums and dataclasses for music file processing flow.
 Why: Keep the core processor lean by centralising type definitions.
+Assumptions:
+- Downstream log consumers tolerate additive enum members.
+Trade-offs:
+- Expanding the enum requires dependent systems to handle the new key.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ class ProcessingEvent(StrEnum):
     LYRICS_PLAN = "processing.lyrics.plan"
     LYRICS_SKIP_MISSING = "processing.lyrics.skip.missing"
     LYRICS_SKIP_CONFLICT = "processing.lyrics.skip.conflict"
+    LYRICS_SKIP_ALREADY_AT_TARGET = "processing.lyrics.skip.already_at_target"
     LYRICS_ERROR = "processing.lyrics.error"
     ARTWORK_MOVE = "processing.artwork.move"
     ARTWORK_PLAN = "processing.artwork.plan"
