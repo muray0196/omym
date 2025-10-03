@@ -1,59 +1,46 @@
-"""tests/features/metadata/test_unprocessed_cleanup.py
-Where: Metadata feature tests.
-What: Validate pending-unprocessed filtering rules for associated assets.
-Why: Guard against regressions that would misclassify organised files.
-"""
+"""Tests for unprocessed cleanup helpers using filesystem ports."""
+
+from __future__ import annotations
 
 from pathlib import Path
 
-from omym.features.metadata.usecases.processing_types import (
-    ArtworkProcessingResult,
-    LyricsProcessingResult,
-    ProcessResult,
-)
-from omym.features.metadata.usecases.unprocessed_cleanup import (
-    calculate_pending_unprocessed,
-)
+from pytest_mock import MockerFixture
+
+from omym.config.settings import UNPROCESSED_DIR_NAME
+from omym.features.metadata.usecases.ports import FilesystemPort
+from omym.features.metadata.usecases.unprocessed_cleanup import relocate_unprocessed_files
 
 
-def test_calculate_pending_ignores_already_at_target_assets(tmp_path: Path) -> None:
-    """Assets already at target should not be relocated to unprocessed."""
+def test_relocate_unprocessed_files_invokes_filesystem_port(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    """relocate_unprocessed_files should ensure directories and cleanup via the port."""
 
-    source_root = tmp_path / "Library"
-    audio_source = source_root / "Artist" / "Album" / "track.mp3"
-    lyrics_source = audio_source.with_suffix(".lrc")
-    artwork_source = audio_source.with_suffix(".jpg")
+    source = tmp_path / "album" / "track.mp3"
+    source.parent.mkdir(parents=True)
+    _ = source.write_text("dummy")
 
-    _ = lyrics_source.parent.mkdir(parents=True)
-    for path in (audio_source, lyrics_source, artwork_source):
-        _ = path.touch()
+    filesystem = mocker.create_autospec(FilesystemPort, instance=True)
 
-    snapshot = {audio_source, lyrics_source, artwork_source}
+    def ensure_parent(destination: Path) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        return destination.parent
 
-    result = ProcessResult(
-        source_path=audio_source,
-        target_path=audio_source,
-        success=True,
+    filesystem.ensure_parent_directory.side_effect = ensure_parent
+    filesystem.remove_empty_directories.return_value = None
+
+    moves = relocate_unprocessed_files(
+        tmp_path,
+        [source],
+        unprocessed_dir_name=UNPROCESSED_DIR_NAME,
         dry_run=False,
-        lyrics_result=LyricsProcessingResult(
-            source_path=lyrics_source,
-            target_path=lyrics_source,
-            moved=False,
-            dry_run=False,
-            reason="already_at_target",
-        ),
-        artwork_results=[
-            ArtworkProcessingResult(
-                source_path=artwork_source,
-                target_path=artwork_source,
-                linked_track=audio_source,
-                moved=False,
-                dry_run=False,
-                reason="already_at_target",
-            )
-        ],
+        filesystem=filesystem,
     )
 
-    pending = calculate_pending_unprocessed(snapshot, [result])
+    destination = tmp_path / UNPROCESSED_DIR_NAME / "album" / "track.mp3"
+    assert moves == [(source, destination)]
+    assert destination.exists()
+    assert not source.exists()
 
-    assert pending == set()
+    filesystem.ensure_parent_directory.assert_called_once_with(destination)
+    filesystem.remove_empty_directories.assert_called_once_with(tmp_path)

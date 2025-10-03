@@ -18,6 +18,7 @@ from omym.features.metadata import (
     ProcessingEvent,
     ProcessResult,
 )
+from omym.features.metadata.usecases.ports import FilesystemPort
 from omym.shared import PreviewCacheEntry, TrackMetadata
 
 
@@ -715,6 +716,45 @@ class TestMusicProcessor:
         process_ids.discard(None)
         assert len(process_ids) == 1
 
+    def test_process_directory_passes_filesystem_port_to_cleanup(
+        self,
+        mocker: MockerFixture,
+        processor: MusicProcessor,
+        tmp_path: Path,
+    ) -> None:
+        """The processor should wire its filesystem port into relocation helpers."""
+
+        filesystem = mocker.create_autospec(FilesystemPort, instance=True)
+        processor.filesystem = filesystem
+
+        remaining = {tmp_path / "unprocessed" / "leftover.txt"}
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.music_file_processor.snapshot_unprocessed_candidates",
+            return_value=remaining,
+        )
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.music_file_processor.run_directory_processing",
+            return_value=[],
+        )
+        _ = mocker.patch(
+            "omym.features.metadata.usecases.music_file_processor.calculate_pending_unprocessed",
+            return_value=remaining,
+        )
+        relocate_mock = mocker.patch(
+            "omym.features.metadata.usecases.music_file_processor.relocate_unprocessed_files",
+            return_value=[],
+        )
+
+        _ = processor.process_directory(tmp_path)
+
+        relocate_mock.assert_called_once_with(
+            tmp_path,
+            remaining,
+            unprocessed_dir_name=UNPROCESSED_DIR_NAME,
+            dry_run=processor.dry_run,
+            filesystem=filesystem,
+        )
+
     def test_process_directory_rollback_failure_logs_and_raises(
         self,
         mocker: MockerFixture,
@@ -733,8 +773,9 @@ class TestMusicProcessor:
             "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
-        _ = mocker.patch(
-            "omym.features.metadata.usecases.directory_runner.remove_empty_directories",
+        _ = mocker.patch.object(
+            processor.filesystem,
+            "remove_empty_directories",
             autospec=True,
         )
 

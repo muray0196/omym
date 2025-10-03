@@ -32,6 +32,7 @@ from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import configure_romanization_cache
 
 from omym.shared.track_metadata import TrackMetadata
+from ..adapters.filesystem_adapter import LocalFilesystemAdapter
 from .directory_runner import run_directory_processing
 from .file_runner import run_file_processing
 from .file_operations import calculate_file_hash, generate_target_path, move_file
@@ -43,6 +44,7 @@ from .unprocessed_cleanup import (
 from .ports import (
     ArtistCachePort,
     DatabaseManagerPort,
+    FilesystemPort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
@@ -90,9 +92,12 @@ class MusicProcessor:
         after_gateway: ProcessingAfterPort | None = None,
         artist_cache: ArtistCachePort | None = None,
         preview_cache: PreviewCachePort | None = None,
+        filesystem: FilesystemPort | None = None,
     ) -> None:
         self.base_path = base_path
         self.dry_run = dry_run
+
+        self.filesystem: FilesystemPort = filesystem or LocalFilesystemAdapter()
 
         try:
             self.artist_name_preferences = load_artist_name_preferences()
@@ -178,6 +183,7 @@ class MusicProcessor:
             src_path,
             dest_path,
             log=self._log_processing,
+            filesystem=self.filesystem,
             process_id=process_id,
             sequence=sequence,
             total=total,
@@ -312,6 +318,7 @@ class MusicProcessor:
             remaining_candidates,
             unprocessed_dir_name=UNPROCESSED_DIR_NAME,
             dry_run=self.dry_run,
+            filesystem=self.filesystem,
         )
 
         return results

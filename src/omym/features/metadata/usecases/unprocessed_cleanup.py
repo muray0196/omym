@@ -13,10 +13,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-from omym.platform.filesystem import ensure_parent_directory, remove_empty_directories
 from omym.platform.logging import logger
 
 from .processing_types import ProcessResult
+from .ports import FilesystemPort
 
 _LYRICS_COMPLETION_REASONS = {"already_at_target"}
 _ARTWORK_COMPLETION_REASONS = {"already_at_target"}
@@ -55,6 +55,7 @@ def relocate_unprocessed_files(
     *,
     unprocessed_dir_name: str,
     dry_run: bool,
+    filesystem: FilesystemPort,
 ) -> list[tuple[Path, Path]]:
     """Relocate surviving snapshot files under the unprocessed folder.
 
@@ -87,7 +88,7 @@ def relocate_unprocessed_files(
             )
             continue
 
-        _ = ensure_parent_directory(destination)
+        _ = filesystem.ensure_parent_directory(destination)
         target_path = _next_available_destination(destination)
         _ = original_path.replace(target_path)
         moves.append((original_path, target_path))
@@ -99,7 +100,7 @@ def relocate_unprocessed_files(
         )
 
     if moves:
-        remove_empty_directories(root)
+        filesystem.remove_empty_directories(root)
 
     return moves
 

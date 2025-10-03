@@ -14,11 +14,11 @@ from pathlib import Path
 
 from omym.config.settings import FILE_HASH_CHUNK_SIZE
 from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
-from omym.platform.filesystem import ensure_parent_directory
 from omym.platform.logging import logger
 
 from .associated_assets import ProcessLogger
 from .processing_types import ProcessingEvent
+from .ports import FilesystemPort
 from omym.shared.track_metadata import TrackMetadata
 
 
@@ -85,6 +85,7 @@ def move_file(
     dest_path: Path,
     *,
     log: ProcessLogger,
+    filesystem: FilesystemPort,
     process_id: str | None = None,
     sequence: int | None = None,
     total: int | None = None,
@@ -93,7 +94,7 @@ def move_file(
 ) -> None:
     """Move a file from the source path to the target path."""
 
-    _ = ensure_parent_directory(dest_path)
+    _ = filesystem.ensure_parent_directory(dest_path)
     log(
         logging.INFO,
         ProcessingEvent.FILE_MOVE,

@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Protocol
 
 from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
-from omym.platform.filesystem import remove_empty_directories
 
 from .processing_types import (
     DirectoryRollbackError,
@@ -23,7 +22,7 @@ from .processing_types import (
 )
 from .extraction.romanization import RomanizationCoordinator
 from .extraction.track_metadata_extractor import MetadataExtractor
-from .ports import DatabaseManagerPort
+from .ports import DatabaseManagerPort, FilesystemPort
 from omym.shared.track_metadata import TrackMetadata
 
 
@@ -34,6 +33,7 @@ class ProcessorLike(Protocol):
     dry_run: bool
     db_manager: DatabaseManagerPort
     directory_generator: DirectoryGenerator
+    filesystem: FilesystemPort
     SUPPORTED_EXTENSIONS: set[str]
 
     def log_processing(
@@ -191,7 +191,7 @@ def run_directory_processing(
                 progress_callback(processed_count, total_files, current_file)
 
         if not processor.dry_run:
-            remove_empty_directories(directory)
+            processor.filesystem.remove_empty_directories(directory)
             conn.commit()
 
         summary_extra = stats.summary_extra()
