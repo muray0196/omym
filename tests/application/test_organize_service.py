@@ -22,8 +22,6 @@ from omym.features.metadata.adapters import LocalFilesystemAdapter
 def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> None:
     """Service should construct a MusicProcessor with given parameters."""
 
-    service = OrganizeMusicService()
-
     mock_db_cls = mocker.patch(
         "omym.application.services.organize_service.DatabaseManager"
     )
@@ -65,6 +63,8 @@ def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> No
         "omym.application.services.organize_service.MusicProcessor"
     )
 
+    service = OrganizeMusicService()
+
     req = OrganizeRequest(base_path=Path("."), dry_run=True)
     _ = service.build_processor(req)
 
@@ -92,8 +92,6 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
     caplog: LogCaptureFixture, mocker: MockerFixture
 ) -> None:
     """build_processor should warn and continue when cache cleanup fails."""
-    service = OrganizeMusicService()
-
     processor_mock = mocker.Mock()
     conn = mocker.Mock(name="conn")
     db_manager = mocker.Mock(conn=conn)
@@ -136,6 +134,8 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
     maintenance_instance.clear_all.side_effect = sqlite3.OperationalError(
         "maintenance clearing failed"
     )
+
+    service = OrganizeMusicService()
 
     caplog.set_level(logging.WARNING, logger="omym")
 

@@ -14,8 +14,6 @@ from omym.application.services.organize_service import (
 
 def test_clear_cache_uses_maintenance_dao(mocker: MockerFixture) -> None:
     """When clear_cache=True, service should call MaintenanceDAO.clear_all()."""
-    service = OrganizeMusicService()
-
     db_manager = mocker.MagicMock()
     db_manager.conn = object()
     artist_cache = mocker.MagicMock()
@@ -57,6 +55,8 @@ def test_clear_cache_uses_maintenance_dao(mocker: MockerFixture) -> None:
     mocked_maint = mocker.patch("omym.application.services.organize_service.MaintenanceDAO")
     maint_instance = mocked_maint.return_value
 
+    service = OrganizeMusicService()
+
     req = OrganizeRequest(base_path=Path("."), dry_run=True, clear_cache=True)
     _ = service.build_processor(req)
 
@@ -73,8 +73,6 @@ def test_clear_cache_uses_maintenance_dao(mocker: MockerFixture) -> None:
 
 def test_clear_artist_cache_uses_artist_dao(mocker: MockerFixture) -> None:
     """When clear_artist_cache=True, service should call ArtistCacheDAO.clear_cache()."""
-    service = OrganizeMusicService()
-
     db_manager = mocker.MagicMock()
     db_manager.conn = object()
     artist_cache = mocker.MagicMock()
@@ -112,6 +110,8 @@ def test_clear_artist_cache_uses_artist_dao(mocker: MockerFixture) -> None:
         "omym.application.services.organize_service.MusicProcessor",
         side_effect=processor_factory,
     )
+
+    service = OrganizeMusicService()
 
     req = OrganizeRequest(base_path=Path("."), dry_run=True, clear_artist_cache=True)
     _ = service.build_processor(req)
