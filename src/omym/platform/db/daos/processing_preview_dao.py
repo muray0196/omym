@@ -10,7 +10,7 @@ import sqlite3
 from pathlib import Path
 from typing import Final, cast
 
-from omym.features.metadata.usecases.ports import PreviewCacheEntry
+from omym.shared import PreviewCacheEntry
 from omym.platform.logging import logger
 
 

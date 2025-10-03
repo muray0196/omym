@@ -19,7 +19,7 @@ from omym.features.metadata import (
     ProcessingEvent,
     ProcessResult,
 )
-from omym.features.metadata.usecases.ports import PreviewCacheEntry
+from omym.shared import PreviewCacheEntry
 
 
 @pytest.fixture

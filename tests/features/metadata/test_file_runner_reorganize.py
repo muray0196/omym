@@ -18,7 +18,6 @@ from omym.features.metadata.usecases.ports import (
     ArtistCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
-    PreviewCacheEntry,
     PreviewCachePort,
 )
 from omym.features.path.usecases.renamer import (
@@ -26,6 +25,7 @@ from omym.features.path.usecases.renamer import (
     DirectoryGenerator,
     FileNameGenerator,
 )
+from omym.shared import PreviewCacheEntry
 
 from pytest_mock import MockerFixture
 
