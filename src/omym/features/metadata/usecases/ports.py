@@ -108,3 +108,16 @@ class PreviewCachePort(Protocol):
     def delete_preview(self, file_hash: str) -> bool:
         """Remove a cached preview entry."""
         ...
+
+
+@runtime_checkable
+class FilesystemPort(Protocol):
+    """Port abstracting filesystem directory management helpers."""
+
+    def ensure_parent_directory(self, path: Path) -> Path:
+        """Ensure the parent directory for ``path`` exists and return it."""
+        ...
+
+    def remove_empty_directories(self, directory: Path) -> None:
+        """Recursively remove empty directories rooted at ``directory``."""
+        ...

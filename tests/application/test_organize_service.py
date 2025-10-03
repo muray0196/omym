@@ -16,6 +16,7 @@ from omym.application.services.organize_service import (
     OrganizeRequest,
 )
 from omym.features.metadata import ProcessResult
+from omym.features.metadata.adapters import LocalFilesystemAdapter
 
 
 def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> None:
@@ -35,6 +36,7 @@ def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> No
     kwargs = mocked.call_args.kwargs
     assert kwargs.get("base_path") == Path(".")
     assert kwargs.get("dry_run") is True
+    assert isinstance(kwargs.get("filesystem"), LocalFilesystemAdapter)
 
 
 def test_build_processor_warns_and_continues_on_cache_clear_failure(

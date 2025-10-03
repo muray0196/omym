@@ -733,8 +733,9 @@ class TestMusicProcessor:
             "omym.features.metadata.usecases.file_runner.MetadataExtractor.extract",
             return_value=metadata,
         )
-        _ = mocker.patch(
-            "omym.features.metadata.usecases.directory_runner.remove_empty_directories",
+        _ = mocker.patch.object(
+            processor.filesystem,
+            "remove_empty_directories",
             autospec=True,
         )
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Callable, final
 
 from omym.features.metadata import MusicProcessor, ProcessResult
+from omym.features.metadata.adapters import LocalFilesystemAdapter
 from omym.platform.db.daos.maintenance_dao import MaintenanceDAO
 from omym.platform.logging import logger
 
@@ -50,7 +51,11 @@ class OrganizeMusicService:
         Returns:
             Configured ``MusicProcessor`` instance.
         """
-        processor = MusicProcessor(base_path=request.base_path, dry_run=request.dry_run)
+        processor = MusicProcessor(
+            base_path=request.base_path,
+            dry_run=request.dry_run,
+            filesystem=LocalFilesystemAdapter(),
+        )
 
         # Optionally clear artist cache; continue on recognized transient errors.
         if request.clear_artist_cache and hasattr(processor, "artist_dao"):

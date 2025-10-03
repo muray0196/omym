@@ -18,6 +18,7 @@ from .usecases.processing_types import (
 from .usecases.ports import (
     ArtistCachePort,
     DatabaseManagerPort,
+    FilesystemPort,
     ProcessingAfterPort,
     ProcessingBeforePort,
 )
@@ -37,4 +38,5 @@ __all__ = [
     "ProcessingBeforePort",
     "ProcessingAfterPort",
     "ArtistCachePort",
+    "FilesystemPort",
 ]
