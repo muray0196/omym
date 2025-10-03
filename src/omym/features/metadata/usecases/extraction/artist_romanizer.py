@@ -19,7 +19,7 @@ from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import fetch_romanized_name
 from omym.platform.musicbrainz.cache import save_cached_name
 
-from ...domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 ArtistFetcher = Callable[[str], str | None]
 LanguageDetector = Callable[[str], str | None]

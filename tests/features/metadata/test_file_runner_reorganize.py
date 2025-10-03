@@ -25,11 +25,10 @@ from omym.features.path.usecases.renamer import (
     DirectoryGenerator,
     FileNameGenerator,
 )
-from omym.shared import PreviewCacheEntry
+from omym.shared import PreviewCacheEntry, TrackMetadata
 
 from pytest_mock import MockerFixture
 
-from omym.features.metadata import TrackMetadata
 from omym.features.metadata.usecases.extraction.romanization import RomanizationCoordinator
 from omym.features.metadata.usecases.file_runner import run_file_processing
 

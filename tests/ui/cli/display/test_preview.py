@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import ClassVar
 from pytest_mock import MockerFixture
 
-from omym.features.metadata import TrackMetadata
 from omym.features.metadata import (
     ArtworkProcessingResult,
     LyricsProcessingResult,
     ProcessResult,
 )
+from omym.shared import TrackMetadata
 from omym.ui.cli.display.preview import PreviewDisplay
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import ClassVar, final
 
-from omym.features.metadata.domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 from omym.features.path.domain.sanitizer import Sanitizer
 from omym.platform.logging import logger
 

@@ -9,7 +9,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from omym.features.metadata import ProcessResult
-from omym.features.metadata import TrackMetadata
+from omym.shared import TrackMetadata
 from omym.features.restoration.domain.models import (
     CollisionPolicy,
     RestorePlanItem,

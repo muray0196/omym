@@ -7,8 +7,9 @@ import pytest
 from pytest_mock import MockerFixture
 
 from typing import Callable
-from omym.features.metadata import TrackMetadata
+
 from omym.features.metadata import ProcessResult
+from omym.shared import TrackMetadata
 from omym.ui.cli.display.progress import ProgressDisplay, ProcessorWithProgress
 from omym.application.services.organize_service import OrganizeRequest
 from omym.platform.logging import logger

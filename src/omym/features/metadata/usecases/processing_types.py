@@ -17,7 +17,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from ..domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 
 class ProcessingEvent(StrEnum):

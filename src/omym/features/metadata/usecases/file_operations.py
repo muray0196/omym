@@ -19,7 +19,7 @@ from omym.platform.logging import logger
 
 from .associated_assets import ProcessLogger
 from .processing_types import ProcessingEvent
-from ..domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 
 def calculate_file_hash(file_path: Path) -> str:

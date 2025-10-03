@@ -1,6 +1,10 @@
+# Where: omym.features.metadata.__init__
+# What: Expose metadata feature services and shared dataclasses.
+# Why: Provide a cohesive import surface for UI and integration layers.
+
 """Public API for the metadata feature."""
 
-from .domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 from .usecases.extraction import ArtistRomanizer, MetadataExtractor
 from .usecases.music_file_processor import MusicProcessor
 from .usecases.processing_types import (

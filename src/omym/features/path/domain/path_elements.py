@@ -8,7 +8,7 @@ from the shared layer so adapters and the domain agree on the structure.
 from abc import ABC, abstractmethod
 from typing import final, ClassVar, override
 
-from omym.features.metadata.domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 from omym.features.path.domain.sanitizer import Sanitizer
 from omym.platform.logging import logger
 from omym.shared.path_components import ComponentValue

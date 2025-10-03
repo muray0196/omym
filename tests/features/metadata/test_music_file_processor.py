@@ -11,7 +11,6 @@ import pytest
 from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
-from omym.features.metadata import TrackMetadata
 from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.features.metadata import (
     DirectoryRollbackError,
@@ -19,7 +18,7 @@ from omym.features.metadata import (
     ProcessingEvent,
     ProcessResult,
 )
-from omym.shared import PreviewCacheEntry
+from omym.shared import PreviewCacheEntry, TrackMetadata
 
 
 @pytest.fixture

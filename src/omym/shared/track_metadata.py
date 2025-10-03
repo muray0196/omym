@@ -1,4 +1,8 @@
-"""Metadata related functionality."""
+# Where: omym.shared.track_metadata
+# What: Canonical TrackMetadata dataclass shared across features.
+# Why: Centralize metadata representation for reuse and consistency.
+
+"""Shared dataclass representing track metadata."""
 
 from dataclasses import dataclass
 
@@ -18,3 +22,6 @@ class TrackMetadata:
     disc_number: int | None = None
     disc_total: int | None = None
     file_extension: str | None = None
+
+
+__all__ = ["TrackMetadata"]

@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from omym.features.metadata import ProcessResult, TrackMetadata
+from omym.features.metadata import ProcessResult
+from omym.shared import TrackMetadata
 from omym.ui.cli.display.result import ResultDisplay
 from omym.ui.cli.models import UnprocessedSummary
 
