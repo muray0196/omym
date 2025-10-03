@@ -24,7 +24,7 @@ from .processing_types import (
 from .extraction.romanization import RomanizationCoordinator
 from .extraction.track_metadata_extractor import MetadataExtractor
 from .ports import DatabaseManagerPort
-from ..domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 
 class ProcessorLike(Protocol):

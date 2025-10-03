@@ -38,7 +38,7 @@ from .ports import (
 from .processing_types import ProcessResult, ProcessingEvent
 from .extraction.romanization import RomanizationCoordinator
 from .extraction.track_metadata_extractor import MetadataExtractor
-from ..domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 
 LOGGER = logging.getLogger(__name__)

@@ -1,4 +1,4 @@
-from omym.features.metadata.domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 from omym.features.path.usecases.renamer import FileNameGenerator, CachedArtistIdGenerator
 from omym.platform.db.db_manager import DatabaseManager
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO

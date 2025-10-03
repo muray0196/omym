@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 from .associated_assets import process_artwork, process_lyrics, summarize_artwork, summarize_lyrics
 from .processing_types import ProcessResult, ProcessingEvent
 from .file_context import FileProcessingContext

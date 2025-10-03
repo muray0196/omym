@@ -17,7 +17,7 @@ from .format_extractors import (
     OpusExtractor,
 )
 from .artist_romanizer import ArtistRomanizer
-from ...domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 __all__ = [
     "MetadataExtractor",

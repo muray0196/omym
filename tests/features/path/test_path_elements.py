@@ -11,7 +11,7 @@ from omym.features.path.domain.path_elements import (
     AlbumComponent,
     PathComponentFactory,
 )
-from omym.features.metadata.domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 
 @pytest.fixture

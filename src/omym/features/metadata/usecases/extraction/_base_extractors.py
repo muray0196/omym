@@ -16,7 +16,7 @@ from mutagen._util import MutagenError
 from omym.platform.logging import logger
 
 from ._tag_utils import parse_slash_separated, parse_year, safe_get_first
-from ...domain.track_metadata import TrackMetadata
+from omym.shared.track_metadata import TrackMetadata
 
 if TYPE_CHECKING:
     from mutagen import MutagenTags
