@@ -1,9 +1,14 @@
-"""Data access object for path components."""
+"""Adapter layer DAO for path components stored in SQLite.
+
+This module persists ComponentValue records generated in the path domain
+model. Importing the dataclass from the shared layer keeps adapters in sync
+with the domain types while avoiding duplicate definitions.
+"""
 
 from sqlite3 import Connection
 from typing import final
 
-from omym.features.path.domain.path_elements import ComponentValue
+from omym.shared.path_components import ComponentValue
 from omym.platform.logging import logger
 
 

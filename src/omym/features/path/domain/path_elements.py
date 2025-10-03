@@ -1,21 +1,17 @@
-"""Path component handling functionality."""
+"""Domain-level path component behavior for building file paths.
+
+This module defines the polymorphic path component abstractions used to
+generate filesystem paths from track metadata. ComponentValue is imported
+from the shared layer so adapters and the domain agree on the structure.
+"""
 
 from abc import ABC, abstractmethod
 from typing import final, ClassVar, override
-from dataclasses import dataclass
 
 from omym.features.metadata.domain.track_metadata import TrackMetadata
 from omym.features.path.domain.sanitizer import Sanitizer
 from omym.platform.logging import logger
-
-
-@dataclass
-class ComponentValue:
-    """Value and metadata for a path component."""
-
-    value: str
-    order: int
-    type: str
+from omym.shared.path_components import ComponentValue
 
 
 class PathComponent(ABC):
