@@ -3,8 +3,8 @@
 import pytest
 from typing import override
 
+from omym.shared.path_components import ComponentValue
 from omym.features.path.domain.path_elements import (
-    ComponentValue,
     PathComponent,
     AlbumArtistComponent,
     AlbumComponent,

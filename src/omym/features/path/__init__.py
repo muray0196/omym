@@ -1,8 +1,9 @@
-"""Public API for the path feature."""
+"""Public API for the path feature (domain + use cases)."""
+
+from omym.shared.path_components import ComponentValue
 
 from .domain.sanitizer import Sanitizer
 from .domain.path_elements import (
-    ComponentValue,
     PathComponent,
     PathComponentFactory,
     AlbumArtistComponent,
