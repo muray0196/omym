@@ -1,5 +1,10 @@
 """Tests for music file processing functionality."""
 
+"""tests/features/metadata/test_music_file_processor.py
+What: Validate MusicProcessor orchestration across processing scenarios.
+Why: Dependency injection refactor must preserve behavior and contracts.
+"""
+
 import logging
 import sqlite3
 from dataclasses import asdict
@@ -18,7 +23,16 @@ from omym.features.metadata import (
     ProcessingEvent,
     ProcessResult,
 )
+from omym.features.metadata.adapters import LocalFilesystemAdapter
+from omym.features.metadata.usecases.extraction.artist_cache_adapter import (
+    DryRunArtistCacheAdapter,
+)
 from omym.features.metadata.usecases.ports import FilesystemPort
+from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
+from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
+from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
+from omym.platform.db.daos.processing_preview_dao import ProcessingPreviewDAO
+from omym.platform.db.db_manager import DatabaseManager
 from omym.shared import PreviewCacheEntry, TrackMetadata
 
 
@@ -65,32 +79,47 @@ def processor(mocker: MockerFixture, tmp_path: Path, file_hash: str) -> MusicPro
     Returns:
         MusicProcessor: A test processor.
     """
-    # Mock database manager
-    mock_db = mocker.patch("omym.features.metadata.usecases.music_file_processor.DatabaseManager").return_value
-    mock_db.conn = mocker.MagicMock()
+    configure_patch = mocker.patch(
+        "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
+    )
 
-    # Mock DAOs
-    mock_before_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingBeforeDAO").return_value
-    mock_after_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingAfterDAO").return_value
-    mock_artist_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ArtistCacheDAO").return_value
-    mock_preview_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingPreviewDAO").return_value
+    db_manager = mocker.MagicMock()
+    db_manager.conn = mocker.MagicMock()
 
-    # Configure DAO behavior
-    _ = mock_before_dao.check_file_exists.return_value = False
-    _ = mock_before_dao.insert_file.return_value = True
-    _ = mock_after_dao.insert_file.return_value = True
-    _ = mock_artist_dao.get_artist_id.return_value = "PNKFL"
-    _ = mock_artist_dao.get_romanized_name.return_value = None
-    _ = mock_artist_dao.insert_artist_id.return_value = True
-    _ = mock_artist_dao.upsert_romanized_name.return_value = True
-    _ = mock_preview_dao.get_preview.return_value = None
-    _ = mock_preview_dao.upsert_preview.return_value = True
-    _ = mock_preview_dao.delete_preview.return_value = True
+    before_dao = mocker.MagicMock()
+    before_dao.check_file_exists.return_value = False
+    before_dao.insert_file.return_value = True
+    before_dao.get_target_path.return_value = None
 
-    # Create processor
-    processor = MusicProcessor(base_path=tmp_path)
+    after_dao = mocker.MagicMock()
+    after_dao.insert_file.return_value = True
 
-    # Mock file hash calculation
+    artist_dao = mocker.MagicMock()
+    artist_dao.get_artist_id.return_value = "PNKFL"
+    artist_dao.get_romanized_name.return_value = None
+    artist_dao.insert_artist_id.return_value = True
+    artist_dao.upsert_romanized_name.return_value = True
+    artist_dao.clear_cache.return_value = True
+
+    preview_dao = mocker.MagicMock()
+    preview_dao.get_preview.return_value = None
+    preview_dao.upsert_preview.return_value = True
+    preview_dao.delete_preview.return_value = True
+
+    filesystem = LocalFilesystemAdapter()
+
+    processor = MusicProcessor(
+        base_path=tmp_path,
+        dry_run=False,
+        db_manager=db_manager,
+        before_gateway=before_dao,
+        after_gateway=after_dao,
+        artist_cache=artist_dao,
+        preview_cache=preview_dao,
+        filesystem=filesystem,
+    )
+    configure_patch.assert_called_once_with(artist_dao)
+
     _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
 
     return processor
@@ -1080,9 +1109,9 @@ class TestMusicProcessor:
         _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
 
         # Mock database check to indicate file exists
-        mock_before_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingBeforeDAO").return_value
-        mock_before_dao.check_file_exists.return_value = True
-        mock_before_dao.get_target_path.return_value = str(existing_file)
+        before_dao = cast(MagicMock, processor.before_dao)
+        before_dao.check_file_exists.return_value = True
+        before_dao.get_target_path.return_value = existing_file
 
         # Act
         result = processor.process_file(source_file)
@@ -1123,9 +1152,9 @@ class TestMusicProcessor:
         _ = mocker.patch("omym.features.metadata.usecases.file_runner.MetadataExtractor.extract", return_value=metadata)
 
         # Mock database check to indicate file exists
-        mock_before_dao = mocker.patch("omym.features.metadata.usecases.music_file_processor.ProcessingBeforeDAO").return_value
-        mock_before_dao.check_file_exists.return_value = True
-        mock_before_dao.get_target_path.return_value = str(existing_file)
+        before_dao = cast(MagicMock, processor.before_dao)
+        before_dao.check_file_exists.return_value = True
+        before_dao.get_target_path.return_value = existing_file
 
         # Act
         result = processor.process_file(source_file)
@@ -1249,10 +1278,41 @@ class TestMusicProcessor:
                 self.romanized.clear()
                 return True
 
+        class StubPreviewCache:
+            def __init__(self) -> None:
+                self.entries: dict[str, PreviewCacheEntry] = {}
+
+            def upsert_preview(
+                self,
+                *,
+                file_hash: str,
+                source_path: Path,
+                base_path: Path,
+                target_path: Path | None,
+                payload: dict[str, object],
+            ) -> bool:
+                self.entries[file_hash] = PreviewCacheEntry(
+                    file_hash=file_hash,
+                    source_path=source_path,
+                    base_path=base_path,
+                    target_path=target_path,
+                    payload=payload,
+                )
+                return True
+
+            def get_preview(self, file_hash: str) -> PreviewCacheEntry | None:
+                return self.entries.get(file_hash)
+
+            def delete_preview(self, file_hash: str) -> bool:
+                return self.entries.pop(file_hash, None) is not None
+
         stub_db = StubDatabaseManager()
         stub_before = StubProcessingBefore()
         stub_after = StubProcessingAfter()
         stub_artist = StubArtistCache()
+        stub_preview = StubPreviewCache()
+
+        stub_db.connect()
 
         configure_mock = mocker.patch(
             "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
@@ -1264,12 +1324,15 @@ class TestMusicProcessor:
             before_gateway=stub_before,
             after_gateway=stub_after,
             artist_cache=stub_artist,
+            preview_cache=stub_preview,
+            filesystem=LocalFilesystemAdapter(),
         )
 
         assert processor.db_manager is stub_db
         assert processor.before_dao is stub_before
         assert processor.after_dao is stub_after
         assert processor.artist_dao is stub_artist
+        assert processor.preview_dao is stub_preview
         assert stub_db.connect_called is True
         configure_mock.assert_called_once_with(stub_artist)
 
@@ -1306,7 +1369,31 @@ def test_dry_run_skips_persistent_state(
         return_value=metadata,
     )
 
-    processor = MusicProcessor(base_path=destination_dir, dry_run=True)
+    configure_patch = mocker.patch(
+        "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
+    )
+
+    db_manager = DatabaseManager(":memory:")
+    db_manager.connect()
+    conn = db_manager.conn
+    assert conn is not None
+
+    before_dao = ProcessingBeforeDAO(conn)
+    after_dao = ProcessingAfterDAO(conn)
+    preview_dao = ProcessingPreviewDAO(conn)
+    artist_cache = DryRunArtistCacheAdapter(ArtistCacheDAO(conn))
+
+    processor = MusicProcessor(
+        base_path=destination_dir,
+        dry_run=True,
+        db_manager=db_manager,
+        before_gateway=before_dao,
+        after_gateway=after_dao,
+        artist_cache=artist_cache,
+        preview_cache=preview_dao,
+        filesystem=LocalFilesystemAdapter(),
+    )
+    configure_patch.assert_called_once_with(artist_cache)
     target_candidate = destination_dir / "Track.mp3"
     _ = mocker.patch.object(processor, "_generate_target_path", return_value=target_candidate)
 
@@ -1326,4 +1413,5 @@ def test_dry_run_skips_persistent_state(
     assert cursor.fetchone()[0] == 0
 
     processor._romanizer_executor.shutdown(wait=False)  # pyright: ignore[reportPrivateUsage] - executor cleanup for test
+    assert processor.db_manager.conn is not None
     processor.db_manager.conn.close()

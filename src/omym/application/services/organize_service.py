@@ -11,6 +11,15 @@ from typing import Callable, final
 
 from omym.features.metadata import MusicProcessor, ProcessResult
 from omym.features.metadata.adapters import LocalFilesystemAdapter
+from omym.features.metadata.usecases.ports import ArtistCachePort
+from omym.features.metadata.usecases.extraction.artist_cache_adapter import (
+    DryRunArtistCacheAdapter,
+)
+from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
+from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
+from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
+from omym.platform.db.daos.processing_preview_dao import ProcessingPreviewDAO
+from omym.platform.db.db_manager import DatabaseManager
 from omym.platform.db.daos.maintenance_dao import MaintenanceDAO
 from omym.platform.logging import logger
 
@@ -51,37 +60,58 @@ class OrganizeMusicService:
         Returns:
             Configured ``MusicProcessor`` instance.
         """
+        filesystem = LocalFilesystemAdapter()
+        db_manager = DatabaseManager()
+        if db_manager.conn is None:
+            db_manager.connect()
+        conn = db_manager.conn
+        if conn is None:
+            raise RuntimeError("Database connection could not be established")
+
+        before_dao = ProcessingBeforeDAO(conn)
+        after_dao = ProcessingAfterDAO(conn)
+        preview_dao = ProcessingPreviewDAO(conn)
+        base_artist_dao = ArtistCacheDAO(conn)
+        artist_dao: ArtistCachePort
+        if request.dry_run:
+            artist_dao = DryRunArtistCacheAdapter(base_artist_dao)
+        else:
+            artist_dao = base_artist_dao
+
         processor = MusicProcessor(
             base_path=request.base_path,
             dry_run=request.dry_run,
-            filesystem=LocalFilesystemAdapter(),
+            db_manager=db_manager,
+            before_gateway=before_dao,
+            after_gateway=after_dao,
+            artist_cache=artist_dao,
+            preview_cache=preview_dao,
+            filesystem=filesystem,
         )
 
         # Optionally clear artist cache; continue on recognized transient errors.
-        if request.clear_artist_cache and hasattr(processor, "artist_dao"):
-            artist_dao = getattr(processor, "artist_dao")
-            if artist_dao is not None:
-                try:
-                    _ = artist_dao.clear_cache()
-                except Exception as exc:
-                    if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
-                        logger.warning(
-                            (
-                                "build_processor: clear_artist_cache requested but "
-                                "artist_dao.clear_cache() failed; continuing without "
-                                "flushing the persistent artist cache. error=%s"
-                            ),
-                            exc,
-                        )
-                    else:
-                        raise
+        if request.clear_artist_cache:
+            artist_dao = processor.artist_dao
+            try:
+                _ = artist_dao.clear_cache()
+            except Exception as exc:
+                if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
+                    logger.warning(
+                        (
+                            "build_processor: clear_artist_cache requested but "
+                            "artist_dao.clear_cache() failed; continuing without "
+                            "flushing the persistent artist cache. error=%s"
+                        ),
+                        exc,
+                    )
+                else:
+                    raise
 
         # Optionally clear all caches and processing state when requested.
         if request.clear_cache:
-            db_manager = getattr(processor, "db_manager", None)
-            conn: sqlite3.Connection | None = None
+            db_manager = processor.db_manager
+            conn: sqlite3.Connection | None = db_manager.conn
             try:
-                conn = db_manager.conn if db_manager is not None else None
                 if conn is not None:
                     _ = MaintenanceDAO(conn).clear_all()
             except Exception as exc:

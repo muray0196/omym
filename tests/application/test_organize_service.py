@@ -21,21 +21,70 @@ from omym.features.metadata.adapters import LocalFilesystemAdapter
 
 def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> None:
     """Service should construct a MusicProcessor with given parameters."""
+
     service = OrganizeMusicService()
 
-    # Patch MusicProcessor to observe construction
-    mocked = mocker.patch(
+    mock_db_cls = mocker.patch(
+        "omym.application.services.organize_service.DatabaseManager"
+    )
+    db_instance = mock_db_cls.return_value
+    db_instance.conn = None
+    db_connection = mocker.Mock(name="conn")
+
+    def connect_side_effect() -> None:
+        db_instance.conn = db_connection
+
+    db_instance.connect.side_effect = connect_side_effect
+
+    mock_before_cls = mocker.patch(
+        "omym.application.services.organize_service.ProcessingBeforeDAO"
+    )
+    before_instance = mock_before_cls.return_value
+
+    mock_after_cls = mocker.patch(
+        "omym.application.services.organize_service.ProcessingAfterDAO"
+    )
+    after_instance = mock_after_cls.return_value
+
+    mock_preview_cls = mocker.patch(
+        "omym.application.services.organize_service.ProcessingPreviewDAO"
+    )
+    preview_instance = mock_preview_cls.return_value
+
+    mock_artist_cls = mocker.patch(
+        "omym.application.services.organize_service.ArtistCacheDAO"
+    )
+    base_artist_instance = mock_artist_cls.return_value
+
+    mock_dry_run_cls = mocker.patch(
+        "omym.application.services.organize_service.DryRunArtistCacheAdapter"
+    )
+    dry_run_instance = mock_dry_run_cls.return_value
+
+    mocked_processor = mocker.patch(
         "omym.application.services.organize_service.MusicProcessor"
     )
-    _ = mocked.return_value
 
     req = OrganizeRequest(base_path=Path("."), dry_run=True)
     _ = service.build_processor(req)
 
-    mocked.assert_called_once()
-    kwargs = mocked.call_args.kwargs
+    _ = mock_db_cls.assert_called_once_with()
+    _ = db_instance.connect.assert_called_once_with()
+    _ = mock_before_cls.assert_called_once_with(db_connection)
+    _ = mock_after_cls.assert_called_once_with(db_connection)
+    _ = mock_preview_cls.assert_called_once_with(db_connection)
+    _ = mock_artist_cls.assert_called_once_with(db_connection)
+    _ = mock_dry_run_cls.assert_called_once_with(base_artist_instance)
+
+    _ = mocked_processor.assert_called_once()
+    kwargs = mocked_processor.call_args.kwargs
     assert kwargs.get("base_path") == Path(".")
     assert kwargs.get("dry_run") is True
+    assert kwargs.get("db_manager") is db_instance
+    assert kwargs.get("before_gateway") is before_instance
+    assert kwargs.get("after_gateway") is after_instance
+    assert kwargs.get("preview_cache") is preview_instance
+    assert kwargs.get("artist_cache") is dry_run_instance
     assert isinstance(kwargs.get("filesystem"), LocalFilesystemAdapter)
 
 
@@ -46,12 +95,34 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
     service = OrganizeMusicService()
 
     processor_mock = mocker.Mock()
-    processor_mock.artist_dao = mocker.Mock()
-    processor_mock.artist_dao.clear_cache.side_effect = sqlite3.OperationalError(
-        "artist cache locked"
-    )
     conn = mocker.Mock(name="conn")
-    processor_mock.db_manager = mocker.Mock(conn=conn)
+    db_manager = mocker.Mock(conn=conn)
+    processor_mock.db_manager = db_manager
+
+    base_artist = mocker.Mock()
+    processor_mock.artist_dao = base_artist
+    base_artist.clear_cache.side_effect = sqlite3.OperationalError("artist cache locked")
+
+    _ = mocker.patch(
+        "omym.application.services.organize_service.DatabaseManager",
+        return_value=db_manager,
+    )
+    _ = mocker.patch(
+        "omym.application.services.organize_service.ProcessingBeforeDAO"
+    )
+    _ = mocker.patch(
+        "omym.application.services.organize_service.ProcessingAfterDAO"
+    )
+    _ = mocker.patch(
+        "omym.application.services.organize_service.ProcessingPreviewDAO"
+    )
+    _ = mocker.patch(
+        "omym.application.services.organize_service.ArtistCacheDAO",
+        return_value=base_artist,
+    )
+    mock_dry_run = mocker.patch(
+        "omym.application.services.organize_service.DryRunArtistCacheAdapter"
+    )
 
     _ = mocker.patch(
         "omym.application.services.organize_service.MusicProcessor",
@@ -78,8 +149,9 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
     result = service.build_processor(request)
 
     assert result is processor_mock
-    processor_mock.artist_dao.clear_cache.assert_called_once_with()
-    maintenance_cls.assert_called_once_with(conn)
+    _ = processor_mock.artist_dao.clear_cache.assert_called_once_with()
+    _ = maintenance_cls.assert_called_once_with(conn)
+    mock_dry_run.assert_not_called()
 
     warning_messages = [
         record.message for record in caplog.records if record.levelno == logging.WARNING
@@ -93,13 +165,10 @@ def test_process_file_delegates(mocker: MockerFixture) -> None:
     service = OrganizeMusicService()
     req = OrganizeRequest(base_path=Path("."), dry_run=True)
 
-    # Mock processor
-    mocked_proc = mocker.patch(
-        "omym.application.services.organize_service.MusicProcessor"
-    )
-    instance = mocked_proc.return_value
-    instance.process_file.return_value = ProcessResult(source_path=Path("a.mp3"), success=True)
+    processor = mocker.Mock()
+    _ = mocker.patch.object(service, "build_processor", return_value=processor)
+    processor.process_file.return_value = ProcessResult(source_path=Path("a.mp3"), success=True)
 
     res = service.process_file(req, Path("a.mp3"))
     assert res.success is True
-    instance.process_file.assert_called_once()
+    processor.process_file.assert_called_once()
