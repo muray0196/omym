@@ -3,6 +3,7 @@
 import pytest
 from typing import override
 
+from omym.shared import ComponentValue as ExportedComponentValue
 from omym.shared.path_components import ComponentValue
 from omym.features.path.domain.path_elements import (
     PathComponent,
@@ -41,6 +42,11 @@ def test_component_value() -> None:
     assert value.value == "test"
     assert value.order == 1
     assert value.type == "TestType"
+
+
+def test_shared_component_value_reexport() -> None:
+    """Ensure ComponentValue is re-exported from the shared package."""
+    assert ExportedComponentValue is ComponentValue
 
 
 def test_album_artist_component_with_album_artist(metadata: TrackMetadata) -> None:

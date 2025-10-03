@@ -7,6 +7,8 @@ consistent typing across module boundaries without duplicating logic.
 
 from dataclasses import dataclass
 
+__all__ = ["ComponentValue"]
+
 
 @dataclass
 class ComponentValue:
