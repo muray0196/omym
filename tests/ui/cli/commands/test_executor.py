@@ -9,11 +9,11 @@ import pytest
 from pytest_mock import MockerFixture
 
 from omym.features.metadata import (
-    TrackMetadata,
-    ProcessResult,
-    LyricsProcessingResult,
     ArtworkProcessingResult,
+    LyricsProcessingResult,
+    ProcessResult,
 )
+from omym.shared import TrackMetadata
 from omym.application.services.organize_service import OrganizeRequest
 from omym.config.settings import UNPROCESSED_DIR_NAME
 from omym.ui.cli.args.options import OrganizeArgs

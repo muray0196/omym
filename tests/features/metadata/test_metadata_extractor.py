@@ -12,8 +12,8 @@ import pytest
 from pytest_mock import MockerFixture
 
 from omym.features.metadata import ArtistRomanizer
-from omym.features.metadata import TrackMetadata
 from omym.features.metadata import MetadataExtractor
+from omym.shared import TrackMetadata
 
 # Type aliases for metadata dictionaries
 MP3Metadata: TypeAlias = dict[str, list[str]]

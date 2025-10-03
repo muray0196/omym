@@ -3,7 +3,7 @@ from __future__ import annotations
 from pytest_mock import MockerFixture
 
 from omym.features.metadata import ArtistRomanizer
-from omym.features.metadata import TrackMetadata
+from omym.shared import TrackMetadata
 
 
 class TestArtistRomanizer:
