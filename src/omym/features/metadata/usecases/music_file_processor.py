@@ -23,16 +23,10 @@ from omym.features.path.usecases.renamer import (
     DirectoryGenerator,
     FileNameGenerator,
 )
-from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
-from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
-from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
-from omym.platform.db.daos.processing_preview_dao import ProcessingPreviewDAO
-from omym.platform.db.db_manager import DatabaseManager
 from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import configure_romanization_cache
 
 from omym.shared.track_metadata import TrackMetadata
-from ..adapters.filesystem_adapter import LocalFilesystemAdapter
 from .directory_runner import run_directory_processing
 from .file_runner import run_file_processing
 from .file_operations import calculate_file_hash, generate_target_path, move_file
@@ -50,7 +44,6 @@ from .ports import (
     ProcessingBeforePort,
 )
 from .processing_types import ProcessingEvent
-from .extraction.artist_cache_adapter import DryRunArtistCacheAdapter
 from .extraction.romanization import RomanizationCoordinator
 
 if TYPE_CHECKING:
@@ -87,17 +80,17 @@ class MusicProcessor:
         base_path: Path,
         *,
         dry_run: bool = False,
-        db_manager: DatabaseManagerPort | None = None,
-        before_gateway: ProcessingBeforePort | None = None,
-        after_gateway: ProcessingAfterPort | None = None,
-        artist_cache: ArtistCachePort | None = None,
-        preview_cache: PreviewCachePort | None = None,
-        filesystem: FilesystemPort | None = None,
+        db_manager: DatabaseManagerPort,
+        before_gateway: ProcessingBeforePort,
+        after_gateway: ProcessingAfterPort,
+        artist_cache: ArtistCachePort,
+        preview_cache: PreviewCachePort,
+        filesystem: FilesystemPort,
     ) -> None:
         self.base_path = base_path
         self.dry_run = dry_run
 
-        self.filesystem: FilesystemPort = filesystem or LocalFilesystemAdapter()
+        self.filesystem: FilesystemPort = filesystem
 
         try:
             self.artist_name_preferences = load_artist_name_preferences()
@@ -106,25 +99,15 @@ class MusicProcessor:
                 f"Failed to load artist name preference configuration: {exc}"
             ) from exc
 
-        self.db_manager = db_manager or DatabaseManager()
+        self.db_manager = db_manager
         if self.db_manager.conn is None:
-            self.db_manager.connect()
-        conn = self.db_manager.conn
-        if conn is None:
-            raise RuntimeError("Failed to connect to database")
+            raise RuntimeError("Database manager must provide an active connection")
 
-        self.before_dao = before_gateway or ProcessingBeforeDAO(conn)
-        self.after_dao = after_gateway or ProcessingAfterDAO(conn)
-        self.preview_dao = preview_cache or ProcessingPreviewDAO(conn)
+        self.before_dao = before_gateway
+        self.after_dao = after_gateway
+        self.preview_dao = preview_cache
 
-        if artist_cache is not None:
-            self.artist_dao = artist_cache
-        else:
-            base_artist_dao = ArtistCacheDAO(conn)
-            if self.dry_run:
-                self.artist_dao = DryRunArtistCacheAdapter(base_artist_dao)
-            else:
-                self.artist_dao = base_artist_dao
+        self.artist_dao = artist_cache
         configure_romanization_cache(self.artist_dao)
 
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)

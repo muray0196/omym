@@ -73,8 +73,7 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
     Returns:
         MagicMock: Mock processor instance.
     """
-    mock = mocker.patch("omym.application.services.organize_service.MusicProcessor", autospec=True)
-    mock_instance = mock.return_value
+    mock_instance = mocker.MagicMock()
     mock_instance.base_path = Path("output")
 
     # Setup mock process_file method
@@ -99,6 +98,11 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
         artist_id=None,
     )
 
+    _ = mocker.patch(
+        "omym.application.services.organize_service.OrganizeMusicService.build_processor",
+        return_value=mock_instance,
+    )
+
     return mock_instance
 
 
@@ -121,12 +125,12 @@ def test_file_command(test_args: OrganizeArgs, mock_processor: MagicMock, mocker
 
     # Verify
     assert len(results) == 1
-    mock_processor.process_file.assert_called_once_with(test_args.music_path)
-    mock_result.return_value.show_results.assert_called_once()
-    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    _ = mock_processor.process_file.assert_called_once_with(test_args.music_path)
+    _ = mock_result.return_value.show_results.assert_called_once()
+    _ = mock_result.return_value.show_unprocessed_summary.assert_called_once()
     summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
     assert summary_arg.total == 0
-    mock_preview.return_value.show_preview.assert_not_called()
+    _ = mock_preview.return_value.show_preview.assert_not_called()
 
 
 def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, mocker: MockerFixture) -> None:
@@ -160,11 +164,11 @@ def test_directory_command(test_args: OrganizeArgs, mock_processor: MagicMock, m
     assert args[2] == test_args.music_path
     assert kwargs.get("interactive") == test_args.interactive
     assert kwargs.get("processor") is mock_processor
-    mock_result.return_value.show_results.assert_called_once()
-    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    _ = mock_result.return_value.show_results.assert_called_once()
+    _ = mock_result.return_value.show_unprocessed_summary.assert_called_once()
     summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
     assert summary_arg.total == 0
-    mock_preview.return_value.show_preview.assert_not_called()
+    _ = mock_preview.return_value.show_preview.assert_not_called()
 
 
 def test_dry_run_mode(
@@ -193,9 +197,9 @@ def test_dry_run_mode(
 
     # Verify
     assert len(results) == 1
-    mock_preview.return_value.show_preview.assert_called_once()
-    mock_result.return_value.show_results.assert_not_called()
-    mock_result.return_value.show_unprocessed_summary.assert_called_once()
+    _ = mock_preview.return_value.show_preview.assert_called_once()
+    _ = mock_result.return_value.show_results.assert_not_called()
+    _ = mock_result.return_value.show_unprocessed_summary.assert_called_once()
     summary_arg = mock_result.return_value.show_unprocessed_summary.call_args.args[0]
     assert summary_arg.total == 0
 

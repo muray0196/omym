@@ -46,8 +46,7 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
     Returns:
         MagicMock: Mock processor instance.
     """
-    mock = mocker.patch("omym.application.services.organize_service.MusicProcessor")
-    mock_instance = mock.return_value
+    mock_instance = mocker.MagicMock()
 
     # Setup mock process_file method
     metadata = TrackMetadata(
@@ -69,6 +68,11 @@ def mock_processor(mocker: MockerFixture) -> MagicMock:
         success=True,
         metadata=metadata,
         artist_id=None,
+    )
+
+    _ = mocker.patch(
+        "omym.application.services.organize_service.OrganizeMusicService.build_processor",
+        return_value=mock_instance,
     )
 
     return mock_instance
@@ -105,9 +109,9 @@ def test_process_single_file(test_dir: Path, mock_processor: MagicMock, mocker: 
     CommandProcessor.process_command(['organize', str(test_file)])
 
     # Verify
-    mock_processor.process_file.assert_called_once_with(test_file)
-    mock_result.return_value.show_results.assert_called_once()
-    mock_preview.return_value.show_preview.assert_not_called()
+    _ = mock_processor.process_file.assert_called_once_with(test_file)
+    _ = mock_result.return_value.show_results.assert_called_once()
+    _ = mock_preview.return_value.show_preview.assert_not_called()
 
 
 def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: MockerFixture) -> None:
@@ -136,8 +140,8 @@ def test_process_directory(test_dir: Path, mock_processor: MagicMock, mocker: Mo
     # Third positional arg is directory
     assert args[2] == test_dir
     assert kwargs.get("interactive") is False
-    mock_result.return_value.show_results.assert_called_once()
-    mock_preview.return_value.show_preview.assert_not_called()
+    _ = mock_result.return_value.show_results.assert_called_once()
+    _ = mock_preview.return_value.show_preview.assert_not_called()
 
 
 def test_plan_subcommand(test_dir: Path, mocker: MockerFixture) -> None:
@@ -156,8 +160,8 @@ def test_plan_subcommand(test_dir: Path, mocker: MockerFixture) -> None:
     CommandProcessor.process_command(['plan', str(test_dir)])
 
     # Verify
-    mock_preview.return_value.show_preview.assert_called_once()
-    mock_result.return_value.show_results.assert_not_called()
+    _ = mock_preview.return_value.show_preview.assert_called_once()
+    _ = mock_result.return_value.show_results.assert_not_called()
 
 
 def test_error_handling(

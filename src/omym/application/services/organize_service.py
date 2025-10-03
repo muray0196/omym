@@ -4,6 +4,8 @@ This layer centralizes orchestration and construction of domain/infra objects
 so that multiple UIs (CLI, GUI) can reuse the same use cases.
 """
 
+from __future__ import annotations
+
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +13,22 @@ from typing import Callable, final
 
 from omym.features.metadata import MusicProcessor, ProcessResult
 from omym.features.metadata.adapters import LocalFilesystemAdapter
+from omym.features.metadata.usecases.ports import (
+    ArtistCachePort,
+    DatabaseManagerPort,
+    FilesystemPort,
+    PreviewCachePort,
+    ProcessingAfterPort,
+    ProcessingBeforePort,
+)
+from omym.features.metadata.usecases.extraction.artist_cache_adapter import (
+    DryRunArtistCacheAdapter,
+)
+from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
+from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
+from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
+from omym.platform.db.daos.processing_preview_dao import ProcessingPreviewDAO
+from omym.platform.db.db_manager import DatabaseManager
 from omym.platform.db.daos.maintenance_dao import MaintenanceDAO
 from omym.platform.logging import logger
 
@@ -42,6 +60,53 @@ class OrganizeMusicService:
     semantics in one place so UIs don't need to reach into infra details.
     """
 
+    def __init__(
+        self,
+        *,
+        filesystem_factory: Callable[[], FilesystemPort] | None = None,
+        db_factory: Callable[[], DatabaseManagerPort] | None = None,
+        before_factory: Callable[[sqlite3.Connection], ProcessingBeforePort] | None = None,
+        after_factory: Callable[[sqlite3.Connection], ProcessingAfterPort] | None = None,
+        preview_factory: Callable[[sqlite3.Connection], PreviewCachePort] | None = None,
+        artist_factory: Callable[[sqlite3.Connection], ArtistCacheDAO] | None = None,
+        dry_run_artist_factory: Callable[[ArtistCacheDAO], ArtistCachePort] | None = None,
+        maintenance_factory: Callable[[sqlite3.Connection], MaintenanceDAO] | None = None,
+        processor_factory: Callable[..., MusicProcessor] | None = None,
+    ) -> None:
+        """Create a service with overridable infrastructure factories.
+
+        Tests can inject light-weight doubles while production code relies on
+        the default adapters and DAOs.
+        """
+
+        self._filesystem_factory: Callable[[], FilesystemPort] = (
+            filesystem_factory or LocalFilesystemAdapter
+        )
+        self._db_factory: Callable[[], DatabaseManagerPort] = (
+            db_factory or DatabaseManager
+        )
+        self._before_factory: Callable[[sqlite3.Connection], ProcessingBeforePort] = (
+            before_factory or ProcessingBeforeDAO
+        )
+        self._after_factory: Callable[[sqlite3.Connection], ProcessingAfterPort] = (
+            after_factory or ProcessingAfterDAO
+        )
+        self._preview_factory: Callable[[sqlite3.Connection], PreviewCachePort] = (
+            preview_factory or ProcessingPreviewDAO
+        )
+        self._artist_factory: Callable[[sqlite3.Connection], ArtistCacheDAO] = (
+            artist_factory or ArtistCacheDAO
+        )
+        self._dry_run_artist_factory: Callable[[ArtistCacheDAO], ArtistCachePort] = (
+            dry_run_artist_factory or DryRunArtistCacheAdapter
+        )
+        self._maintenance_factory: Callable[[sqlite3.Connection], MaintenanceDAO] = (
+            maintenance_factory or MaintenanceDAO
+        )
+        self._processor_factory: Callable[..., MusicProcessor] = (
+            processor_factory or MusicProcessor
+        )
+
     def build_processor(self, request: OrganizeRequest) -> MusicProcessor:
         """Build and configure a ``MusicProcessor`` according to the request.
 
@@ -51,39 +116,61 @@ class OrganizeMusicService:
         Returns:
             Configured ``MusicProcessor`` instance.
         """
-        processor = MusicProcessor(
+        filesystem = self._filesystem_factory()
+        db_manager = self._db_factory()
+        if db_manager.conn is None:
+            db_manager.connect()
+        conn = db_manager.conn
+        if conn is None:
+            raise RuntimeError("Database connection could not be established")
+
+        before_dao = self._before_factory(conn)
+        after_dao = self._after_factory(conn)
+        preview_dao = self._preview_factory(conn)
+        base_artist_dao = self._artist_factory(conn)
+        artist_dao: ArtistCachePort
+        if request.dry_run:
+            artist_dao = self._dry_run_artist_factory(base_artist_dao)
+        else:
+            artist_dao = base_artist_dao
+
+        processor = self._processor_factory(
             base_path=request.base_path,
             dry_run=request.dry_run,
-            filesystem=LocalFilesystemAdapter(),
+            db_manager=db_manager,
+            before_gateway=before_dao,
+            after_gateway=after_dao,
+            artist_cache=artist_dao,
+            preview_cache=preview_dao,
+            filesystem=filesystem,
         )
 
         # Optionally clear artist cache; continue on recognized transient errors.
-        if request.clear_artist_cache and hasattr(processor, "artist_dao"):
-            artist_dao = getattr(processor, "artist_dao")
-            if artist_dao is not None:
-                try:
-                    _ = artist_dao.clear_cache()
-                except Exception as exc:
-                    if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
-                        logger.warning(
-                            (
-                                "build_processor: clear_artist_cache requested but "
-                                "artist_dao.clear_cache() failed; continuing without "
-                                "flushing the persistent artist cache. error=%s"
-                            ),
-                            exc,
-                        )
-                    else:
-                        raise
+        if request.clear_artist_cache:
+            artist_dao = processor.artist_dao
+            try:
+                _ = artist_dao.clear_cache()
+            except Exception as exc:
+                if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
+                    logger.warning(
+                        (
+                            "build_processor: clear_artist_cache requested but "
+                            "artist_dao.clear_cache() failed; continuing without "
+                            "flushing the persistent artist cache. error=%s"
+                        ),
+                        exc,
+                    )
+                else:
+                    raise
 
         # Optionally clear all caches and processing state when requested.
         if request.clear_cache:
-            db_manager = getattr(processor, "db_manager", None)
-            conn: sqlite3.Connection | None = None
+            db_manager = processor.db_manager
+            conn = db_manager.conn
             try:
-                conn = db_manager.conn if db_manager is not None else None
                 if conn is not None:
-                    _ = MaintenanceDAO(conn).clear_all()
+                    maintenance = self._maintenance_factory(conn)
+                    _ = maintenance.clear_all()
             except Exception as exc:
                 if isinstance(exc, CACHE_CLEAR_EXCEPTIONS):
                     logger.warning(
