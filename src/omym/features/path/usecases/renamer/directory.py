@@ -1,9 +1,8 @@
-"""Directory generation helpers.
+# Path: `src/omym/features/path/usecases/renamer/directory.py`
+# Summary: Generate album directory structures with sanitized metadata.
+# Why: Catch sanitization errors at the use case boundary for proper logging.
 
-Where: features/path/usecases/renamer/directory.py
-What: Build album directory paths using sanitized metadata and year aggregation.
-Why: Keep album-level state isolated from higher-level orchestration.
-"""
+"""Directory generation helpers."""
 
 from __future__ import annotations
 
@@ -11,7 +10,7 @@ from pathlib import Path
 from typing import ClassVar, final
 
 from omym.shared.track_metadata import TrackMetadata
-from omym.features.path.domain.sanitizer import Sanitizer
+from omym.features.path.domain.sanitizer import Sanitizer, SanitizerError
 from omym.platform.logging import logger
 
 
@@ -67,6 +66,10 @@ class DirectoryGenerator:
             year_str = str(year).zfill(4)
 
             return Path(f"{album_artist}/{year_str}_{album}")
+
+        except SanitizerError as exc:
+            logger.error("Failed to sanitize directory metadata: %s", exc)
+            return Path("ERROR/0000_ERROR")
 
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Failed to generate directory path: %s", exc)

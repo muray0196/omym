@@ -1,3 +1,7 @@
+# Path: `tests/features/path/test_path_elements.py`
+# Summary: Validate domain path component creation and sanitization behaviors.
+# Why: Ensure domain raises errors instead of logging directly.
+
 """Tests for path component functionality."""
 
 import pytest
@@ -6,10 +10,11 @@ from typing import override
 from omym.shared import ComponentValue as ExportedComponentValue
 from omym.shared.path_components import ComponentValue
 from omym.features.path.domain.path_elements import (
-    PathComponent,
     AlbumArtistComponent,
     AlbumComponent,
+    PathComponent,
     PathComponentFactory,
+    UnknownPathComponentError,
 )
 from omym.shared.track_metadata import TrackMetadata
 
@@ -136,8 +141,11 @@ def test_path_component_factory_create_album() -> None:
 
 def test_path_component_factory_create_unknown() -> None:
     """Test PathComponentFactory with unknown component type."""
-    component = PathComponentFactory.create("UnknownType", 1)
-    assert component is None
+
+    with pytest.raises(UnknownPathComponentError) as exc_info:
+        _ = PathComponentFactory.create("UnknownType", 1)
+
+    assert exc_info.value.component_type == "UnknownType"
 
 
 class MockPathComponent(PathComponent):

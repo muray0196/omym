@@ -1,3 +1,7 @@
+# Path: `src/omym/features/path/domain/path_elements.py`
+# Summary: Domain abstractions for album artist and album path components.
+# Why: Provide deterministic component ordering without leaking logging concerns.
+
 """Domain-level path component behavior for building file paths.
 
 This module defines the polymorphic path component abstractions used to
@@ -6,11 +10,10 @@ from the shared layer so adapters and the domain agree on the structure.
 """
 
 from abc import ABC, abstractmethod
-from typing import final, ClassVar, override
+from typing import ClassVar, final, override
 
 from omym.shared.track_metadata import TrackMetadata
 from omym.features.path.domain.sanitizer import Sanitizer
-from omym.platform.logging import logger
 from omym.shared.path_components import ComponentValue
 
 
@@ -114,6 +117,14 @@ class AlbumComponent(PathComponent):
         return "Album"
 
 
+class UnknownPathComponentError(ValueError):
+    """Raised when the factory cannot resolve the requested component."""
+
+    def __init__(self, component_type: str) -> None:
+        super().__init__(f"Unknown path component type: {component_type}")
+        self.component_type: str = component_type
+
+
 @final
 class PathComponentFactory:
     """Factory for creating path components."""
@@ -124,7 +135,7 @@ class PathComponentFactory:
     }
 
     @classmethod
-    def create(cls, component_type: str, order: int) -> PathComponent | None:
+    def create(cls, component_type: str, order: int) -> PathComponent:
         """Create a path component.
 
         Args:
@@ -132,13 +143,15 @@ class PathComponentFactory:
             order: Order in which this component appears in the path.
 
         Returns:
-            PathComponent | None: Created component or None if type is unknown.
+            PathComponent: Created component instance.
+
+        Raises:
+            UnknownPathComponentError: If the requested component type is not registered.
         """
         component_class = cls._components.get(component_type)
         if component_class:
             return component_class(order)
-        logger.warning(f"Unknown path component type: {component_type}")
-        return None
+        raise UnknownPathComponentError(component_type)
 
     @classmethod
     def register_component(cls, type_name: str, component_class: type[PathComponent]) -> None:

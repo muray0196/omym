@@ -1,12 +1,19 @@
+# Path: `tests/features/path/test_music_file_renamer.py`
+# Summary: Exercise renamer helpers and ensure sanitization failures are logged.
+# Why: Validate that use cases handle domain exceptions without crashing.
+
 """Test renaming logic functionality."""
 
 from pathlib import Path
+
+import pytest
 
 from omym.features.path.usecases.renamer import (
     ArtistIdGenerator,
     CachedArtistIdGenerator,
     DirectoryGenerator,
 )
+from omym.features.path.domain.sanitizer import Sanitizer, SanitizerError
 from omym.shared.track_metadata import TrackMetadata
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.db_manager import DatabaseManager
@@ -238,3 +245,31 @@ class TestDirectoryGenerator:
 
         path = DirectoryGenerator.generate(metadata1)
         assert "0000_No-Year-Album" in str(path)
+
+    def test_directory_generator_logs_sanitizer_error(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Directory generation should log sanitization failures instead of raising."""
+
+        metadata = self.create_test_metadata(2024, "Log Album")
+
+        def _raise_artist(
+            _cls: type[Sanitizer],
+            _value: str | None,
+        ) -> str:
+            raise SanitizerError("artist sanitize failed")
+
+        monkeypatch.setattr(
+            Sanitizer,
+            "sanitize_artist_name",
+            classmethod(_raise_artist),
+        )
+
+        caplog.set_level("ERROR")
+
+        path = DirectoryGenerator.generate(metadata)
+
+        assert str(path) == "ERROR/0000_ERROR"
+        assert any("sanitize" in message for message in caplog.messages)

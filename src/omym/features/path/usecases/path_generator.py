@@ -1,9 +1,8 @@
-"""Path generation use cases.
+# Path: `src/omym/features/path/usecases/path_generator.py`
+# Summary: Build relative library paths from filter projections or grouped metadata.
+# Why: Keep logging in the use case layer while domain components remain pure.
 
-Where: features/path/usecases.
-What: Assemble relative library paths from filter hierarchies or grouped metadata.
-Why: Expose a port-driven service so adapters can back persistence lookups.
-"""
+"""Path generation use cases."""
 
 from dataclasses import dataclass
 from pathlib import Path

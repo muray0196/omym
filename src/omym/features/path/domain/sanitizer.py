@@ -1,11 +1,16 @@
+# Path: `src/omym/features/path/domain/sanitizer.py`
+# Summary: Pure sanitization helpers for file and directory components.
+# Why: Keep normalization logic in the domain without side effects like logging.
+
 """File and path name sanitization functionality."""
 
 import re
-from pathlib import Path
-from typing import final, ClassVar
 import unicodedata
+from pathlib import Path
+from typing import ClassVar, final
 
-from omym.platform.logging import logger
+class SanitizerError(RuntimeError):
+    """Raised when sanitization cannot complete successfully."""
 
 
 @final
@@ -86,7 +91,7 @@ class Sanitizer:
                 - Empty string if input is None or contains only special characters
 
         Raises:
-            Exception: If string sanitization fails for any reason.
+            SanitizerError: If string sanitization fails for any reason.
         """
         if not text:
             return ""
@@ -121,9 +126,8 @@ class Sanitizer:
 
             return text + extension
 
-        except Exception as e:
-            logger.error("Failed to sanitize string '%s': %s", text, e)
-            raise
+        except Exception as error:  # pragma: no cover - defensive: unexpected codec failures
+            raise SanitizerError("String sanitization failed") from error
 
     @classmethod
     def sanitize_artist_name(cls, artist_name: str | None) -> str:
@@ -186,7 +190,7 @@ class Sanitizer:
                 - File extension is preserved for the last component
 
         Raises:
-            Exception: If path sanitization fails for any reason.
+            SanitizerError: If path sanitization fails for any reason.
         """
         try:
             parts = list(path.parts)
@@ -217,9 +221,8 @@ class Sanitizer:
 
             return result
 
-        except Exception as e:
-            logger.error("Failed to sanitize path '%s': %s", path, e)
-            raise
+        except Exception as error:  # pragma: no cover - defensive: unexpected path failures
+            raise SanitizerError("Path sanitization failed") from error
 
     @classmethod
     def sanitize_title(cls, title: str | None) -> str:

@@ -1,16 +1,15 @@
-"""File name generation helpers.
+# Path: `src/omym/features/path/usecases/renamer/filename.py`
+# Summary: Generate sanitized track file names with cached artist identifiers.
+# Why: Handle sanitization failures outside the domain layer and log them once.
 
-Where: features/path/usecases/renamer/filename.py
-What: Build canonical track file names using cached artist IDs and album context.
-Why: Allow reuse across use cases without depending on full processor orchestration.
-"""
+"""File name generation helpers."""
 
 from __future__ import annotations
 
 from typing import ClassVar, final
 
 from omym.shared.track_metadata import TrackMetadata
-from omym.features.path.domain.sanitizer import Sanitizer
+from omym.features.path.domain.sanitizer import Sanitizer, SanitizerError
 from omym.platform.logging import logger
 
 from .cached_artist_id import CachedArtistIdGenerator
@@ -98,6 +97,10 @@ class FileNameGenerator:
             if prefix:
                 return f"{prefix}_{track_num}_{title}_{artist_id}{extension}"
             return f"{track_num}_{title}_{artist_id}{extension}"
+
+        except SanitizerError as exc:
+            logger.error("Failed to sanitize file name metadata: %s", exc)
+            return f"ERROR_{metadata.file_extension}"
 
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Failed to generate file name: %s", exc)
