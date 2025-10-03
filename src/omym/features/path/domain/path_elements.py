@@ -2,13 +2,6 @@
 # Summary: Domain abstractions for album artist and album path components.
 # Why: Provide deterministic component ordering without leaking logging concerns.
 
-"""Domain-level path component behavior for building file paths.
-
-This module defines the polymorphic path component abstractions used to
-generate filesystem paths from track metadata. ComponentValue is imported
-from the shared layer so adapters and the domain agree on the structure.
-"""
-
 from abc import ABC, abstractmethod
 from typing import ClassVar, final, override
 

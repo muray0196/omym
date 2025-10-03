@@ -1,8 +1,6 @@
 """Where: src/omym/config/config.py
 What: Configuration management primitives for OMYM.
 Why: Centralise persisted settings and defaults for runtime use.
-Assumptions: - Configuration file remains small enough for eager loading.
-Trade-offs: - Defaults live in code instead of schema definition for simplicity.
 """
 
 import tomllib
@@ -128,9 +126,7 @@ class Config:
         # MusicBrainz romanization section
         lines.append("# MusicBrainz romanization (optional)")
         lines.append("# Set to true to resolve artist names via MusicBrainz (default true)")
-        lines.append(
-            f"use_mb_romanization = {self._format_toml_value(config['use_mb_romanization'])}"
-        )
+        lines.append(f"use_mb_romanization = {self._format_toml_value(config['use_mb_romanization'])}")
         lines.append("")
 
         # MusicBrainz identity
@@ -146,30 +142,22 @@ class Config:
 
         # Organization fallback folder
         lines.append("# Folder name for files that could not be organized")
-        lines.append(
-            f"unprocessed_dir_name = {self._format_toml_value(config['unprocessed_dir_name'])}"
-        )
+        lines.append(f"unprocessed_dir_name = {self._format_toml_value(config['unprocessed_dir_name'])}")
         lines.append("")
 
         # Unprocessed preview limit section
         lines.append("# Maximum number of unprocessed files to preview inline (set to 0 for all)")
-        lines.append(
-            f"unprocessed_preview_limit = {self._format_toml_value(config['unprocessed_preview_limit'])}"
-        )
+        lines.append(f"unprocessed_preview_limit = {self._format_toml_value(config['unprocessed_preview_limit'])}")
         lines.append("")
 
         # File hashing section
         lines.append("# Chunk size in bytes used when hashing files (set higher for large files)")
-        lines.append(
-            f"file_hash_chunk_size = {self._format_toml_value(config['file_hash_chunk_size'])}"
-        )
+        lines.append(f"file_hash_chunk_size = {self._format_toml_value(config['file_hash_chunk_size'])}")
         lines.append("")
 
         # Artist identifier settings
         lines.append("# Maximum number of characters generated for artist IDs")
-        lines.append(
-            f"artist_id_max_length = {self._format_toml_value(config['artist_id_max_length'])}"
-        )
+        lines.append(f"artist_id_max_length = {self._format_toml_value(config['artist_id_max_length'])}")
         lines.append("")
 
         return "\n".join(lines)

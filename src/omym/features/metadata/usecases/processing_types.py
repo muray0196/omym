@@ -2,10 +2,6 @@
 Where: Metadata feature usecases layer.
 What: Shared enums and dataclasses for music file processing flow.
 Why: Keep the core processor lean by centralising type definitions.
-Assumptions:
-- Downstream log consumers tolerate additive enum members.
-Trade-offs:
-- Expanding the enum requires dependent systems to handle the new key.
 """
 
 from __future__ import annotations

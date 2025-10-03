@@ -2,12 +2,11 @@
 # Summary: Pure sanitization helpers for file and directory components.
 # Why: Keep normalization logic in the domain without side effects like logging.
 
-"""File and path name sanitization functionality."""
-
 import re
 import unicodedata
 from pathlib import Path
 from typing import ClassVar, final
+
 
 class SanitizerError(RuntimeError):
     """Raised when sanitization cannot complete successfully."""

@@ -2,8 +2,6 @@
 # What: Canonical TrackMetadata dataclass shared across features.
 # Why: Centralize metadata representation for reuse and consistency.
 
-"""Shared dataclass representing track metadata."""
-
 from dataclasses import dataclass
 
 

@@ -2,12 +2,6 @@
 # Where: features/metadata/usecases/file_runner.py
 # What: Shared implementation for per-file music processing orchestration.
 # Why: Keep MusicProcessor lean by isolating procedural flow and duplicate handling.
-# Assumptions:
-# - Processor dependencies follow ports specified in features.metadata.usecases.ports.
-# - File system semantics follow pathlib/shutil guarantees on POSIX-like systems.
-# Trade-offs:
-# - Duplicate detection now defers until metadata extraction to permit reorganizing when targets shift.
-# - Additional filesystem comparisons introduce minor overhead but improve correctness.
 # */
 
 from __future__ import annotations
@@ -68,27 +62,23 @@ class ProcessorLike(Protocol):
     SUPPORTED_EXTENSIONS: set[str]
     SUPPORTED_IMAGE_EXTENSIONS: set[str]
 
-    def _calculate_file_hash(self, file_path: Path) -> str:
-        ...
+    def _calculate_file_hash(self, file_path: Path) -> str: ...
 
-    def calculate_file_hash(self, file_path: Path) -> str:
-        ...
+    def calculate_file_hash(self, file_path: Path) -> str: ...
 
     def _generate_target_path(
         self,
         metadata: TrackMetadata,
         *,
         existing_path: Path | None = None,
-    ) -> Path | None:
-        ...
+    ) -> Path | None: ...
 
     def generate_target_path(
         self,
         metadata: TrackMetadata,
         *,
         existing_path: Path | None = None,
-    ) -> Path | None:
-        ...
+    ) -> Path | None: ...
 
     def _move_file(
         self,
@@ -100,8 +90,7 @@ class ProcessorLike(Protocol):
         total: int | None = None,
         source_root: Path | None = None,
         target_root: Path | None = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def move_file(
         self,
@@ -113,8 +102,7 @@ class ProcessorLike(Protocol):
         total: int | None = None,
         source_root: Path | None = None,
         target_root: Path | None = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def log_processing(
         self,
@@ -123,12 +111,10 @@ class ProcessorLike(Protocol):
         message: str,
         *message_args: object,
         **context: object,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @property
-    def romanization(self) -> RomanizationCoordinator:
-        ...
+    def romanization(self) -> RomanizationCoordinator: ...
 
 
 def run_file_processing(
@@ -249,9 +235,7 @@ def run_file_processing(
 
         # Defer duplicate checks until after recomputing the destination so reorganize runs
         # can relocate tracks when artist IDs or metadata evolve.
-        if duplicate_target_path is not None and _paths_point_to_same_file(
-            duplicate_target_path, target_path
-        ):
+        if duplicate_target_path is not None and _paths_point_to_same_file(duplicate_target_path, target_path):
             return handle_duplicate(
                 ctx,
                 target_raw=duplicate_target_path,

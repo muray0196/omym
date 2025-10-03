@@ -2,10 +2,6 @@
 Where: CLI adapter layer for preview rendering.
 What: Build Rich trees that preview planned metadata operations.
 Why: Provide users with a safe, visual diff before applying changes.
-Assumptions:
-- Preview labels should mirror processing outcomes for user clarity.
-Trade-offs:
-- Extra mapping upkeep needed whenever new warning reasons appear.
 """
 
 from pathlib import Path
@@ -16,6 +12,7 @@ from rich.tree import Tree
 from omym.features.metadata import ProcessResult
 
 from .summary import render_processing_summary
+
 
 @final
 class PreviewDisplay:

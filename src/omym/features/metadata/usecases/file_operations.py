@@ -2,13 +2,6 @@
 # Summary: File hashing, target path derivation, and move orchestration helpers.
 # Why: Shield orchestration from filesystem details while logging sanitization issues.
 
-"""Where: src/omym/features/metadata/usecases/file_operations.py
-What: File movement helpers and target-path generation for music assets.
-Why: Separate low-level filesystem handling from MusicProcessor orchestration.
-Assumptions: - Input paths reference regular files accessible on disk.
-Trade-offs: - Hashing remains synchronous to avoid cross-thread complexity.
-"""
-
 from __future__ import annotations
 
 import hashlib

@@ -1,8 +1,6 @@
 """Where: src/omym/config/settings.py
 What: Derived runtime settings sourced from persisted configuration.
 Why: Expose validated constants to feature layers without file I/O.
-Assumptions: - Config defaults remain compatible with current runtime expectations.
-Trade-offs: - Validation is limited to simple boundary checks for speed.
 """
 
 from __future__ import annotations
@@ -42,16 +40,12 @@ _preview_limit = getattr(app_config, "unprocessed_preview_limit", 5)
 UNPROCESSED_PREVIEW_LIMIT: int = _preview_limit if _preview_limit >= 0 else 0
 
 _file_hash_chunk_size = getattr(app_config, "file_hash_chunk_size", FILE_HASH_CHUNK_SIZE_DEFAULT)
-FILE_HASH_CHUNK_SIZE: int = (
-    _file_hash_chunk_size if _file_hash_chunk_size > 0 else FILE_HASH_CHUNK_SIZE_DEFAULT
-)
+FILE_HASH_CHUNK_SIZE: int = _file_hash_chunk_size if _file_hash_chunk_size > 0 else FILE_HASH_CHUNK_SIZE_DEFAULT
 
 
 _artist_id_max = getattr(app_config, "artist_id_max_length", ARTIST_ID_MAX_LENGTH_DEFAULT)
 ARTIST_ID_MAX_LENGTH: int = (
-    _artist_id_max
-    if isinstance(_artist_id_max, int) and _artist_id_max > 0
-    else ARTIST_ID_MAX_LENGTH_DEFAULT
+    _artist_id_max if isinstance(_artist_id_max, int) and _artist_id_max > 0 else ARTIST_ID_MAX_LENGTH_DEFAULT
 )
 
 

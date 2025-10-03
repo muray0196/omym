@@ -2,10 +2,6 @@
 Where: Metadata feature usecases layer.
 What: Handle movement and summarisation of lyrics files tied to tracks.
 Why: Keep lyrics-specific side effects isolated from core processing logic.
-Assumptions:
-- Filesystem exposes pathlib.samefile for already-organised detection.
-Trade-offs:
-- Treating identical source/target as organised skips warning about stale files.
 """
 
 from __future__ import annotations
@@ -195,12 +191,7 @@ def summarize_lyrics(result: LyricsProcessingResult | None) -> list[str]:
         return []
 
     if result.dry_run and not result.moved:
-        return [
-            (
-                "Dry run: lyrics "
-                f"{result.source_path.name} would move to {result.target_path.name}"
-            )
-        ]
+        return [(f"Dry run: lyrics {result.source_path.name} would move to {result.target_path.name}")]
 
     if not result.moved:
         reason_map = {
@@ -210,9 +201,7 @@ def summarize_lyrics(result: LyricsProcessingResult | None) -> list[str]:
         }
         reason = result.reason or "unknown reason"
         friendly_reason = reason_map.get(reason, reason)
-        return [
-            f"Lyrics file {result.source_path.name} not moved: {friendly_reason}"
-        ]
+        return [f"Lyrics file {result.source_path.name} not moved: {friendly_reason}"]
 
     return []
 

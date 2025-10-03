@@ -2,8 +2,6 @@
 # Summary: Build relative library paths from filter projections or grouped metadata.
 # Why: Keep logging in the use case layer while domain components remain pure.
 
-"""Path generation use cases."""
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import final

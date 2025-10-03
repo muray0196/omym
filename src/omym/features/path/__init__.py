@@ -2,8 +2,6 @@
 # Summary: Export path feature domain and use case symbols.
 # Why: Provide a stable import surface for adapters and tests.
 
-"""Public API for the path feature (domain + use cases)."""
-
 from omym.shared.path_components import ComponentValue
 
 from .domain.sanitizer import Sanitizer, SanitizerError

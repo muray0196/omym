@@ -2,10 +2,6 @@
 Where: Metadata feature usecases layer.
 What: Handle movement and summarisation of artwork files for tracks.
 Why: Separate artwork-specific behaviour from the core processor.
-Assumptions:
-- samefile is reliable for detecting in-place artwork.
-Trade-offs:
-- Detection adds filesystem calls before moves, impacting throughput slightly.
 """
 
 from __future__ import annotations
@@ -257,12 +253,7 @@ def summarize_artwork(results: Iterable[ArtworkProcessingResult]) -> list[str]:
     warnings: list[str] = []
     for result in results:
         if result.dry_run and not result.moved:
-            warnings.append(
-                (
-                    "Dry run: artwork "
-                    f"{result.source_path.name} would move to {result.target_path.name}"
-                )
-            )
+            warnings.append((f"Dry run: artwork {result.source_path.name} would move to {result.target_path.name}"))
             continue
 
         if not result.moved:
@@ -274,9 +265,7 @@ def summarize_artwork(results: Iterable[ArtworkProcessingResult]) -> list[str]:
             }
             reason = result.reason or "unknown reason"
             friendly_reason = reason_map.get(reason, reason)
-            warnings.append(
-                f"Artwork file {result.source_path.name} not moved: {friendly_reason}"
-            )
+            warnings.append(f"Artwork file {result.source_path.name} not moved: {friendly_reason}")
 
     return warnings
 
