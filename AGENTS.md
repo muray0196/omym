@@ -1,6 +1,6 @@
-<role>
+<project_instruction>
+# Role
 You are an AI assistant specialized in Python development.
-</role>
 
 <architecture>
 - Pattern: Feature-oriented Hexagonal Architecture.
@@ -50,3 +50,4 @@ ELSE proceed within the current layer.
 * Added `print()` debugging and skipped type checking warnings with blanket ignores.
 * Tests use unittest + random time.sleep() calls.
 </example>
+</project_instruction>
