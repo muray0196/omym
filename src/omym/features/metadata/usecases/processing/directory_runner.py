@@ -1,7 +1,5 @@
-"""src/omym/features/metadata/usecases/processing/directory_runner.py
-What: Shared implementation for directory-wide music processing.
-Why: Keep MusicProcessor slim while reusing robust directory orchestration logic.
-"""
+"""Summary: Shared implementation for directory-wide music processing.
+Why: Keep MusicProcessor slim while reusing robust directory orchestration logic."""
 
 from __future__ import annotations
 
@@ -12,11 +10,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from omym.features.path.usecases.renamer import DirectoryGenerator, FileNameGenerator
-
 from ..extraction.romanization import RomanizationCoordinator
 from ..extraction.track_metadata_extractor import MetadataExtractor
-from ..ports import DatabaseManagerPort, FilesystemPort
+from ..ports import (
+    DatabaseManagerPort,
+    DirectoryNamingPort,
+    FileNameGenerationPort,
+    FilesystemPort,
+)
 from .processing_types import (
     DirectoryRollbackError,
     ProcessResult,
@@ -32,7 +33,8 @@ class ProcessorLike(Protocol):
     base_path: Path
     dry_run: bool
     db_manager: DatabaseManagerPort
-    directory_generator: DirectoryGenerator
+    directory_generator: DirectoryNamingPort
+    file_name_generator: FileNameGenerationPort
     filesystem: FilesystemPort
     SUPPORTED_EXTENSIONS: set[str]
 
@@ -123,7 +125,7 @@ def run_directory_processing(
         if metadata.album_artist:
             processor.romanization.ensure_scheduled(metadata.album_artist)
         processor.directory_generator.register_album_year(metadata)
-        FileNameGenerator.register_album_track_width(metadata)
+        processor.file_name_generator.register_album_track_width(metadata)
         precomputed_metadata[pre_file] = metadata
 
     processed_count = 0

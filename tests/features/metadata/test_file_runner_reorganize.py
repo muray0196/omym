@@ -1,13 +1,6 @@
 # /*
-# Where: tests/features/metadata/test_file_runner_reorganize.py
-# What: Regression coverage ensuring reorganize moves run despite cached hashes.
-# Why: Guard against duplicate short-circuit blocking metadata-driven relocations.
-# Assumptions:
-# - Path.rename suffices to simulate file moves within the temporary filesystem.
-# - MetadataExtractor provides TrackMetadata consistent with serializer expectations.
-# Trade-offs:
-# - Lightweight processor stub covers only the pathways needed for reorganization checks.
-# */
+"""Summary: Regression coverage ensuring reorganize moves run despite cached hashes.
+Why: Guard against duplicate short-circuit blocking metadata-driven relocations."""
 
 from __future__ import annotations
 
@@ -16,15 +9,13 @@ from typing import Any, cast
 
 from omym.features.metadata.usecases.ports import (
     ArtistCachePort,
+    ArtistIdGeneratorPort,
+    DirectoryNamingPort,
+    FileNameGenerationPort,
     FilesystemPort,
     ProcessingAfterPort,
     ProcessingBeforePort,
     PreviewCachePort,
-)
-from omym.features.path.usecases.renamer import (
-    CachedArtistIdGenerator,
-    DirectoryGenerator,
-    FileNameGenerator,
 )
 from omym.shared import PreviewCacheEntry, TrackMetadata
 
@@ -155,6 +146,35 @@ class _StubRomanization:
         return name
 
 
+class _StubArtistIdGenerator(ArtistIdGeneratorPort):
+    """Generate deterministic IDs for reorganize flow tests."""
+
+    def generate(self, artist_name: str | None) -> str:
+        return (artist_name or "unknown").upper()[:6]
+
+
+class _StubDirectoryGenerator(DirectoryNamingPort):
+    """Provide stable directory outputs without invoking path feature helpers."""
+
+    def register_album_year(self, metadata: TrackMetadata) -> None:  # pragma: no cover - no-op
+        del metadata
+
+    def generate(self, metadata: TrackMetadata) -> Path:
+        artist = metadata.album_artist or metadata.artist or "Unknown"
+        return Path(artist) / "0000_Album"
+
+
+class _StubFileNameGenerator(FileNameGenerationPort):
+    """Provide deterministic file names for reorganize tests."""
+
+    def register_album_track_width(self, metadata: TrackMetadata) -> None:  # pragma: no cover - no-op
+        del metadata
+
+    def generate(self, metadata: TrackMetadata) -> str:
+        title = metadata.title or "Track"
+        return f"01_{title}_ID.mp3"
+
+
 class _StubProcessor:
     """Processor-like stub tailored for run_file_processing tests."""
 
@@ -170,9 +190,9 @@ class _StubProcessor:
     preview_dao_stub: _StubPreviewDAO
     artist_dao: ArtistCachePort
     artist_dao_stub: _StubArtistDAO
-    artist_id_generator: CachedArtistIdGenerator
-    directory_generator: DirectoryGenerator
-    file_name_generator: FileNameGenerator
+    artist_id_generator: ArtistIdGeneratorPort
+    directory_generator: DirectoryNamingPort
+    file_name_generator: FileNameGenerationPort
     _romanization: _StubRomanization
     _new_target: Path
     move_calls: list[tuple[Path, Path]]
@@ -188,9 +208,9 @@ class _StubProcessor:
         self.preview_dao = self.preview_dao_stub
         self.artist_dao_stub = _StubArtistDAO()
         self.artist_dao = self.artist_dao_stub
-        self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao_stub)
-        self.directory_generator = DirectoryGenerator()
-        self.file_name_generator = FileNameGenerator(self.artist_id_generator)
+        self.artist_id_generator = _StubArtistIdGenerator()
+        self.directory_generator = _StubDirectoryGenerator()
+        self.file_name_generator = _StubFileNameGenerator()
         self._romanization = _StubRomanization()
         self._new_target = new_target
         self.move_calls = []

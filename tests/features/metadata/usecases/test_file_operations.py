@@ -14,12 +14,14 @@ from __future__ import annotations
 import hashlib
 
 from pathlib import Path
-from typing import cast
 
 import pytest
 
 from omym.features.metadata.usecases.processing import file_operations
-from omym.features.path import DirectoryGenerator, FileNameGenerator, SanitizerError
+from omym.features.metadata.usecases.ports import (
+    DirectoryNamingPort,
+    FileNameGenerationPort,
+)
 from omym.shared.track_metadata import TrackMetadata
 
 
@@ -47,12 +49,20 @@ def test_generate_target_path_logs_sanitizer_error(
 
     base_path = Path("/music")
 
-    class _FailingDirectoryGenerator:
-        def generate(self, _metadata: TrackMetadata) -> Path:
-            raise SanitizerError("directory sanitize failed")
+    class _FailingDirectoryGenerator(DirectoryNamingPort):
+        def register_album_year(self, metadata: TrackMetadata) -> None:  # pragma: no cover - unused
+            del metadata
 
-    class _StubFileNameGenerator:
-        def generate(self, _metadata: TrackMetadata) -> str:
+        def generate(self, metadata: TrackMetadata) -> Path:
+            del metadata
+            raise RuntimeError("directory sanitize failed")
+
+    class _StubFileNameGenerator(FileNameGenerationPort):
+        def register_album_track_width(self, metadata: TrackMetadata) -> None:  # pragma: no cover - unused
+            del metadata
+
+        def generate(self, metadata: TrackMetadata) -> str:
+            del metadata
             return "ignored.mp3"
 
     metadata = TrackMetadata(title="Song", album_artist="Artist")
@@ -61,16 +71,10 @@ def test_generate_target_path_logs_sanitizer_error(
 
     result = file_operations.generate_target_path(
         base_path,
-        directory_generator=cast(
-            DirectoryGenerator,
-            cast(object, _FailingDirectoryGenerator()),
-        ),
-        file_name_generator=cast(
-            FileNameGenerator,
-            cast(object, _StubFileNameGenerator()),
-        ),
+        directory_generator=_FailingDirectoryGenerator(),
+        file_name_generator=_StubFileNameGenerator(),
         metadata=metadata,
     )
 
     assert result is None
-    assert any("Sanitization failed" in message for message in caplog.messages)
+    assert any("Error generating target path" in message for message in caplog.messages)
