@@ -1,14 +1,19 @@
-"""Tests for the album management system."""
+"""
+Summary: Tests for the album management system and adapter wiring.
+Why: Ensure album grouping works with the dedicated DAO-backed repository adapter.
+"""
 
 import sqlite3
 
 import pytest
 
 from omym.features.organization import AlbumManager, AlbumGroup
+from omym.features.organization.adapters import AlbumDaoAdapter
 from omym.features.organization.usecases.ports import (
     AlbumRecord,
     AlbumRepositoryPort,
 )
+from omym.platform.db.daos.albums_dao import AlbumDAO
 
 
 @pytest.fixture
@@ -48,16 +53,17 @@ def conn() -> sqlite3.Connection:
 
 
 @pytest.fixture
-def album_manager(conn: sqlite3.Connection) -> AlbumManager:
-    """Create a test album manager.
+def album_port(conn: sqlite3.Connection) -> AlbumRepositoryPort:
+    """Expose ``AlbumDAO`` through the repository port adapter."""
 
-    Args:
-        conn: SQLite database connection.
+    return AlbumDaoAdapter(AlbumDAO(conn))
 
-    Returns:
-        AlbumManager: Album manager instance.
-    """
-    return AlbumManager(conn)
+
+@pytest.fixture
+def album_manager(album_port: AlbumRepositoryPort) -> AlbumManager:
+    """Create a test album manager."""
+
+    return AlbumManager(album_port=album_port)
 
 
 def test_process_files_single_album(album_manager: AlbumManager) -> None:
