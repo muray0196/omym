@@ -9,8 +9,7 @@ from pathlib import Path
 from sqlite3 import Connection
 from typing import cast
 
-from omym.features.metadata.adapters import DryRunArtistCacheAdapter
-from omym.features.path.usecases.renamer import ArtistIdGenerator
+from omym.features.metadata.adapters import DryRunArtistCacheAdapter, build_path_renamer_ports
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.db_manager import DatabaseManager
 
@@ -30,7 +29,8 @@ def _build_adapter(
 def test_dry_run_adapter_persists_artist_ids(tmp_path: Path) -> None:
     manager, conn, adapter = _build_adapter(tmp_path)
     try:
-        expected_id = ArtistIdGenerator.generate("John Smith")
+        renamer_ports = build_path_renamer_ports(adapter)
+        expected_id = renamer_ports.artist_id.generate("John Smith")
         assert adapter.insert_artist_id("John Smith", expected_id) is True
         assert adapter.get_artist_id("John Smith") == expected_id
 

@@ -15,11 +15,13 @@ from omym.features.metadata.adapters import (
     DryRunArtistCacheAdapter,
     LocalFilesystemAdapter,
     MusicBrainzRomanizationAdapter,
+    build_path_renamer_ports,
 )
 from omym.features.metadata.usecases.ports import (
     ArtistCachePort,
     DatabaseManagerPort,
     FilesystemPort,
+    RenamerPorts,
     RomanizationPort,
     PreviewCachePort,
     ProcessingAfterPort,
@@ -73,6 +75,7 @@ class OrganizeMusicService:
         dry_run_artist_factory: Callable[[ArtistCacheDAO], ArtistCachePort] | None = None,
         maintenance_factory: Callable[[sqlite3.Connection], MaintenanceDAO] | None = None,
         romanization_port_factory: Callable[[], RomanizationPort] | None = None,
+        renamer_factory: Callable[[ArtistCachePort], RenamerPorts] | None = None,
         processor_factory: Callable[..., MusicProcessor] | None = None,
     ) -> None:
         """Create a service with overridable infrastructure factories.
@@ -108,6 +111,9 @@ class OrganizeMusicService:
         self._romanization_port_factory: Callable[[], RomanizationPort] = (
             romanization_port_factory or MusicBrainzRomanizationAdapter
         )
+        self._renamer_factory: Callable[[ArtistCachePort], RenamerPorts] = (
+            renamer_factory or build_path_renamer_ports
+        )
         self._processor_factory: Callable[..., MusicProcessor] = (
             processor_factory or MusicProcessor
         )
@@ -140,6 +146,7 @@ class OrganizeMusicService:
             artist_dao = base_artist_dao
 
         romanization_port = self._romanization_port_factory()
+        renamer_ports = self._renamer_factory(artist_dao)
 
         processor = self._processor_factory(
             base_path=request.base_path,
@@ -151,6 +158,7 @@ class OrganizeMusicService:
             romanization_port=romanization_port,
             preview_cache=preview_dao,
             filesystem=filesystem,
+            renamer_ports=renamer_ports,
         )
 
         # Optionally clear artist cache; continue on recognized transient errors.

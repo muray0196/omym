@@ -16,22 +16,21 @@ from omym.config.artist_name_preferences import (
     load_artist_name_preferences,
 )
 from omym.config.settings import UNPROCESSED_DIR_NAME
-from omym.features.path.usecases.renamer import (
-    CachedArtistIdGenerator,
-    DirectoryGenerator,
-    FileNameGenerator,
-)
 from omym.platform.logging import logger
 
 from omym.shared.track_metadata import TrackMetadata
 from .ports import (
+    ArtistIdGeneratorPort,
     ArtistCachePort,
     DatabaseManagerPort,
+    DirectoryNamingPort,
     FilesystemPort,
+    FileNameGenerationPort,
     RomanizationPort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
+    RenamerPorts,
 )
 from .processing import (
     ProcessingEvent,
@@ -71,9 +70,9 @@ class MusicProcessor:
     artist_dao: ArtistCachePort
     preview_dao: PreviewCachePort
     artist_name_preferences: ArtistNamePreferenceRepository
-    artist_id_generator: CachedArtistIdGenerator
-    directory_generator: DirectoryGenerator
-    file_name_generator: FileNameGenerator
+    artist_id_generator: ArtistIdGeneratorPort
+    directory_generator: DirectoryNamingPort
+    file_name_generator: FileNameGenerationPort
 
     def __init__(
         self,
@@ -87,6 +86,7 @@ class MusicProcessor:
         romanization_port: RomanizationPort,
         preview_cache: PreviewCachePort,
         filesystem: FilesystemPort,
+        renamer_ports: RenamerPorts,
     ) -> None:
         self.base_path = base_path
         self.dry_run = dry_run
@@ -112,9 +112,9 @@ class MusicProcessor:
         self.artist_dao = artist_cache
         self._romanization_port.configure_cache(self.artist_dao)
 
-        self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)
-        self.directory_generator = DirectoryGenerator()
-        self.file_name_generator = FileNameGenerator(self.artist_id_generator)
+        self.artist_id_generator = renamer_ports.artist_id
+        self.directory_generator = renamer_ports.directory
+        self.file_name_generator = renamer_ports.file_name
 
         self._romanization: RomanizationCoordinator = RomanizationCoordinator(
             preferences=self.artist_name_preferences,

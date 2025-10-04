@@ -1,5 +1,3 @@
-"""Tests for music file processing functionality."""
-
 """Summary: Validate MusicProcessor orchestration across processing scenarios.
 Why: Ensure dependency injection continues to honour processing contracts."""
 
@@ -24,6 +22,7 @@ from omym.features.metadata import (
 from omym.features.metadata.adapters import (
     DryRunArtistCacheAdapter,
     LocalFilesystemAdapter,
+    build_path_renamer_ports,
 )
 from omym.features.metadata.usecases.ports import FilesystemPort, RomanizationPort
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
@@ -113,6 +112,7 @@ def processor(mocker: MockerFixture, tmp_path: Path, file_hash: str) -> MusicPro
         romanization_port=romanization_port,
         preview_cache=preview_dao,
         filesystem=filesystem,
+        renamer_ports=build_path_renamer_ports(artist_dao),
     )
     romanization_port.configure_cache.assert_called_once_with(artist_dao)
 
@@ -1321,6 +1321,7 @@ class TestMusicProcessor:
             romanization_port=romanization_port,
             preview_cache=stub_preview,
             filesystem=LocalFilesystemAdapter(),
+            renamer_ports=build_path_renamer_ports(stub_artist),
         )
 
         assert processor.db_manager is stub_db
@@ -1385,6 +1386,7 @@ def test_dry_run_skips_persistent_state(
         romanization_port=romanization_port,
         preview_cache=preview_dao,
         filesystem=LocalFilesystemAdapter(),
+        renamer_ports=build_path_renamer_ports(artist_cache),
     )
     romanization_port.configure_cache.assert_called_once_with(artist_cache)
     target_candidate = destination_dir / "Track.mp3"

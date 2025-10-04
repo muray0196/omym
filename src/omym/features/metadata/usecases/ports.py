@@ -3,11 +3,13 @@ Why: Decouple use cases from concrete adapters so tests and swaps stay simple.""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection
 from typing import Protocol, runtime_checkable
 
 from omym.shared import PreviewCacheEntry
+from omym.shared.track_metadata import TrackMetadata
 
 
 @runtime_checkable
@@ -140,3 +142,62 @@ class FilesystemPort(Protocol):
     def remove_empty_directories(self, directory: Path) -> None:
         """Recursively remove empty directories rooted at ``directory``."""
         ...
+
+
+@runtime_checkable
+class ArtistIdGeneratorPort(Protocol):
+    """Port for generating stable artist identifiers from metadata."""
+
+    def generate(self, artist_name: str | None) -> str:
+        """Return a deterministic identifier for ``artist_name``."""
+        ...
+
+
+@runtime_checkable
+class DirectoryNamingPort(Protocol):
+    """Port exposing album-directory generation helpers."""
+
+    def register_album_year(self, metadata: TrackMetadata) -> None:
+        """Record album-year metadata so subsequent calls stay consistent."""
+        ...
+
+    def generate(self, metadata: TrackMetadata) -> Path:
+        """Build the relative directory path for ``metadata``."""
+        ...
+
+
+@runtime_checkable
+class FileNameGenerationPort(Protocol):
+    """Port exposing sanitized track file-name generation helpers."""
+
+    def register_album_track_width(self, metadata: TrackMetadata) -> None:
+        """Update cached width calculations for ``metadata``'s album."""
+        ...
+
+    def generate(self, metadata: TrackMetadata) -> str:
+        """Build the sanitized file name for ``metadata``."""
+        ...
+
+
+@dataclass(slots=True)
+class RenamerPorts:
+    """Bundle the renamer-related ports used by metadata processing flows."""
+
+    directory: DirectoryNamingPort
+    file_name: FileNameGenerationPort
+    artist_id: ArtistIdGeneratorPort
+
+
+__all__ = [
+    "DatabaseManagerPort",
+    "ProcessingBeforePort",
+    "ProcessingAfterPort",
+    "ArtistCachePort",
+    "RomanizationPort",
+    "PreviewCachePort",
+    "FilesystemPort",
+    "ArtistIdGeneratorPort",
+    "DirectoryNamingPort",
+    "FileNameGenerationPort",
+    "RenamerPorts",
+]

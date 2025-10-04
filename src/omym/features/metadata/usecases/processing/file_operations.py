@@ -1,7 +1,5 @@
-"""
-Summary: File hashing, target path derivation, and move orchestration helpers.
-Why: Shield orchestration from filesystem details while logging sanitization issues.
-"""
+"""Summary: Hashing and renaming helpers supporting metadata processing flows.
+Why: Keep filesystem operations isolated from adapters while coordinating ports."""
 
 from __future__ import annotations
 
@@ -11,15 +9,14 @@ import shutil
 from pathlib import Path
 
 from omym.config.settings import FILE_HASH_CHUNK_SIZE
-from omym.features.path import (
-    DirectoryGenerator,
-    FileNameGenerator,
-    SanitizerError,
-)
 from omym.platform.logging import logger
 
 from ..assets import ProcessLogger
-from ..ports import FilesystemPort
+from ..ports import (
+    DirectoryNamingPort,
+    FileNameGenerationPort,
+    FilesystemPort,
+)
 from .processing_types import ProcessingEvent
 from omym.shared.track_metadata import TrackMetadata
 
@@ -62,8 +59,8 @@ def find_available_path(target_path: Path, *, existing_path: Path | None = None)
 def generate_target_path(
     base_path: Path,
     *,
-    directory_generator: DirectoryGenerator,
-    file_name_generator: FileNameGenerator,
+    directory_generator: DirectoryNamingPort,
+    file_name_generator: FileNameGenerationPort,
     metadata: TrackMetadata,
     existing_path: Path | None = None,
 ) -> Path | None:
@@ -74,9 +71,6 @@ def generate_target_path(
         file_name = file_name_generator.generate(metadata)
         if not dir_path or not file_name:
             return None
-    except SanitizerError as exc:
-        logger.error("Sanitization failed while generating target path: %s", exc)
-        return None
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error("Error generating target path: %s", exc)
         return None
