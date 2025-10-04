@@ -1,8 +1,6 @@
-"""Ports for path use cases.
-
-Where: features/path/usecases.
-What: Protocols and records describing infrastructure interactions required by path logic.
-Why: Allow adapters to satisfy filesystem/database/language dependencies without coupling use cases to concrete implementations.
+"""
+Summary: Define ports used by the path use cases for external data access.
+Why: Keep adapters replaceable while use cases remain free of infrastructure concerns.
 """
 
 from __future__ import annotations
