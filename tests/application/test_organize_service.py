@@ -7,6 +7,7 @@ calls appropriately. Infra details are mocked so tests remain fast and stable.
 import logging
 import sqlite3
 from pathlib import Path
+from typing import cast
 
 from pytest import LogCaptureFixture
 from pytest_mock import MockerFixture
@@ -17,6 +18,7 @@ from omym.application.services.organize_service import (
 )
 from omym.features.metadata import ProcessResult
 from omym.features.metadata.adapters import LocalFilesystemAdapter
+from omym.features.metadata.usecases.ports import ArtistCachePort, RomanizationPort
 
 
 def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> None:
@@ -59,11 +61,13 @@ def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> No
     )
     dry_run_instance = mock_dry_run_cls.return_value
 
+    romanization_port: RomanizationPort = mocker.create_autospec(RomanizationPort, instance=True)
+
     mocked_processor = mocker.patch(
         "omym.application.services.organize_service.MusicProcessor"
     )
 
-    service = OrganizeMusicService()
+    service = OrganizeMusicService(romanization_port_factory=lambda: romanization_port)
 
     req = OrganizeRequest(base_path=Path("."), dry_run=True)
     _ = service.build_processor(req)
@@ -85,6 +89,7 @@ def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> No
     assert kwargs.get("after_gateway") is after_instance
     assert kwargs.get("preview_cache") is preview_instance
     assert kwargs.get("artist_cache") is dry_run_instance
+    assert kwargs.get("romanization_port") is romanization_port
     assert isinstance(kwargs.get("filesystem"), LocalFilesystemAdapter)
 
 
@@ -122,9 +127,17 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
         "omym.application.services.organize_service.DryRunArtistCacheAdapter"
     )
 
+    romanization_port: RomanizationPort = mocker.create_autospec(RomanizationPort, instance=True)
+
+    def processor_factory(*_: object, **kwargs: object) -> object:
+        romanization_port = cast(RomanizationPort, kwargs["romanization_port"])
+        artist_cache = cast(ArtistCachePort, kwargs["artist_cache"])
+        romanization_port.configure_cache(artist_cache)
+        return processor_mock
+
     _ = mocker.patch(
         "omym.application.services.organize_service.MusicProcessor",
-        return_value=processor_mock,
+        side_effect=processor_factory,
     )
 
     maintenance_cls = mocker.patch(
@@ -135,7 +148,7 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
         "maintenance clearing failed"
     )
 
-    service = OrganizeMusicService()
+    service = OrganizeMusicService(romanization_port_factory=lambda: romanization_port)
 
     caplog.set_level(logging.WARNING, logger="omym")
 
@@ -152,6 +165,7 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
     _ = processor_mock.artist_dao.clear_cache.assert_called_once_with()
     _ = maintenance_cls.assert_called_once_with(conn)
     mock_dry_run.assert_not_called()
+    getattr(romanization_port, "configure_cache").assert_called_once_with(base_artist)
 
     warning_messages = [
         record.message for record in caplog.records if record.levelno == logging.WARNING

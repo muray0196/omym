@@ -1,7 +1,5 @@
-"""src/omym/features/metadata/usecases/music_file_processor.py
-What: High-level coordinator that organises music files into the library structure.
-Why: Tie together metadata extraction, romanisation, persistence, and asset moves.
-"""
+"""Summary: High-level coordinator for organising music files into the library.
+Why: Tie together romanization, persistence, and filesystem orchestration."""
 
 from __future__ import annotations
 
@@ -24,13 +22,13 @@ from omym.features.path.usecases.renamer import (
     FileNameGenerator,
 )
 from omym.platform.logging import logger
-from omym.platform.musicbrainz.client import configure_romanization_cache
 
 from omym.shared.track_metadata import TrackMetadata
 from .ports import (
     ArtistCachePort,
     DatabaseManagerPort,
     FilesystemPort,
+    RomanizationPort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
@@ -86,6 +84,7 @@ class MusicProcessor:
         before_gateway: ProcessingBeforePort,
         after_gateway: ProcessingAfterPort,
         artist_cache: ArtistCachePort,
+        romanization_port: RomanizationPort,
         preview_cache: PreviewCachePort,
         filesystem: FilesystemPort,
     ) -> None:
@@ -93,6 +92,7 @@ class MusicProcessor:
         self.dry_run = dry_run
 
         self.filesystem: FilesystemPort = filesystem
+        self._romanization_port: RomanizationPort = romanization_port
 
         try:
             self.artist_name_preferences = load_artist_name_preferences()
@@ -110,7 +110,7 @@ class MusicProcessor:
         self.preview_dao = preview_cache
 
         self.artist_dao = artist_cache
-        configure_romanization_cache(self.artist_dao)
+        self._romanization_port.configure_cache(self.artist_dao)
 
         self.artist_id_generator = CachedArtistIdGenerator(self.artist_dao)
         self.directory_generator = DirectoryGenerator()
@@ -119,6 +119,7 @@ class MusicProcessor:
         self._romanization: RomanizationCoordinator = RomanizationCoordinator(
             preferences=self.artist_name_preferences,
             artist_cache=self.artist_dao,
+            romanization_port=self._romanization_port,
         )
 
     def _calculate_file_hash(self, file_path: Path) -> str:

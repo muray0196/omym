@@ -12,11 +12,15 @@ from pathlib import Path
 from typing import Callable, final
 
 from omym.features.metadata import MusicProcessor, ProcessResult
-from omym.features.metadata.adapters import LocalFilesystemAdapter
+from omym.features.metadata.adapters import (
+    LocalFilesystemAdapter,
+    MusicBrainzRomanizationAdapter,
+)
 from omym.features.metadata.usecases.ports import (
     ArtistCachePort,
     DatabaseManagerPort,
     FilesystemPort,
+    RomanizationPort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
@@ -71,6 +75,7 @@ class OrganizeMusicService:
         artist_factory: Callable[[sqlite3.Connection], ArtistCacheDAO] | None = None,
         dry_run_artist_factory: Callable[[ArtistCacheDAO], ArtistCachePort] | None = None,
         maintenance_factory: Callable[[sqlite3.Connection], MaintenanceDAO] | None = None,
+        romanization_port_factory: Callable[[], RomanizationPort] | None = None,
         processor_factory: Callable[..., MusicProcessor] | None = None,
     ) -> None:
         """Create a service with overridable infrastructure factories.
@@ -103,6 +108,9 @@ class OrganizeMusicService:
         self._maintenance_factory: Callable[[sqlite3.Connection], MaintenanceDAO] = (
             maintenance_factory or MaintenanceDAO
         )
+        self._romanization_port_factory: Callable[[], RomanizationPort] = (
+            romanization_port_factory or MusicBrainzRomanizationAdapter
+        )
         self._processor_factory: Callable[..., MusicProcessor] = (
             processor_factory or MusicProcessor
         )
@@ -134,6 +142,8 @@ class OrganizeMusicService:
         else:
             artist_dao = base_artist_dao
 
+        romanization_port = self._romanization_port_factory()
+
         processor = self._processor_factory(
             base_path=request.base_path,
             dry_run=request.dry_run,
@@ -141,6 +151,7 @@ class OrganizeMusicService:
             before_gateway=before_dao,
             after_gateway=after_dao,
             artist_cache=artist_dao,
+            romanization_port=romanization_port,
             preview_cache=preview_dao,
             filesystem=filesystem,
         )

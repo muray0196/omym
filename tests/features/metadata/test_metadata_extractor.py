@@ -13,6 +13,7 @@ from pytest_mock import MockerFixture
 
 from omym.features.metadata import ArtistRomanizer
 from omym.features.metadata import MetadataExtractor
+from omym.features.metadata.usecases.ports import RomanizationPort
 from omym.shared import TrackMetadata
 
 # Type aliases for metadata dictionaries
@@ -244,7 +245,11 @@ class TestMetadataExtractor:
         test_file = tmp_path / "test.mp3"
         test_file.touch()
 
-        romanizer = ArtistRomanizer(enabled_supplier=lambda: True, fetcher=lambda _: "Hikaru Utada")
+        romanizer = ArtistRomanizer(
+            romanization_port=_NoOpRomanizationPort(),
+            enabled_supplier=lambda: True,
+            fetcher=lambda _: "Hikaru Utada",
+        )
         MetadataExtractor.configure_romanizer(romanizer)
 
         _ = mocker.patch.object(
@@ -258,7 +263,9 @@ class TestMetadataExtractor:
             assert metadata.artist == "Hikaru Utada"
             assert metadata.album_artist == "Hikaru Utada"
         finally:
-            MetadataExtractor.configure_romanizer(ArtistRomanizer())
+            MetadataExtractor.configure_romanizer(
+                ArtistRomanizer(romanization_port=_NoOpRomanizationPort())
+            )
             test_file.unlink()
 
     def test_m4a_extraction(
@@ -400,3 +407,24 @@ class TestMetadataExtractor:
                 _ = MetadataExtractor.extract(test_file)
         finally:
             test_file.unlink()
+class _NoOpRomanizationPort(RomanizationPort):
+    """Minimal romanization port stub used for extractor tests."""
+
+    def configure_cache(self, cache: object | None) -> None:  # pragma: no cover - trivial
+        del cache
+
+    def fetch_romanized_name(self, artist_name: str) -> str | None:  # pragma: no cover - unused
+        del artist_name
+        return None
+
+    def save_cached_name(
+        self,
+        original: str,
+        romanized: str,
+        *,
+        source: str | None = None,
+    ) -> None:  # pragma: no cover - trivial
+        del original
+        del romanized
+        del source
+

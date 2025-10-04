@@ -1,9 +1,5 @@
-"""Ports defining metadata use case dependencies.
-
-Where: features/metadata/usecases.
-What: Protocols capturing the interactions MusicProcessor needs.
-Why: Decouple use cases from concrete DB and cache adapters for testing and swaps.
-"""
+"""Summary: Ports defining metadata use case dependencies.
+Why: Decouple use cases from concrete adapters so tests and swaps stay simple."""
 
 from __future__ import annotations
 
@@ -82,6 +78,29 @@ class ArtistCachePort(Protocol):
 
     def clear_cache(self) -> bool:
         """Erase cached artist data."""
+        ...
+
+
+@runtime_checkable
+class RomanizationPort(Protocol):
+    """Port abstracting MusicBrainz romanization helpers."""
+
+    def configure_cache(self, cache: ArtistCachePort | None) -> None:
+        """Attach the persistence layer used by remote fetch helpers."""
+        ...
+
+    def fetch_romanized_name(self, artist_name: str) -> str | None:
+        """Retrieve a romanized name for ``artist_name`` when available."""
+        ...
+
+    def save_cached_name(
+        self,
+        original: str,
+        romanized: str,
+        *,
+        source: str | None = None,
+    ) -> None:
+        """Persist a romanized mapping so future runs reuse the value."""
         ...
 
 

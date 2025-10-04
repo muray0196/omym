@@ -1,9 +1,35 @@
+"""Summary: Tests for ArtistRomanizer behaviour.
+Why: Validate caching, fallback, and MusicBrainz port interactions."""
+
 from __future__ import annotations
 
-from pytest_mock import MockerFixture
-
 from omym.features.metadata import ArtistRomanizer
+from omym.features.metadata.usecases.ports import RomanizationPort
 from omym.shared import TrackMetadata
+
+
+class _StubRomanizationPort(RomanizationPort):
+    """In-memory stub capturing cache persistence calls."""
+
+    def __init__(self) -> None:
+        self.configured_with: object | None = None
+        self.saved: list[tuple[str, str, str | None]] = []
+
+    def configure_cache(self, cache: object | None) -> None:  # pragma: no cover - trivial
+        self.configured_with = cache
+
+    def fetch_romanized_name(self, artist_name: str) -> str | None:  # pragma: no cover - default unused
+        del artist_name
+        return None
+
+    def save_cached_name(
+        self,
+        original: str,
+        romanized: str,
+        *,
+        source: str | None = None,
+    ) -> None:
+        self.saved.append((original, romanized, source))
 
 
 class TestArtistRomanizer:
@@ -19,6 +45,7 @@ class TestArtistRomanizer:
             return "Hikaru Utada"
 
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: True,
             fetcher=fetcher,
             language_detector=lambda _: "ja",
@@ -34,6 +61,7 @@ class TestArtistRomanizer:
         """Skip MusicBrainz requests when feature flag is disabled."""
 
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: False,
             fetcher=lambda _: "ignored",
             language_detector=lambda _: "ja",
@@ -48,6 +76,7 @@ class TestArtistRomanizer:
         """Apply romanization to artist and album artist fields."""
 
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: True,
             fetcher=lambda _: "Hikaru Utada",
             language_detector=lambda _: "ja",
@@ -61,14 +90,11 @@ class TestArtistRomanizer:
         assert metadata.artist == "Hikaru Utada"
         assert metadata.album_artist == "Hikaru Utada"
 
-    def test_fallback_transliterator_used_when_fetcher_returns_none(
-        self, mocker: MockerFixture
-    ) -> None:
-        save_cached = mocker.patch(
-            "omym.features.metadata.usecases.extraction.artist_romanizer.save_cached_name"
-        )
+    def test_fallback_transliterator_used_when_fetcher_returns_none(self) -> None:
+        port = _StubRomanizationPort()
 
         romanizer = ArtistRomanizer(
+            romanization_port=port,
             enabled_supplier=lambda: True,
             fetcher=lambda _: None,
             language_detector=lambda _: "ja",
@@ -78,10 +104,11 @@ class TestArtistRomanizer:
         result = romanizer.romanize_name("宇多田ヒカル")
 
         assert result == "Fallback"
-        save_cached.assert_called_once_with("宇多田ヒカル", "Fallback", source="transliteration")
+        assert port.saved == [("宇多田ヒカル", "Fallback", "transliteration")]
 
     def test_musicbrainz_non_latin_value_triggers_transliterator(self) -> None:
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: True,
             fetcher=lambda _: "雀が原中学卓球部",
             language_detector=lambda _: "ja",
@@ -106,6 +133,7 @@ class TestArtistRomanizer:
             return "Should not happen"
 
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: True,
             fetcher=fetcher,
             language_detector=lambda _: "en",
@@ -130,6 +158,7 @@ class TestArtistRomanizer:
             return romanized_values[name]
 
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: True,
             fetcher=fetcher,
             language_detector=lambda _: "ja",
@@ -155,6 +184,7 @@ class TestArtistRomanizer:
             return "ja" if text == "佐藤貴文" else "en"
 
         romanizer = ArtistRomanizer(
+            romanization_port=_StubRomanizationPort(),
             enabled_supplier=lambda: True,
             fetcher=fetcher,
             language_detector=detector,
