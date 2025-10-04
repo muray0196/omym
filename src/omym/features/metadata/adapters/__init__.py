@@ -1,7 +1,7 @@
-"""src/omym/features/metadata/adapters/__init__.py
-What: Package marker for metadata adapters.
-Why: Allow adapter modules to live alongside use cases with a clear namespace."""
+"""Summary: Package marker for metadata adapters.
+Why: Keep adapter exports together for easy discovery."""
 
 from .filesystem_adapter import LocalFilesystemAdapter
+from .romanization_adapter import MusicBrainzRomanizationAdapter
 
-__all__ = ["LocalFilesystemAdapter"]
+__all__ = ["LocalFilesystemAdapter", "MusicBrainzRomanizationAdapter"]

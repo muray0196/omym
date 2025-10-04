@@ -1,12 +1,5 @@
-"""tests/features/metadata/test_romanization_coordinator.py
-Where: tests/features/metadata/test_romanization_coordinator.py
-What: Validate romanization coordinator cache handling with cached values.
-Why: Document current behaviour when cached values bypass MusicBrainz queries.
-Assumptions:
-- RomanizationCoordinator keeps `_romanizer` as the active ArtistRomanizer instance.
-Trade-offs:
-- Casting stubs through `object` avoids refactoring production constructors.
-"""
+"""Summary: Document behaviour when cached values bypass MusicBrainz queries.
+Why: Ensure the romanization coordinator honours cache-first resolution paths."""
 
 from __future__ import annotations
 
@@ -17,7 +10,7 @@ import pytest
 
 from omym.config.artist_name_preferences import ArtistNamePreferenceRepository
 from omym.features.metadata.usecases.extraction.romanization import RomanizationCoordinator
-from omym.features.metadata.usecases.ports import ArtistCachePort
+from omym.features.metadata.usecases.ports import ArtistCachePort, RomanizationPort
 
 
 class _StubPreferences:
@@ -74,10 +67,15 @@ def _as_preferences_stub() -> ArtistNamePreferenceRepository:
 
 
 @pytest.fixture
-def coordinator_components() -> tuple[RomanizationCoordinator, _StubArtistCache]:
+def coordinator_components() -> tuple[RomanizationCoordinator, _StubArtistCache, _StubRomanizationPort]:
     cache = _StubArtistCache(cached={"雀が原中学卓球部": "雀が原中学卓球部"})
     preferences = _as_preferences_stub()
-    coordinator = RomanizationCoordinator(preferences=preferences, artist_cache=cache)
+    port = _StubRomanizationPort()
+    coordinator = RomanizationCoordinator(
+        preferences=preferences,
+        artist_cache=cache,
+        romanization_port=cast(RomanizationPort, cast(object, port)),
+    )
 
     romanizer = getattr(coordinator, "_romanizer")
 
@@ -90,17 +88,19 @@ def coordinator_components() -> tuple[RomanizationCoordinator, _StubArtistCache]
 
     romanizer.language_detector = _detector  # type: ignore[attr-defined]
     romanizer.transliterator = _transliterator  # type: ignore[attr-defined]
-    return coordinator, cache
+    return coordinator, cache, port
 
 
 def test_non_latin_cache_returns_cached_value(
-    coordinator_components: tuple[RomanizationCoordinator, _StubArtistCache]
+    coordinator_components: tuple[
+        RomanizationCoordinator, _StubArtistCache, _StubRomanizationPort
+    ]
 ) -> None:
     """Existing cache entries are returned even when non-Latin."""
 
     target = "雀が原中学卓球部"
 
-    coordinator, cache = coordinator_components
+    coordinator, cache, port = coordinator_components
     coordinator.ensure_scheduled(target)
     result = coordinator.await_result(target)
 
@@ -108,3 +108,28 @@ def test_non_latin_cache_returns_cached_value(
     romanizer = getattr(coordinator, "_romanizer")
     assert romanizer.consume_last_result_source() is None  # type: ignore[attr-defined]
     assert cache.last_upsert is None
+    assert port.fetch_calls == []
+class _StubRomanizationPort(RomanizationPort):
+    """Stub port capturing configure, fetch, and save interactions."""
+
+    def __init__(self) -> None:
+        self.configured_with: object | None = None
+        self.fetch_calls: list[str] = []
+        self.saved: list[tuple[str, str, str | None]] = []
+
+    def configure_cache(self, cache: object | None) -> None:  # pragma: no cover - trivial
+        self.configured_with = cache
+
+    def fetch_romanized_name(self, artist_name: str) -> str | None:  # pragma: no cover - unused in tests
+        self.fetch_calls.append(artist_name)
+        return None
+
+    def save_cached_name(
+        self,
+        original: str,
+        romanized: str,
+        *,
+        source: str | None = None,
+    ) -> None:
+        self.saved.append((original, romanized, source))
+

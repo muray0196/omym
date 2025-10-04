@@ -1,9 +1,7 @@
 """Tests for music file processing functionality."""
 
-"""tests/features/metadata/test_music_file_processor.py
-What: Validate MusicProcessor orchestration across processing scenarios.
-Why: Dependency injection refactor must preserve behavior and contracts.
-"""
+"""Summary: Validate MusicProcessor orchestration across processing scenarios.
+Why: Ensure dependency injection continues to honour processing contracts."""
 
 import logging
 import sqlite3
@@ -27,7 +25,7 @@ from omym.features.metadata.adapters import LocalFilesystemAdapter
 from omym.features.metadata.usecases.extraction.artist_cache_adapter import (
     DryRunArtistCacheAdapter,
 )
-from omym.features.metadata.usecases.ports import FilesystemPort
+from omym.features.metadata.usecases.ports import FilesystemPort, RomanizationPort
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
 from omym.platform.db.daos.processing_before_dao import ProcessingBeforeDAO
@@ -79,10 +77,6 @@ def processor(mocker: MockerFixture, tmp_path: Path, file_hash: str) -> MusicPro
     Returns:
         MusicProcessor: A test processor.
     """
-    configure_patch = mocker.patch(
-        "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
-    )
-
     db_manager = mocker.MagicMock()
     db_manager.conn = mocker.MagicMock()
 
@@ -107,6 +101,7 @@ def processor(mocker: MockerFixture, tmp_path: Path, file_hash: str) -> MusicPro
     preview_dao.delete_preview.return_value = True
 
     filesystem = LocalFilesystemAdapter()
+    romanization_port = mocker.create_autospec(RomanizationPort, instance=True)
 
     processor = MusicProcessor(
         base_path=tmp_path,
@@ -115,10 +110,11 @@ def processor(mocker: MockerFixture, tmp_path: Path, file_hash: str) -> MusicPro
         before_gateway=before_dao,
         after_gateway=after_dao,
         artist_cache=artist_dao,
+        romanization_port=romanization_port,
         preview_cache=preview_dao,
         filesystem=filesystem,
     )
-    configure_patch.assert_called_once_with(artist_dao)
+    romanization_port.configure_cache.assert_called_once_with(artist_dao)
 
     _ = mocker.patch.object(processor, "_calculate_file_hash", return_value=file_hash)
 
@@ -1314,9 +1310,7 @@ class TestMusicProcessor:
 
         stub_db.connect()
 
-        configure_mock = mocker.patch(
-            "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
-        )
+        romanization_port = mocker.create_autospec(RomanizationPort, instance=True)
 
         processor = MusicProcessor(
             base_path=tmp_path,
@@ -1324,6 +1318,7 @@ class TestMusicProcessor:
             before_gateway=stub_before,
             after_gateway=stub_after,
             artist_cache=stub_artist,
+            romanization_port=romanization_port,
             preview_cache=stub_preview,
             filesystem=LocalFilesystemAdapter(),
         )
@@ -1334,7 +1329,7 @@ class TestMusicProcessor:
         assert processor.artist_dao is stub_artist
         assert processor.preview_dao is stub_preview
         assert stub_db.connect_called is True
-        configure_mock.assert_called_once_with(stub_artist)
+        romanization_port.configure_cache.assert_called_once_with(stub_artist)
 
         processor.db_manager.close()
 
@@ -1369,10 +1364,6 @@ def test_dry_run_skips_persistent_state(
         return_value=metadata,
     )
 
-    configure_patch = mocker.patch(
-        "omym.features.metadata.usecases.music_file_processor.configure_romanization_cache"
-    )
-
     db_manager = DatabaseManager(":memory:")
     db_manager.connect()
     conn = db_manager.conn
@@ -1382,6 +1373,7 @@ def test_dry_run_skips_persistent_state(
     after_dao = ProcessingAfterDAO(conn)
     preview_dao = ProcessingPreviewDAO(conn)
     artist_cache = DryRunArtistCacheAdapter(ArtistCacheDAO(conn))
+    romanization_port = mocker.create_autospec(RomanizationPort, instance=True)
 
     processor = MusicProcessor(
         base_path=destination_dir,
@@ -1390,10 +1382,11 @@ def test_dry_run_skips_persistent_state(
         before_gateway=before_dao,
         after_gateway=after_dao,
         artist_cache=artist_cache,
+        romanization_port=romanization_port,
         preview_cache=preview_dao,
         filesystem=LocalFilesystemAdapter(),
     )
-    configure_patch.assert_called_once_with(artist_cache)
+    romanization_port.configure_cache.assert_called_once_with(artist_cache)
     target_candidate = destination_dir / "Track.mp3"
     _ = mocker.patch.object(processor, "_generate_target_path", return_value=target_candidate)
 

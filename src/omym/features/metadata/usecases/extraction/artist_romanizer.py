@@ -1,14 +1,9 @@
-"""Artist romanization helpers using MusicBrainz.
-
-Where: src/omym/features/metadata/usecases/extraction/artist_romanizer.py
-What: Provide an artist romanization utility with caching and transliteration fallback.
-Why: Allow metadata extraction and pipeline components to reuse a single implementation.
-"""
+"""Summary: Artist romanization helpers using MusicBrainz.
+Why: Provide reusable caching and transliteration for metadata workflows."""
 
 from __future__ import annotations
 
 import unicodedata
-from dataclasses import dataclass, field
 from typing import Callable
 
 import langid
@@ -16,8 +11,8 @@ import pykakasi
 
 from omym.config.settings import MB_NON_LATIN_LANG_CODES, USE_MB_ROMANIZATION
 from omym.platform.logging import logger
-from omym.platform.musicbrainz.client import fetch_romanized_name
-from omym.platform.musicbrainz.cache import save_cached_name
+
+from ..ports import RomanizationPort
 
 from omym.shared.track_metadata import TrackMetadata
 
@@ -49,12 +44,6 @@ def _default_enabled() -> bool:
     return USE_MB_ROMANIZATION
 
 
-def _default_fetcher(name: str) -> str | None:
-    """Default fetcher delegating to the MusicBrainz client helper."""
-    logger.info("Querying MusicBrainz for romanized name: '%s'", name)
-    return fetch_romanized_name(name)
-
-
 def _default_language_detector(text: str) -> str | None:
     """Detect language code for deciding whether to romanize via MusicBrainz."""
 
@@ -78,7 +67,28 @@ def _default_transliterator(text: str) -> str:
         return text
 
 
-@dataclass(slots=True)
+class _NullRomanizationPort(RomanizationPort):
+    """No-op romanization port used when none is provided."""
+
+    def configure_cache(self, cache: object | None) -> None:  # pragma: no cover - trivial
+        del cache
+
+    def fetch_romanized_name(self, artist_name: str) -> str | None:  # pragma: no cover - trivial
+        del artist_name
+        return None
+
+    def save_cached_name(
+        self,
+        original: str,
+        romanized: str,
+        *,
+        source: str | None = None,
+    ) -> None:  # pragma: no cover - trivial
+        del original
+        del romanized
+        del source
+
+
 class ArtistRomanizer:
     """Romanize artist names using MusicBrainz WS2.
 
@@ -87,15 +97,47 @@ class ArtistRomanizer:
     the shared client module.
     """
 
-    enabled_supplier: Callable[[], bool] = field(default=_default_enabled)
-    fetcher: ArtistFetcher = field(default=_default_fetcher)
-    language_detector: LanguageDetector = field(default=_default_language_detector)
-    transliterator: Transliterator = field(default=_default_transliterator)
-    _cache: dict[str, str] = field(default_factory=dict, init=False)
-    _last_fetch_source: str | None = field(default=None, init=False, repr=False)
-    _last_fetch_original: str | None = field(default=None, init=False, repr=False)
-    _last_fetch_value: str | None = field(default=None, init=False, repr=False)
-    _last_result_source: str | None = field(default=None, init=False, repr=False)
+    __slots__: tuple[str, ...] = (
+        "_romanization_port",
+        "enabled_supplier",
+        "fetcher",
+        "language_detector",
+        "transliterator",
+        "_cache",
+        "_last_fetch_source",
+        "_last_fetch_original",
+        "_last_fetch_value",
+        "_last_result_source",
+    )
+
+    def __init__(
+        self,
+        *,
+        romanization_port: RomanizationPort | None = None,
+        enabled_supplier: Callable[[], bool] = _default_enabled,
+        fetcher: ArtistFetcher | None = None,
+        language_detector: LanguageDetector = _default_language_detector,
+        transliterator: Transliterator = _default_transliterator,
+    ) -> None:
+        self._romanization_port: RomanizationPort = (
+            romanization_port if romanization_port is not None else _NullRomanizationPort()
+        )
+        self.enabled_supplier: Callable[[], bool] = enabled_supplier
+        self.fetcher: ArtistFetcher = fetcher or self._build_default_fetcher()
+        self.language_detector: LanguageDetector = language_detector
+        self.transliterator: Transliterator = transliterator
+        self._cache: dict[str, str] = {}
+        self._last_fetch_source: str | None = None
+        self._last_fetch_original: str | None = None
+        self._last_fetch_value: str | None = None
+        self._last_result_source: str | None = None
+
+    def _build_default_fetcher(self) -> ArtistFetcher:
+        def _fetch(name: str) -> str | None:
+            logger.info("Querying MusicBrainz for romanized name: '%s'", name)
+            return self._romanization_port.fetch_romanized_name(name)
+
+        return _fetch
 
     def record_fetch_context(
         self,
@@ -206,7 +248,11 @@ class ArtistRomanizer:
                 fallback,
             )
             # Persist transliteration so CLI views surface the fallback result.
-            save_cached_name(text, fallback, source="transliteration")
+            self._romanization_port.save_cached_name(
+                text,
+                fallback,
+                source="transliteration",
+            )
             self._cache[text] = fallback
             self._last_result_source = "transliteration"
             return fallback

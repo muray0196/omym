@@ -9,6 +9,7 @@ review_cadence: quarterly
     - `domain/`: pure business rules for the feature.
     - `usecases/`: application services, commands, queries, and port protocols.
     - `adapters/`: infrastructure implementations (DB, filesystem, external APIs) that fulfil ports.
+      - `metadata/adapters/`: `LocalFilesystemAdapter` (filesystem helpers) and `MusicBrainzRomanizationAdapter` (MusicBrainz romanization port).
   - [`omym/platform/`](../src/omym/platform): Cross-cutting technical services—database manager, filesystem primitives, logging bootstrap, configuration providers, MusicBrainz HTTP client.
     - `musicbrainz/`: split into focused modules (`http_client`, `rate_limit`, `romanization`, `cache`, `user_agent`) with `client.py` acting as the public façade.
   - [`omym/shared/`](../src/omym/shared): Feature-agnostic value objects, typed results, error types, functional helpers.

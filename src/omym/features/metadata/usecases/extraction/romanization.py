@@ -1,9 +1,5 @@
-"""Romanization coordination utilities.
-
-Where: src/omym/features/metadata/usecases/extraction/romanization.py
-What: Coordinate artist name romanization across preferences, cache, and remote fetches.
-Why: Isolate asynchronous romanization concerns away from the main processor logic.
-"""
+"""Summary: Romanization coordination utilities.
+Why: Orchestrate cache, preference, and MusicBrainz lookups for artists."""
 
 from __future__ import annotations
 
@@ -11,10 +7,9 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Callable
 
 from omym.platform.logging import logger
-from omym.platform.musicbrainz.client import fetch_romanized_name
 
 from omym.config.artist_name_preferences import ArtistNamePreferenceRepository
-from ..ports import ArtistCachePort
+from ..ports import ArtistCachePort, RomanizationPort
 from .artist_romanizer import ArtistRomanizer
 from .track_metadata_extractor import MetadataExtractor
 
@@ -27,16 +22,19 @@ class RomanizationCoordinator:
         preferences: ArtistNamePreferenceRepository,
         artist_cache: ArtistCachePort,
         *,
+        romanization_port: RomanizationPort,
         executor_factory: Callable[[], ThreadPoolExecutor] | None = None,
     ) -> None:
         self._preferences: ArtistNamePreferenceRepository = preferences
         self._artist_cache: ArtistCachePort = artist_cache
+        self._romanization_port: RomanizationPort = romanization_port
         self._executor: ThreadPoolExecutor = (
             executor_factory()
             if executor_factory
             else ThreadPoolExecutor(max_workers=1, thread_name_prefix="mb-romanizer")
         )
         self._romanizer: ArtistRomanizer = ArtistRomanizer(
+            romanization_port=self._romanization_port,
             fetcher=self._fetch_with_persistent_cache
         )
         MetadataExtractor.configure_romanizer(self._romanizer)
@@ -80,7 +78,7 @@ class RomanizationCoordinator:
             )
             return cached
 
-        result = fetch_romanized_name(name)
+        result = self._romanization_port.fetch_romanized_name(name)
         self._romanizer.record_fetch_context(
             source="musicbrainz",
             original=trimmed,
