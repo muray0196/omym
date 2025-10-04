@@ -1,7 +1,5 @@
-"""Tests for maintenance flags in OrganizeMusicService.
-
-Focus on verifying delegation to DAOs rather than DB effects.
-"""
+"""Summary: Ensure OrganizeMusicService maintenance flags trigger DAO calls.
+Why: Guard against regressions where cache-clearing flags skip persistence layers."""
 
 from pathlib import Path
 from typing import cast
@@ -11,7 +9,11 @@ from omym.application.services.organize_service import (
     OrganizeMusicService,
     OrganizeRequest,
 )
-from omym.features.metadata.usecases.ports import ArtistCachePort, RomanizationPort
+from omym.features.metadata.usecases.ports import (
+    ArtistCachePort,
+    RenamerPorts,
+    RomanizationPort,
+)
 
 
 def test_clear_cache_uses_maintenance_dao(mocker: MockerFixture) -> None:
@@ -52,6 +54,8 @@ def test_clear_cache_uses_maintenance_dao(mocker: MockerFixture) -> None:
         romanization_port_kw = cast(RomanizationPort, kwargs["romanization_port"])
         romanization_port_kw.configure_cache(artist_cache_kw)
         proc_instance.romanization_port = romanization_port_kw
+        renamer_ports_kw = cast(RenamerPorts, kwargs["renamer_ports"])
+        assert renamer_ports_kw.file_name is not None
         return proc_instance
 
     mocked_proc = mocker.patch(
@@ -119,6 +123,8 @@ def test_clear_artist_cache_uses_artist_dao(mocker: MockerFixture) -> None:
         romanization_port_kw = cast(RomanizationPort, kwargs["romanization_port"])
         romanization_port_kw.configure_cache(artist_cache_kw)
         proc_instance.romanization_port = romanization_port_kw
+        renamer_ports_kw = cast(RenamerPorts, kwargs["renamer_ports"])
+        assert renamer_ports_kw.directory is not None
         return proc_instance
 
     _ = mocker.patch(

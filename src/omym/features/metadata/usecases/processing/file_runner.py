@@ -1,8 +1,5 @@
-# /*
-# Where: features/metadata/usecases/processing/file_runner.py
-# What: Shared implementation for per-file music processing orchestration.
-# Why: Keep MusicProcessor lean by isolating procedural flow and duplicate handling.
-# */
+"""Summary: Shared implementation for per-file music processing orchestration.
+Why: Keep MusicProcessor lean by isolating procedural flow and duplicate handling."""
 
 from __future__ import annotations
 
@@ -13,16 +10,13 @@ from pathlib import Path
 from dataclasses import asdict, replace
 from typing import Any, Protocol, cast
 
-from omym.features.path.usecases.renamer import (
-    CachedArtistIdGenerator,
-    DirectoryGenerator,
-    FileNameGenerator,
-)
-
 from ..assets import find_associated_lyrics, resolve_directory_artwork
 from ..ports import (
+    ArtistIdGeneratorPort,
     ArtistCachePort,
+    DirectoryNamingPort,
     FilesystemPort,
+    FileNameGenerationPort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
@@ -57,9 +51,9 @@ class ProcessorLike(Protocol):
     after_dao: ProcessingAfterPort
     artist_dao: ArtistCachePort
     preview_dao: PreviewCachePort
-    artist_id_generator: CachedArtistIdGenerator
-    directory_generator: DirectoryGenerator
-    file_name_generator: FileNameGenerator
+    artist_id_generator: ArtistIdGeneratorPort
+    directory_generator: DirectoryNamingPort
+    file_name_generator: FileNameGenerationPort
     SUPPORTED_EXTENSIONS: set[str]
     SUPPORTED_IMAGE_EXTENSIONS: set[str]
     filesystem: FilesystemPort

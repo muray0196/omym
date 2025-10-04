@@ -1,8 +1,5 @@
-"""Tests for application service that orchestrates organizing.
-
-These tests verify that the service constructs a MusicProcessor and delegates
-calls appropriately. Infra details are mocked so tests remain fast and stable.
-"""
+"""Summary: Validate OrganizeMusicService builds processors and delegates requests.
+Why: Ensure application wiring remains stable while infrastructure is mocked."""
 
 import logging
 import sqlite3
@@ -18,7 +15,11 @@ from omym.application.services.organize_service import (
 )
 from omym.features.metadata import ProcessResult
 from omym.features.metadata.adapters import LocalFilesystemAdapter
-from omym.features.metadata.usecases.ports import ArtistCachePort, RomanizationPort
+from omym.features.metadata.usecases.ports import (
+    ArtistCachePort,
+    RenamerPorts,
+    RomanizationPort,
+)
 
 
 def test_build_processor_constructs_music_processor(mocker: MockerFixture) -> None:
@@ -132,7 +133,9 @@ def test_build_processor_warns_and_continues_on_cache_clear_failure(
     def processor_factory(*_: object, **kwargs: object) -> object:
         romanization_port = cast(RomanizationPort, kwargs["romanization_port"])
         artist_cache = cast(ArtistCachePort, kwargs["artist_cache"])
+        renamer_ports = cast(RenamerPorts, kwargs["renamer_ports"])
         romanization_port.configure_cache(artist_cache)
+        assert renamer_ports.artist_id is not None
         return processor_mock
 
     _ = mocker.patch(

@@ -1,4 +1,5 @@
-"""Tests for duplicate handling path in file processing helpers."""
+"""Summary: Exercise duplicate-handling helpers around metadata processing.
+Why: Verify filesystem coordination and ID generation behave under duplicate flows."""
 
 from __future__ import annotations
 
@@ -11,8 +12,24 @@ from omym.features.metadata.usecases.processing import (
 )
 from omym.features.metadata.usecases.processing.file_context import FileProcessingContext
 from omym.features.metadata.usecases.processing.file_duplicate import handle_duplicate
-from omym.features.metadata.usecases.ports import ArtistCachePort, FilesystemPort
-from omym.features.path.usecases.renamer import CachedArtistIdGenerator
+from omym.features.metadata.usecases.ports import (
+    ArtistCachePort,
+    ArtistIdGeneratorPort,
+    FilesystemPort,
+)
+
+
+class StubArtistIdGenerator(ArtistIdGeneratorPort):
+    """Return deterministic identifiers for duplicate-handling tests."""
+
+    def __init__(self) -> None:
+        self.generated: list[str | None] = []
+
+    def generate(self, artist_name: str | None) -> str:
+        self.generated.append(artist_name)
+        if not artist_name:
+            return "UNKNOWN"
+        return artist_name.upper()[:6]
 
 
 class StubFilesystem(FilesystemPort):
@@ -68,13 +85,13 @@ class StubProcessor:
 
     dry_run: bool
     filesystem: FilesystemPort
-    artist_id_generator: CachedArtistIdGenerator
+    artist_id_generator: ArtistIdGeneratorPort
     log_calls: list[tuple[int, ProcessingEvent, str]]
 
     def __init__(self, filesystem: FilesystemPort) -> None:
         self.dry_run = False
         self.filesystem = filesystem
-        self.artist_id_generator = CachedArtistIdGenerator(StubArtistCache())
+        self.artist_id_generator = StubArtistIdGenerator()
         self.log_calls = []
 
     def log_processing(
