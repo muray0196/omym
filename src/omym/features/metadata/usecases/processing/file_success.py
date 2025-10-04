@@ -1,6 +1,6 @@
-"""src/omym/features/metadata/usecases/processing/file_success.py
-What: Finalise successful processing of a track file.
-Why: Keep the main runner lean by extracting post-move handling.
+"""
+Summary: Finalise successful processing of an organised track file.
+Why: Separate post-move handling from the main processing runner.
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ def complete_success(
             total=ctx.total,
             source_root=ctx.source_root,
             target_root=ctx.target_root,
+            filesystem=ctx.filesystem,
         )
         ctx.warnings.extend(summarize_lyrics(ctx.lyrics_result))
 
@@ -50,6 +51,7 @@ def complete_success(
             total=ctx.total,
             source_root=ctx.source_root,
             target_root=ctx.target_root,
+            filesystem=ctx.filesystem,
         )
         ctx.artwork_results.extend(artwork_plan)
         ctx.warnings.extend(summarize_artwork(artwork_plan))

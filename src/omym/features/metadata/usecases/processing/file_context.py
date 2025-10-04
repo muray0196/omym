@@ -1,6 +1,6 @@
-"""src/omym/features/metadata/usecases/processing/file_context.py
-What: Shared state container for per-file processing helpers.
-Why: Avoid long parameter lists when coordinating helper functions.
+"""
+Summary: Share per-file processor state across helper functions.
+Why: Reduce parameter churn while keeping dependencies explicit.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from .processing_types import (
     LyricsProcessingResult,
     ProcessingEvent,
 )
+from ..ports import FilesystemPort
 
 
 class ProcessorHooks(Protocol):
@@ -24,6 +25,7 @@ class ProcessorHooks(Protocol):
 
     dry_run: bool
     artist_id_generator: "CachedArtistIdGenerator"
+    filesystem: FilesystemPort
 
     def log_processing(
         self,
@@ -51,6 +53,12 @@ class FileProcessingContext:
     warnings: list[str] = field(default_factory=list)
     lyrics_result: LyricsProcessingResult | None = None
     artwork_results: list[ArtworkProcessingResult] = field(default_factory=list)
+
+    @property
+    def filesystem(self) -> FilesystemPort:
+        """Expose the filesystem port used by the active processor."""
+
+        return self.processor.filesystem
 
 
 __all__ = ["FileProcessingContext", "ProcessorHooks"]

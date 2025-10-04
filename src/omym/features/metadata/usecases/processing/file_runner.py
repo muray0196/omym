@@ -22,6 +22,7 @@ from omym.features.path.usecases.renamer import (
 from ..assets import find_associated_lyrics, resolve_directory_artwork
 from ..ports import (
     ArtistCachePort,
+    FilesystemPort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
@@ -61,6 +62,7 @@ class ProcessorLike(Protocol):
     file_name_generator: FileNameGenerator
     SUPPORTED_EXTENSIONS: set[str]
     SUPPORTED_IMAGE_EXTENSIONS: set[str]
+    filesystem: FilesystemPort
 
     def _calculate_file_hash(self, file_path: Path) -> str: ...
 

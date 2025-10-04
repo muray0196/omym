@@ -1,5 +1,5 @@
-"""src/omym/features/metadata/usecases/processing/file_duplicate.py
-What: Handle duplicate detection branch for file processing.
+"""
+Summary: Handle duplicate detection branch for file processing.
 Why: Keep the main runner concise by isolating duplicate logic.
 """
 
@@ -48,6 +48,7 @@ def handle_duplicate(
                 total=ctx.total,
                 source_root=ctx.source_root,
                 target_root=ctx.target_root,
+                filesystem=ctx.filesystem,
             )
             ctx.warnings.extend(summarize_lyrics(ctx.lyrics_result))
         if associated_artwork:
@@ -61,6 +62,7 @@ def handle_duplicate(
                 total=ctx.total,
                 source_root=ctx.source_root,
                 target_root=ctx.target_root,
+                filesystem=ctx.filesystem,
             )
             ctx.artwork_results.extend(artwork_plan)
             ctx.warnings.extend(summarize_artwork(artwork_plan))
@@ -75,6 +77,7 @@ def handle_duplicate(
             total=ctx.total,
             source_root=ctx.source_root,
             target_root=ctx.target_root,
+            filesystem=ctx.filesystem,
         )
         ctx.artwork_results.extend(artwork_plan)
         ctx.warnings.extend(summarize_artwork(artwork_plan))
