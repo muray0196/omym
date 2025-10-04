@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/file_context.py
+"""src/omym/features/metadata/usecases/processing/file_context.py
 What: Shared state container for per-file processing helpers.
 Why: Avoid long parameter lists when coordinating helper functions.
 """

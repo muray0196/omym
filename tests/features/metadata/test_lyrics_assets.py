@@ -2,9 +2,15 @@
 
 from pathlib import Path
 
-from omym.features.metadata.usecases.asset_logging import ProcessLogger
-from omym.features.metadata.usecases.lyrics_assets import process_lyrics, summarize_lyrics
-from omym.features.metadata.usecases.processing_types import LyricsProcessingResult, ProcessingEvent
+from omym.features.metadata.usecases.assets import (
+    ProcessLogger,
+    process_lyrics,
+    summarize_lyrics,
+)
+from omym.features.metadata.usecases.processing import (
+    LyricsProcessingResult,
+    ProcessingEvent,
+)
 
 
 class DummyLogger(ProcessLogger):

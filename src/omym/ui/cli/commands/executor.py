@@ -15,7 +15,7 @@ from omym.ui.cli.display.preview import PreviewDisplay
 from omym.ui.cli.display.progress import ProgressDisplay
 from omym.ui.cli.display.result import ResultDisplay
 from omym.ui.cli.models import UnprocessedSummary
-from omym.features.metadata.usecases.unprocessed_cleanup import (
+from omym.features.metadata.usecases.processing import (
     calculate_pending_unprocessed,
     snapshot_unprocessed_candidates,
 )

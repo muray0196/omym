@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/unprocessed_cleanup.py
+"""src/omym/features/metadata/usecases/processing/cleanup.py
 Where: Metadata feature usecases layer.
 What: Utilities to relocate unprocessed files into a dedicated review folder.
 Why: Keep directory processors focused while centralising fallback clean-up logic.
@@ -11,8 +11,8 @@ from pathlib import Path
 
 from omym.platform.logging import logger
 
+from ..ports import FilesystemPort
 from .processing_types import ProcessResult
-from .ports import FilesystemPort
 
 _LYRICS_COMPLETION_REASONS = {"already_at_target"}
 _ARTWORK_COMPLETION_REASONS = {"already_at_target"}

@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/asset_logging.py
+"""src/omym/features/metadata/usecases/assets/asset_logging.py
 What: Shared protocol definition for structured processing log callbacks.
 Why: Allow asset helpers to depend on a minimal logging contract.
 """
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .processing_types import ProcessingEvent
+from ..processing.processing_types import ProcessingEvent
 
 
 class ProcessLogger(Protocol):

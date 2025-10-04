@@ -18,7 +18,7 @@ from typing import cast
 
 import pytest
 
-from omym.features.metadata.usecases import file_operations
+from omym.features.metadata.usecases.processing import file_operations
 from omym.features.path import DirectoryGenerator, FileNameGenerator, SanitizerError
 from omym.shared.track_metadata import TrackMetadata
 

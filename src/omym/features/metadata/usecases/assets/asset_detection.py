@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/asset_detection.py
+"""src/omym/features/metadata/usecases/assets/asset_detection.py
 What: Detect nearby lyrics or artwork assets for a track file.
 Why: Share discovery logic between file processing flows.
 """

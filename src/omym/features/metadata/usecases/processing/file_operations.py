@@ -1,4 +1,4 @@
-# Path: `src/omym/features/metadata/usecases/file_operations.py`
+# Path: `src/omym/features/metadata/usecases/processing/file_operations.py`
 # Summary: File hashing, target path derivation, and move orchestration helpers.
 # Why: Shield orchestration from filesystem details while logging sanitization issues.
 
@@ -17,9 +17,9 @@ from omym.features.path import (
 )
 from omym.platform.logging import logger
 
-from .associated_assets import ProcessLogger
+from ..assets import ProcessLogger
+from ..ports import FilesystemPort
 from .processing_types import ProcessingEvent
-from .ports import FilesystemPort
 from omym.shared.track_metadata import TrackMetadata
 
 
