@@ -1,23 +1,19 @@
-# Where: src/omym/features/metadata/usecases/extraction/artist_cache_adapter.py
-# What: Dry-run artist cache adapter that now persists through to the backing DAO.
-# Why: Plan runs must pre-populate persistent caches so organising reuses stable IDs.
-# Assumptions:
-# - Plan/preview mode should leave filesystem untouched but may safely update SQLite caches.
-# - Delegate DAO enforces its own locking and validation around SQLite writes.
-# Trade-offs:
-# - Persisting during dry runs adds I/O; mitigate by keeping in-memory fallback when the DB fails.
-# - Delegate failures are swallowed to preserve historical dry-run behaviour.
+"""
+Summary: Dry-run artist cache adapter that persists via a delegate DAO while caching fallback state in memory.
+Why: Keep infrastructure-centric artist cache wiring inside the adapters layer to maintain pure use cases.
+"""
 
 from __future__ import annotations
 
 from sqlite3 import Connection
 from typing import ClassVar
 
+from omym.features.metadata.usecases.ports import ArtistCachePort
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.logging import logger
 
 
-class DryRunArtistCacheAdapter:
+class DryRunArtistCacheAdapter(ArtistCachePort):
     """Artist cache adapter that avoids persistent writes during dry runs."""
 
     _DEFAULT_SOURCE: ClassVar[str] = "musicbrainz"

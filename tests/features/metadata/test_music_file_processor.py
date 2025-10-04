@@ -21,9 +21,9 @@ from omym.features.metadata import (
     ProcessingEvent,
     ProcessResult,
 )
-from omym.features.metadata.adapters import LocalFilesystemAdapter
-from omym.features.metadata.usecases.extraction.artist_cache_adapter import (
+from omym.features.metadata.adapters import (
     DryRunArtistCacheAdapter,
+    LocalFilesystemAdapter,
 )
 from omym.features.metadata.usecases.ports import FilesystemPort, RomanizationPort
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO

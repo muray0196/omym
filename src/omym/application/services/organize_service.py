@@ -1,7 +1,6 @@
-"""Application service for organizing music files.
-
-This layer centralizes orchestration and construction of domain/infra objects
-so that multiple UIs (CLI, GUI) can reuse the same use cases.
+"""
+Summary: Application service that orchestrates organise flows across features and infrastructure.
+Why: Centralise wiring so each UI can reuse the same use cases without duplicating setup.
 """
 
 from __future__ import annotations
@@ -13,6 +12,7 @@ from typing import Callable, final
 
 from omym.features.metadata import MusicProcessor, ProcessResult
 from omym.features.metadata.adapters import (
+    DryRunArtistCacheAdapter,
     LocalFilesystemAdapter,
     MusicBrainzRomanizationAdapter,
 )
@@ -24,9 +24,6 @@ from omym.features.metadata.usecases.ports import (
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
-)
-from omym.features.metadata.usecases.extraction.artist_cache_adapter import (
-    DryRunArtistCacheAdapter,
 )
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.daos.processing_after_dao import ProcessingAfterDAO
