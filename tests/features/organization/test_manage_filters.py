@@ -1,10 +1,14 @@
-"""Tests for the filtering engine."""
+"""
+Summary: Tests for the filtering engine and its SQLite-backed adapter.
+Why: Verify refactored port wiring continues to register hierarchies and values correctly.
+"""
 
 import sqlite3
 
 import pytest
 
 from omym.features.organization import HierarchicalFilter
+from omym.features.organization.adapters import FilterDaoAdapter
 from omym.features.organization.usecases.ports import (
     FilterHierarchyRecord,
     FilterRegistryPort,
@@ -58,16 +62,17 @@ def filter_dao(conn: sqlite3.Connection) -> FilterDAO:
 
 
 @pytest.fixture
-def filter_engine(conn: sqlite3.Connection) -> HierarchicalFilter:
-    """Create a test filter engine.
+def filter_port(filter_dao: FilterDAO) -> FilterRegistryPort:
+    """Create the adapter exposing the DAO via the port interface."""
 
-    Args:
-        conn: SQLite database connection.
+    return FilterDaoAdapter(filter_dao)
 
-    Returns:
-        HierarchicalFilter: Filter engine instance.
-    """
-    return HierarchicalFilter(conn)
+
+@pytest.fixture
+def filter_engine(filter_port: FilterRegistryPort) -> HierarchicalFilter:
+    """Create a test filter engine."""
+
+    return HierarchicalFilter(filter_port=filter_port)
 
 
 def test_register_hierarchies(filter_engine: HierarchicalFilter) -> None:
