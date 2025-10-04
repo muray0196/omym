@@ -1,4 +1,4 @@
-"""src/omym/features/metadata/usecases/file_success.py
+"""src/omym/features/metadata/usecases/processing/file_success.py
 What: Finalise successful processing of a track file.
 Why: Keep the main runner lean by extracting post-move handling.
 """
@@ -9,9 +9,9 @@ import logging
 from pathlib import Path
 
 from omym.shared.track_metadata import TrackMetadata
-from .associated_assets import process_artwork, process_lyrics, summarize_artwork, summarize_lyrics
-from .processing_types import ProcessResult, ProcessingEvent
+from ..assets import process_artwork, process_lyrics, summarize_artwork, summarize_lyrics
 from .file_context import FileProcessingContext
+from .processing_types import ProcessResult, ProcessingEvent
 
 
 def complete_success(

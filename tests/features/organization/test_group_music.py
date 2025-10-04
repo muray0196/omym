@@ -38,7 +38,7 @@ def test_group_by_path_format_normalizes_components(
     )
 
     _ = mocker.patch(
-        "omym.features.metadata.usecases.track_metadata_extractor.MetadataExtractor.extract",
+        "omym.features.metadata.usecases.extraction.track_metadata_extractor.MetadataExtractor.extract",
         return_value=metadata,
     )
 

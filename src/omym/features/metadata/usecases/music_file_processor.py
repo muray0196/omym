@@ -27,14 +27,6 @@ from omym.platform.logging import logger
 from omym.platform.musicbrainz.client import configure_romanization_cache
 
 from omym.shared.track_metadata import TrackMetadata
-from .directory_runner import run_directory_processing
-from .file_runner import run_file_processing
-from .file_operations import calculate_file_hash, generate_target_path, move_file
-from .unprocessed_cleanup import (
-    calculate_pending_unprocessed,
-    relocate_unprocessed_files,
-    snapshot_unprocessed_candidates,
-)
 from .ports import (
     ArtistCachePort,
     DatabaseManagerPort,
@@ -43,11 +35,21 @@ from .ports import (
     ProcessingAfterPort,
     ProcessingBeforePort,
 )
-from .processing_types import ProcessingEvent
+from .processing import (
+    ProcessingEvent,
+    calculate_file_hash,
+    calculate_pending_unprocessed,
+    generate_target_path,
+    move_file,
+    relocate_unprocessed_files,
+    run_directory_processing,
+    run_file_processing,
+    snapshot_unprocessed_candidates,
+)
 from .extraction.romanization import RomanizationCoordinator
 
 if TYPE_CHECKING:
-    from .processing_types import ProcessResult
+    from .processing import ProcessResult
 
 class MusicProcessor:
     """Process music files for organization."""

@@ -1,9 +1,7 @@
-"""src/omym/features/metadata/usecases/associated_assets.py
-What: Convenience re-export for asset detection and handling helpers.
-Why: Preserve existing import surface while splitting hefty modules.
 """
-
-from __future__ import annotations
+Summary: Provide a cohesive import surface for metadata asset helpers.
+Why: Simplify callers referencing lyrics/artwork utilities after package split.
+"""
 
 from .asset_detection import find_associated_lyrics, resolve_directory_artwork
 from .asset_logging import ProcessLogger

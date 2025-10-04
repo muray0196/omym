@@ -5,7 +5,8 @@
 from omym.shared.track_metadata import TrackMetadata
 from .usecases.extraction import ArtistRomanizer, MetadataExtractor
 from .usecases.music_file_processor import MusicProcessor
-from .usecases.processing_types import (
+from .usecases import assets, processing
+from .usecases.processing import (
     ArtworkProcessingResult,
     DirectoryRollbackError,
     LyricsProcessingResult,
@@ -26,6 +27,8 @@ __all__ = [
     "ArtistRomanizer",
     "MusicProcessor",
     "MetadataExtractor",
+    "assets",
+    "processing",
     "ProcessingEvent",
     "ProcessResult",
     "DirectoryRollbackError",

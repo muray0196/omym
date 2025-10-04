@@ -1,5 +1,5 @@
 # /*
-# Where: features/metadata/usecases/file_runner.py
+# Where: features/metadata/usecases/processing/file_runner.py
 # What: Shared implementation for per-file music processing orchestration.
 # Why: Keep MusicProcessor lean by isolating procedural flow and duplicate handling.
 # */
@@ -19,19 +19,19 @@ from omym.features.path.usecases.renamer import (
     FileNameGenerator,
 )
 
-from .asset_detection import find_associated_lyrics, resolve_directory_artwork
-from .file_context import FileProcessingContext
-from .file_duplicate import handle_duplicate
-from .file_success import complete_success
-from .ports import (
+from ..assets import find_associated_lyrics, resolve_directory_artwork
+from ..ports import (
     ArtistCachePort,
     PreviewCachePort,
     ProcessingAfterPort,
     ProcessingBeforePort,
 )
+from ..extraction.romanization import RomanizationCoordinator
+from ..extraction.track_metadata_extractor import MetadataExtractor
+from .file_context import FileProcessingContext
+from .file_duplicate import handle_duplicate
+from .file_success import complete_success
 from .processing_types import ProcessResult, ProcessingEvent
-from .extraction.romanization import RomanizationCoordinator
-from .extraction.track_metadata_extractor import MetadataExtractor
 from omym.shared.track_metadata import TrackMetadata
 
 
