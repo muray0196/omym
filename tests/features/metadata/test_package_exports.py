@@ -42,3 +42,14 @@ def test_processing_package_exports() -> None:
 
     for name in expected_names:
         assert hasattr(processing, name), f"Missing export: {name}"
+
+
+def test_metadata_package_reexports_helper_packages() -> None:
+    """Top-level metadata package should surface helper packages."""
+
+    metadata_pkg = import_module("omym.features.metadata")
+    assets_pkg = import_module("omym.features.metadata.usecases.assets")
+    processing_pkg = import_module("omym.features.metadata.usecases.processing")
+
+    assert metadata_pkg.assets is assets_pkg
+    assert metadata_pkg.processing is processing_pkg
