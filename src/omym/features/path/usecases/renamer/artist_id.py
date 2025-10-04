@@ -1,8 +1,6 @@
-"""Artist ID generation helpers.
-
-Where: features/path/usecases/renamer/artist_id.py
-What: Derive deterministic artist identifiers with transliteration and sanitization.
-Why: Decouple ID heuristics from higher-level use cases for reuse and testing.
+"""
+Summary: Generate deterministic artist identifiers with transliteration and sanitization.
+Why: Reuse consistent heuristics across use cases while centralizing logging concerns.
 """
 
 from __future__ import annotations

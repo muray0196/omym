@@ -1,8 +1,7 @@
-# Path: `tests/features/path/test_music_file_renamer.py`
-# Summary: Exercise renamer helpers and ensure sanitization failures are logged.
-# Why: Validate that use cases handle domain exceptions without crashing.
-
-"""Test renaming logic functionality."""
+"""
+Summary: Exercise renamer helpers and ensure sanitization failures are logged.
+Why: Validate that use cases handle domain exceptions without crashing.
+"""
 
 from pathlib import Path
 

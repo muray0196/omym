@@ -1,8 +1,7 @@
-# Path: `tests/features/path/test_path_generator.py`
-# Summary: Verify path generation success and logging for failure scenarios.
-# Why: Confirm use cases surface domain issues without relying on domain logging.
-
-"""Tests for the path generation system."""
+"""
+Summary: Verify path generation success and logging for failure scenarios.
+Why: Confirm use cases surface domain issues without relying on domain logging.
+"""
 
 import sqlite3
 from pathlib import Path

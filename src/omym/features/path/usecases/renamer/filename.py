@@ -1,8 +1,7 @@
-# Path: `src/omym/features/path/usecases/renamer/filename.py`
-# Summary: Generate sanitized track file names with cached artist identifiers.
-# Why: Handle sanitization failures outside the domain layer and log them once.
-
-"""File name generation helpers."""
+"""
+Summary: Generate sanitized track file names with cached artist identifiers.
+Why: Handle sanitization failures outside the domain layer and log them once.
+"""
 
 from __future__ import annotations
 

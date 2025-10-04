@@ -1,6 +1,7 @@
-# Path: `src/omym/features/path/domain/path_elements.py`
-# Summary: Domain abstractions for album artist and album path components.
-# Why: Provide deterministic component ordering without leaking logging concerns.
+"""
+Summary: Domain abstractions for album artist and album path components.
+Why: Provide deterministic component ordering without leaking logging concerns.
+"""
 
 from abc import ABC, abstractmethod
 from typing import ClassVar, final, override

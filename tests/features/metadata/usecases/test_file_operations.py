@@ -1,13 +1,13 @@
-# Path: `tests/features/metadata/usecases/test_file_operations.py`
-# Summary: Validate hashing and target path generation behaviours in metadata use cases.
-# Why: Confirm sanitization failures propagate as logged errors instead of silent domain logs.
-
-"""Where: tests/features/metadata/usecases/test_file_operations.py
-What: Regression tests for file hashing behaviour in metadata use cases.
-Why: Ensure hashing results stay stable when chunk sizing is configurable.
-Assumptions: - hashlib.sha256 remains deterministic for identical inputs.
-Trade-offs: - Uses monkeypatch to override module constant instead of config reload.
 """
+Summary: Validate hashing and target path generation behaviours in metadata use cases.
+Why: Confirm sanitization failures propagate as logged errors instead of silent domain logs.
+"""
+
+# Where: tests/features/metadata/usecases/test_file_operations.py
+# What: Regression tests for file hashing behaviour in metadata use cases.
+# Why: Ensure hashing results stay stable when chunk sizing is configurable.
+# Assumptions: - hashlib.sha256 remains deterministic for identical inputs.
+# Trade-offs: - Uses monkeypatch to override module constant instead of config reload.
 
 from __future__ import annotations
 

@@ -1,8 +1,6 @@
-"""Cached artist ID generation.
-
-Where: features/path/usecases/renamer/cached_artist_id.py
-What: Wrap artist ID generator with persistence-aware caching and validation.
-Why: Keep cache coordination isolated so other modules can reuse the logic.
+"""
+Summary: Wrap artist ID generation with caching and validation helpers.
+Why: Keep persistence coordination isolated while exposing a simple interface to use cases.
 """
 
 from __future__ import annotations

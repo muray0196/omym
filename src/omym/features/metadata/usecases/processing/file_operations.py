@@ -1,6 +1,7 @@
-# Path: `src/omym/features/metadata/usecases/processing/file_operations.py`
-# Summary: File hashing, target path derivation, and move orchestration helpers.
-# Why: Shield orchestration from filesystem details while logging sanitization issues.
+"""
+Summary: File hashing, target path derivation, and move orchestration helpers.
+Why: Shield orchestration from filesystem details while logging sanitization issues.
+"""
 
 from __future__ import annotations
 
