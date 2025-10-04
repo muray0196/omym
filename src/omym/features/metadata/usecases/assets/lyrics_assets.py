@@ -1,7 +1,6 @@
-"""src/omym/features/metadata/usecases/assets/lyrics_assets.py
-Where: Metadata feature usecases layer.
-What: Handle movement and summarisation of lyrics files tied to tracks.
-Why: Keep lyrics-specific side effects isolated from core processing logic.
+"""
+Summary: Move and summarise lyrics files alongside processed tracks.
+Why: Ensure lyrics logic stays pure by relying on filesystem ports.
 """
 
 from __future__ import annotations
@@ -10,10 +9,9 @@ import logging
 import shutil
 from pathlib import Path
 
-from omym.platform.filesystem import ensure_parent_directory
-
 from .asset_logging import ProcessLogger
 from ..processing.processing_types import LyricsProcessingResult, ProcessingEvent
+from ..ports import FilesystemPort
 
 
 def process_lyrics(
@@ -27,6 +25,7 @@ def process_lyrics(
     total: int | None,
     source_root: Path,
     target_root: Path,
+    filesystem: FilesystemPort,
 ) -> LyricsProcessingResult:
     """Move a lyrics file so that it matches the target music file path."""
 
@@ -132,7 +131,7 @@ def process_lyrics(
         )
 
     try:
-        _ = ensure_parent_directory(target_lyrics_path)
+        _ = filesystem.ensure_parent_directory(target_lyrics_path)
         _ = shutil.move(str(lyrics_path), str(target_lyrics_path))
     except Exception as exc:  # pragma: no cover - defensive logging
         error_message = str(exc) if str(exc) else type(exc).__name__

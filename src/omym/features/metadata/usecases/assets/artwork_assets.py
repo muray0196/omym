@@ -1,7 +1,6 @@
-"""src/omym/features/metadata/usecases/assets/artwork_assets.py
-Where: Metadata feature usecases layer.
-What: Handle movement and summarisation of artwork files for tracks.
-Why: Separate artwork-specific behaviour from the core processor.
+"""
+Summary: Move and summarise artwork files during metadata processing.
+Why: Keep artwork-specific filesystem behaviour isolated behind ports.
 """
 
 from __future__ import annotations
@@ -11,10 +10,9 @@ import shutil
 from pathlib import Path
 from collections.abc import Iterable
 
-from omym.platform.filesystem import ensure_parent_directory
-
 from .asset_logging import ProcessLogger
 from ..processing.processing_types import ArtworkProcessingResult, ProcessingEvent
+from ..ports import FilesystemPort
 
 
 def process_artwork(
@@ -28,6 +26,7 @@ def process_artwork(
     total: int | None,
     source_root: Path,
     target_root: Path,
+    filesystem: FilesystemPort,
 ) -> list[ArtworkProcessingResult]:
     """Move artwork files so they follow the resolved track target."""
 
@@ -184,7 +183,7 @@ def process_artwork(
             continue
 
         try:
-            _ = ensure_parent_directory(target_artwork_path)
+            _ = filesystem.ensure_parent_directory(target_artwork_path)
             _ = shutil.move(str(artwork_path), str(target_artwork_path))
         except Exception as exc:
             error_message = str(exc) if str(exc) else type(exc).__name__

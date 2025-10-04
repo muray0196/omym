@@ -16,6 +16,7 @@ from typing import Any, cast
 
 from omym.features.metadata.usecases.ports import (
     ArtistCachePort,
+    FilesystemPort,
     ProcessingAfterPort,
     ProcessingBeforePort,
     PreviewCachePort,
@@ -95,6 +96,17 @@ class _StubPreviewDAO(PreviewCachePort):
     def delete_preview(self, file_hash: str) -> bool:
         del file_hash
         return True
+
+
+class _StubFilesystem(FilesystemPort):
+    """Filesystem port stub ensuring target directories exist."""
+
+    def ensure_parent_directory(self, path: Path) -> Path:
+        _ = path.parent.mkdir(parents=True, exist_ok=True)
+        return path.parent
+
+    def remove_empty_directories(self, directory: Path) -> None:  # pragma: no cover - unused
+        del directory
 
 
 class _StubArtistDAO(ArtistCachePort):
@@ -182,6 +194,7 @@ class _StubProcessor:
         self._romanization = _StubRomanization()
         self._new_target = new_target
         self.move_calls = []
+        self.filesystem: FilesystemPort = _StubFilesystem()
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         del file_path

@@ -1,4 +1,9 @@
-"""Unit tests for lyrics asset helpers."""
+"""
+Summary: Exercise lyrics asset helpers and filesystem port integration.
+Why: Ensure lyrics moves rely on injected filesystem behavior.
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -11,6 +16,21 @@ from omym.features.metadata.usecases.processing import (
     LyricsProcessingResult,
     ProcessingEvent,
 )
+
+
+class StubFilesystem:
+    """Track filesystem interactions for assertions."""
+
+    def __init__(self) -> None:
+        self.ensure_calls: list[Path] = []
+
+    def ensure_parent_directory(self, path: Path) -> Path:
+        self.ensure_calls.append(path)
+        _ = path.parent.mkdir(parents=True, exist_ok=True)
+        return path.parent
+
+    def remove_empty_directories(self, directory: Path) -> None:  # pragma: no cover - unused
+        del directory
 
 
 class DummyLogger(ProcessLogger):
@@ -38,6 +58,8 @@ def test_process_lyrics_missing_source(tmp_path: Path) -> None:
     audio_target = tmp_path / "Album" / "track.mp3"
     lyrics_source = tmp_path / "track.lrc"
 
+    filesystem = StubFilesystem()
+
     result = process_lyrics(
         lyrics_source,
         audio_target,
@@ -48,6 +70,7 @@ def test_process_lyrics_missing_source(tmp_path: Path) -> None:
         total=1,
         source_root=tmp_path,
         target_root=tmp_path,
+        filesystem=filesystem,
     )
 
     assert result.moved is False
@@ -85,6 +108,8 @@ def test_process_lyrics_already_at_target(tmp_path: Path) -> None:
     _ = lyrics_source.parent.mkdir(parents=True)
     _ = lyrics_source.touch()
 
+    filesystem = StubFilesystem()
+
     result = process_lyrics(
         lyrics_source,
         audio_target,
@@ -95,6 +120,7 @@ def test_process_lyrics_already_at_target(tmp_path: Path) -> None:
         total=1,
         source_root=tmp_path,
         target_root=library_root,
+        filesystem=filesystem,
     )
 
     assert result.moved is False
@@ -106,3 +132,30 @@ def test_process_lyrics_already_at_target(tmp_path: Path) -> None:
         event is ProcessingEvent.LYRICS_SKIP_ALREADY_AT_TARGET
         for _, event, _ in logger.calls
     )
+
+
+def test_process_lyrics_invokes_filesystem_port(tmp_path: Path) -> None:
+    """Successful lyrics moves must ensure the destination via the filesystem port."""
+
+    logger = DummyLogger()
+    filesystem = StubFilesystem()
+    audio_target = tmp_path / "Library" / "Artist" / "Album" / "track.mp3"
+    lyrics_source = tmp_path / "track.lrc"
+    _ = lyrics_source.write_text("[00:00.00]Hello world\n")
+
+    result = process_lyrics(
+        lyrics_source,
+        audio_target,
+        dry_run=False,
+        log=logger,
+        process_id="pid",
+        sequence=1,
+        total=1,
+        source_root=tmp_path,
+        target_root=tmp_path / "Library",
+        filesystem=filesystem,
+    )
+
+    assert result.moved is True
+    assert filesystem.ensure_calls == [audio_target.with_suffix(".lrc")]
+
