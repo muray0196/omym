@@ -1,11 +1,8 @@
-"""Metadata extraction subpackage.
-
-Where: src/omym/features/metadata/usecases/extraction/__init__.py
-What: Expose public entry points for metadata extraction components.
-Why: Provide a single import surface after reorganizing extraction modules.
+"""
+Summary: Public surface for metadata extraction modules.
+Why: Provide a stable import path for orchestrators and tests.
 """
 
-from .artist_cache_adapter import DryRunArtistCacheAdapter
 from .artist_romanizer import ArtistRomanizer
 from .format_extractors import (
     DsfExtractor,
@@ -19,7 +16,6 @@ from .track_metadata_extractor import MetadataExtractor
 __all__ = [
     "MetadataExtractor",
     "ArtistRomanizer",
-    "DryRunArtistCacheAdapter",
     "Mp3Extractor",
     "FlacExtractor",
     "OpusExtractor",

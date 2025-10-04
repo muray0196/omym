@@ -1,11 +1,7 @@
-# Where: tests/features/metadata/usecases/test_artist_cache_adapter.py
-# What: Regression tests for dry-run artist cache adapter persistence behaviour.
-# Why: Ensure plan mode writes reach SQLite so later organise runs reuse identifiers.
-# Assumptions:
-# - DatabaseManager initialises the artist_cache schema on connect.
-# - ArtistCacheDAO enforces upsert semantics for IDs and romanised names.
-# Trade-offs:
-# - Tests rely on SQLite writes, incurring minor IO cost but covering persistence.
+"""
+Summary: Regression tests for dry-run artist cache adapter persistence behaviour.
+Why: Ensure dry-run mode still seeds persistent caches for subsequent organise runs.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +9,7 @@ from pathlib import Path
 from sqlite3 import Connection
 from typing import cast
 
-from omym.features.metadata.usecases.extraction.artist_cache_adapter import DryRunArtistCacheAdapter
+from omym.features.metadata.adapters import DryRunArtistCacheAdapter
 from omym.features.path.usecases.renamer import ArtistIdGenerator
 from omym.platform.db.cache.artist_cache_dao import ArtistCacheDAO
 from omym.platform.db.db_manager import DatabaseManager
