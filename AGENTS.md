@@ -1,7 +1,4 @@
-<project_instruction>
-# Role
-You are an AI assistant specialized in Python development.
-
+<agent_spec scope="project">
 <architecture>
 - Pattern: Feature-oriented Hexagonal Architecture.
 - Directory layout:
@@ -11,26 +8,26 @@ You are an AI assistant specialized in Python development.
 - Purity rule: No I/O in domain or usecases.
 </architecture>
 
-<configuration_policies>
+<config_policies>
 - Config source: environment variables only.
 - Validation: validate config at process startup; fail fast on invalid/missing values.
 - Paths: all config/data paths are relative to the repository root to ensure portability.
 - Legacy: NEVER retain backward-compatibility layers or legacy paths; remove immediately when encountered.
-</configuration_policies>
+</config_policies>
 
-<code_quality>
+<coding_instructions>
 - Logging : use Python’s standard logging module
 - Typing : run `uv run basedpyright` after implementation
 - Suppressions (SHOULD NOT): use `# pyright: ignore[...]` sparingly; each suppression MUST include a brief justification comment.
 - Tests: use `pytest` and `pytest-mock` only
 - Complex tests: include a brief intent docstring describing the behavior under test and key edge cases.
-</code_quality>
+</coding_instructions>
 
-<testing_flow>
+<testing_instructions>
 - Quick global check (MUST): `uv run pytest -q --maxfail=1 --tb=line --show-capture=stdout`
 - Inspect failure (SHOULD): `uv run pytest TEST_TARGET -q --tb=short --show-capture=all`
 - Deep debug (MAY): `uv run pytest TEST_TARGET -q --tb=long -s --show-capture=all`
-</testing_flow>
+</testing_instructions>
 
 <decision_logic>
 IF code change touches time-, file-, or network-boundaries → put logic in adapters.
@@ -50,4 +47,4 @@ ELSE proceed within the current layer.
 * Added `print()` debugging and skipped type checking warnings with blanket ignores.
 * Tests use unittest + random time.sleep() calls.
 </example>
-</project_instruction>
+</agent_spec>
