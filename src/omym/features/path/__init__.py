@@ -1,6 +1,7 @@
-# Path: `src/omym/features/path/__init__.py`
-# Summary: Export path feature domain and use case symbols.
-# Why: Provide a stable import surface for adapters and tests.
+"""
+Summary: Export path feature domain and use case symbols.
+Why: Provide a stable import surface for adapters and tests.
+"""
 
 from omym.shared.path_components import ComponentValue
 

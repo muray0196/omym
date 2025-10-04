@@ -1,8 +1,7 @@
-# Path: `src/omym/features/path/usecases/renamer/directory.py`
-# Summary: Generate album directory structures with sanitized metadata.
-# Why: Catch sanitization errors at the use case boundary for proper logging.
-
-"""Directory generation helpers."""
+"""
+Summary: Generate album directory structures with sanitized metadata.
+Why: Catch sanitization errors at the use case boundary for proper logging.
+"""
 
 from __future__ import annotations
 

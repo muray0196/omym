@@ -1,8 +1,7 @@
-# Path: `tests/features/path/test_path_elements.py`
-# Summary: Validate domain path component creation and sanitization behaviors.
-# Why: Ensure domain raises errors instead of logging directly.
-
-"""Tests for path component functionality."""
+"""
+Summary: Validate domain path component creation and sanitization behaviors.
+Why: Ensure domain raises errors instead of logging directly.
+"""
 
 import pytest
 from typing import override

@@ -1,6 +1,7 @@
-# Path: `src/omym/features/path/domain/sanitizer.py`
-# Summary: Pure sanitization helpers for file and directory components.
-# Why: Keep normalization logic in the domain without side effects like logging.
+"""
+Summary: Pure sanitization helpers for file and directory components.
+Why: Keep normalization logic in the domain without side effects like logging.
+"""
 
 import re
 import unicodedata
